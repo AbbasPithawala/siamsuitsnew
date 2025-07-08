@@ -1,0 +1,111 @@
+.newOrderBg {
+    border: 0;
+    padding: 4px 10px;
+    border-radius: 5px;
+    color: #009e15;
+    background: #009e153d;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+}
+.ProcessingBg {
+    border: 0;
+    padding: 4px 10px;
+    border-radius: 5px;
+    color: #1300a5;
+    background: #334ad73d;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+}
+.ModifiedBg {
+    border: 0;
+    padding: 4px 10px;
+    border-radius: 5px;
+    color: #cb7400;
+    background: #fff00045;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+}
+.ShipmentBg {
+    border: 0;
+    padding: 4px 10px;
+    border-radius: 5px;
+    color: #000000;
+    background: #3d3d3d45;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+}
+.SentBg {
+    border: 0;
+    padding: 4px 10px;
+    border-radius: 5px;
+    color: #a200ff;
+    background: #be00ff26;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+}
+.newOrder-back-btn{
+    background-color: #1c4d8f !important;
+    border: 1px solid #1c4d8f !important;
+    color: white !important;
+    padding: 10px 25px !important;
+    margin-left: 15px;
+    font-size: 14px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.left-side{
+    display: inline-block;
+    text-align: left;
+}
+.rigth-side{
+    display: inline-flex;
+    text-align: right;
+    margin-left: auto;
+}
+.divide{
+display: inline-flex;
+width: 100%;
+align-items: center;
+}
+.c1 {
+    margin-bottom: 0px !important;
+    margin-top: 0px !important;
+}
+
+.order-type-div div{
+    padding: 22px 50px;
+    font-size: 15px;
+    margin: 0 10px;
+    border: solid 0.5px;
+    font-weight: 550;
+    border-color: #DDDDDD;
+    border-radius: 7px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.order-type-div div:hover{
+    background: #1c4d8f;
+    color: #fff;
+}
+
+.active{
+    background: #1c4d8f !important;
+    color: #fff !important;
+}
+
+.inActive{
+    background: #fff !important;
+    color: #000000 !important;
+}
+
+.order-type-div{
+    margin: 25px 4px 0 0;
+    border-bottom: solid 2px #DDDDDD;
+    padding-bottom: 16px;
+}

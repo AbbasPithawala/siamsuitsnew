@@ -1,0 +1,12 @@
+
+
+.rushOrderButton{
+  background-color: #F77777!important;
+}
+
+
+/* abbas */
+
+div.missingFabricDailogueBox:nth-of-type(2) .MuiPaper-root{
+  height: 100% !important;
+}

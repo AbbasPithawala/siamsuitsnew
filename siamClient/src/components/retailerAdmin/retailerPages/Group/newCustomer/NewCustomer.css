@@ -1,0 +1,164 @@
+#leftside-navigation .MuiButtonBase-root {
+  display: flex;
+  padding: 0 15px;
+}
+.MuiStepIcon-root.MuiStepIcon-completed {
+  color: #1c4d8f !important;
+}
+.MuiStepIcon-root.MuiStepIcon-active {
+  color: #1c4d8f !important;
+}
+
+
+
+/* nijniunuin */
+
+.step-formSteps .form-group {
+  width: 33.33%;
+  display: inline-block;
+}
+.steop-one-wrapper{
+  padding-bottom:2rem;
+}
+
+.fileupload-box_NM {
+  border-bottom: 2px solid #ddd;
+  margin-bottom: 50px !important;
+  /* height: 300px;
+  width: 300px;
+  border: 6px solid #184787;
+  border-radius: 7px; */
+  padding: 1rem;
+  padding-bottom: 30px;
+  text-align: center;
+  margin: 0 auto;
+  margin-top: 25px;
+}
+
+.upload-image{
+  color: #1C4D8F !important;
+}
+.upload-image:hover{
+  opacity: 95%;
+  cursor: pointer;
+}
+.fileupload-box_NM h4 {
+  font-weight: 550;
+  margin-top: 0.4rem;
+  margin-bottom:0.4rem;
+  color: #051a2d;
+  font-size: 18px;
+}
+.fileupload-box_NM p {
+  color: #777;
+  margin: 0;
+}
+.fileupload-box_NM h5 {
+  font-size: 16px;
+  font-weight: 500;
+  padding-top: 0.2rem;
+  margin: 18px;
+  color: #051a2d;
+  padding-bottom:0.2rem;
+}
+
+.upload-webcam-buttons input {
+  display: none;
+}
+
+.upload-webcam-buttons .input-file-button {
+  padding: 10px 24px;
+  top: 0;
+  background-color: #1c4d8f;
+  border: 0;
+  border-radius: 7px;
+  color: white;
+  font-size: 14px;
+  transition: 100ms ease-out;
+  cursor: pointer;
+  font-weight: 500;
+  font-family: 'Montserrat', sans-serif !important;
+}
+
+.input-file-outer {
+  margin-right: 10px;
+}
+.upload-webcam-buttons {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-webcam-buttons .custom-btn {
+  background-color: #D1DBE9!important;
+  color: #1c4d8f !important;
+}
+
+.customer-text .form-group {
+  display: flex;
+}
+
+.customer-text {
+  margin-top: 50px;
+}
+
+.customer-text .form-group label {
+  color: #1c4d8f;
+  font-weight: 600;
+}
+
+.image-note label {
+  display: block;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 550;
+  color: #777;
+}
+.image-note textarea:focus-visible {
+  outline: 0;
+}
+
+/* .upload-image {
+  margin: 10px 0;
+  width: 80px;
+  object-fit: cover;
+} */
+/* .uploaded-image {
+  margin: 20px 0;
+  width: 120px;
+  object-fit: cover;
+} */
+.step3_Wrapper_NM{
+  padding-bottom:2rem;
+}
+
+.rigth-sideModel div .MuiPaper-root {
+  width: 100%;
+}
+
+.customer-list{
+  display: block;
+    width: 200px;
+    position: absolute;
+    border: 1px solid;
+    z-index: 1;
+    font-size: 15px;
+    color: #000;
+    top: 51px;
+    margin-left: 87px;
+}
+
+.customer-input input[type="text"] {
+  width: 200px;
+}
+.customer-list li {
+  padding: 6px 0px 6px 10px;
+}
+
+.customer-list li:hover {
+  cursor: pointer;
+  font-weight: 600;
+}
+/* .r */

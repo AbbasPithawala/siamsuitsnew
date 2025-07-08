@@ -1,0 +1,12 @@
+.custom-btn-disabled{
+    background-color: #1c4d8f !important;
+    border: 0;
+    padding: 12px 24px !important;
+    color: #fff !important;
+    opacity: 0.1;
+    font-family: 'Montserrat', sans-serif;
+    border-radius: 7px;
+    font-weight: 600 !important;
+    transition: 0.4s ease;
+    cursor: pointer;
+}

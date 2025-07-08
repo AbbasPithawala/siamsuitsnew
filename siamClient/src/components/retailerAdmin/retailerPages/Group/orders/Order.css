@@ -1,0 +1,28 @@
+.formComplete {
+  border: 0;
+  padding: 4px 10px;
+  border-radius: 5px;
+  color: #009e15;
+  background: #009e153d;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+}
+
+.fromPendding {
+  border: 0;
+  padding: 4px 10px;
+  border-radius: 5px;
+  color: #cb7400;
+  background: #fff00045;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+} 
+.generatePDf:hover{
+  cursor: pointer;
+}
+
+.viewGroupOrderDialog.MuiDialog-container MuiDialog-scrollPaper css-hz1bth-MuiDialog-container{
+  background-color: red !important;
+}

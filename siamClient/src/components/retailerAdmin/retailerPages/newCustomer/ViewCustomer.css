@@ -1,0 +1,10 @@
+.add-new-order-btn{
+  border: 0;
+  padding: 4px 10px;
+  border-radius: 5px;
+  color: #009e15;
+  background: #009e153d;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+}

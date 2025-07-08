@@ -1,0 +1,44 @@
+.singlePageOuter{
+  margin: 15px;
+}
+.detailHeader {
+  display: flex;
+  justify-content: space-between;
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 10px;
+}
+.customerName h3 {
+  margin: 0;
+  font-size: 18px;
+  margin: 5px 0;
+}
+.customerName h3 span{
+  margin-right: 8px;
+}
+.customerDetails{
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.customerDetails p{
+  margin: 0;
+  font-weight: 600;
+}
+.tableDataOuter{
+  width: 100%;
+  padding: 15px;
+  border-radius: 10px;
+  margin-top: 15px;
+  background-color: #fff;
+}
+.tableDataOuter table{
+  width: 100%;
+  border: 1px solid #e1e1e1;
+}
+.tableDataOuter table thead, .tableDataOuter table tr{
+  border-bottom: 1px solid #e1e1e1;
+}
+.tableDataOuter table tr td, .tableDataOuter table  th{
+  border-right: 1px solid #e1e1e1;
+}

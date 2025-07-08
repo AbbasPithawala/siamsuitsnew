@@ -1,0 +1,56 @@
+.login-section {
+    height: 100vh;
+    background-size: cover;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+}
+.logobox {
+    text-align: center;
+}
+.form-width-nav {
+    margin: 60px auto;
+    width: 410px;
+    padding: 30px 40px;
+    border-radius: 30px !important;
+}
+.pd-20{
+    padding-bottom:15px;
+}
+.custom-form-group .form-control {
+    height: 55px;
+    margin-bottom: 10px;
+}
+.custom-btn-nav {
+    background-color: #025 !important;
+    padding: 12px !important;
+}
+.loginicon{
+    padding-right:10px;
+}
+.rightalignnavm{
+    justify-content: end;
+}
+.d-flex {
+    display: flex;
+}
+.forget-pd p{
+    margin: 0;
+    padding-left: 15px;
+    font-size: 14px;
+}
+.forget-pd a {
+  text-decoration: none;
+  color: #1C4D8F;
+  font-weight: 600;
+}
+.forget-pd {
+  padding: 10px;
+  text-align: right;
+}
+.form-control {
+    border: 0 !important;
+}
+.title-name {
+    text-align: center;
+}
