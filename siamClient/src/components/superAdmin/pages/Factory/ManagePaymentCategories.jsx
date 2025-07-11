@@ -699,8 +699,8 @@ export default function ManagePaymentCategories() {
   const handleSubmit = async () => {
     if (
       !extraPayementCategoryObject["product"].length > 0 ||
-      // !extraPayementCategoryObject["feature"].length > 0 ||
-      // !extraPayementCategoryObject["style"].length > 0 ||
+      !extraPayementCategoryObject["feature"] ||
+      !extraPayementCategoryObject["style"] ||
       !extraPayementCategoryObject["thai_name"].length > 0 ||
       !extraPayementCategoryObject["name"].length > 0 ||
       !extraPayementCategoryObject["cost"].length > 0
@@ -773,6 +773,15 @@ export default function ManagePaymentCategories() {
     setOpen(false);
   };
 
+  // Add these new handlers for Snackbars
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === "clickaway") {
+      return;
+    }
+    setSuccess(false);
+    setError(false);
+  };
+
   const handleOpenDeleteDialog = (e) => {
     setCategoryID(e.target.dataset.id);
     setOpenDeleteDialog(true);
@@ -822,6 +831,9 @@ export default function ManagePaymentCategories() {
       setError(false);
       setSuccess(true);
       setSuccessMsg(res.data.message);
+      // Add these lines to close the delete dialog
+      setOpenDeleteDialog(false);
+      setCategoryID("");
     } else {
       setSuccess(false);
       setError(true);
@@ -1152,9 +1164,9 @@ export default function ManagePaymentCategories() {
         </div>
       </Dialog>
       {success && (
-        <Snackbar open={success} autoHideDuration={2000} onClose={handleClose}>
+        <Snackbar open={success} autoHideDuration={2000} onClose={handleSnackbarClose}>
           <Alert
-            onClose={handleClose}
+            onClose={handleSnackbarClose}
             severity="success"
             sx={{ width: "100%" }}
           >
@@ -1163,8 +1175,8 @@ export default function ManagePaymentCategories() {
         </Snackbar>
       )}
       {error && (
-        <Snackbar open={error} autoHideDuration={2000} onClose={handleClose}>
-          <Alert onClose={handleClose} severity="error" sx={{ width: "100%" }}>
+        <Snackbar open={error} autoHideDuration={2000} onClose={handleSnackbarClose}>
+          <Alert onClose={handleSnackbarClose} severity="error" sx={{ width: "100%" }}>
             {errorMsg}
           </Alert>
         </Snackbar>

@@ -117,7 +117,6 @@ router.put("/update/:id", auth, catchAsync(async (req, res, next) => {
 
 
       const extraPaymentCategories = await ExtraPaymentCategories.find({_id : req.params.id});
-    console.log(extraPaymentCategories)  
       if(extraPaymentCategories.length < 1){
         return res.json({
           status: false,
@@ -186,51 +185,51 @@ router.post("/fetch/:id", auth, catchAsync(async (req, res, next) => {
       }
 }));
 
-router.put("/update/:id", auth, catchAsync(async (req, res, next) => {
+// router.put("/update/:id", auth, catchAsync(async (req, res, next) => {
 
-    try{
+//     try{
 
-        const tailer = await Tailor.find({_id : req.params.id});
+//         const tailer = await Tailor.find({_id : req.params.id});
         
-        if(tailer.length < 1){
-          return res.json({
-            status: false,
-            message: "No Tailer found with this ID!.",
-            data: null
-          })
-        }
-        const alreadyExists = await Tailor.find({username: req.body.tailer.username.toLowerCase()})
+//         if(tailer.length < 1){
+//           return res.json({
+//             status: false,
+//             message: "No Tailer found with this ID!.",
+//             data: null
+//           })
+//         }
+//         const alreadyExists = await Tailor.find({username: req.body.tailer.username.toLowerCase()})
     
-        if(alreadyExists.length > 0 && tailer[0].username != req.body.tailer.username){
+//         if(alreadyExists.length > 0 && tailer[0].username != req.body.tailer.username){
     
-          return res.json({
-            status: false,
-            message: "This Tailer username already exists!",
-            data: null
-          })
+//           return res.json({
+//             status: false,
+//             message: "This Tailer username already exists!",
+//             data: null
+//           })
     
-        }
+//         }
     
-        req.body.tailer.username = req.body.tailer.username.toLowerCase()
+//         req.body.tailer.username = req.body.tailer.username.toLowerCase()
     
-        const updatedTailer = await Tailor.findOneAndUpdate({_id: req.params.id}, req.body.tailer)
+//         const updatedTailer = await Tailor.findOneAndUpdate({_id: req.params.id}, req.body.tailer)
     
-        return res.json({
-          status: true,
-          message: "Tailer updated successfully !.",
-          data: updatedTailer
-        })
+//         return res.json({
+//           status: true,
+//           message: "Tailer updated successfully !.",
+//           data: updatedTailer
+//         })
     
-      }catch(err){
-        console.log(err)
-        return res.json({
-          status: false,
-          message: err.message,
-          data: null
-        })
-      }
+//       }catch(err){
+//         console.log(err)
+//         return res.json({
+//           status: false,
+//           message: err.message,
+//           data: null
+//         })
+//       }
 
-}));
+// }));
 
 // router.post("/delete/:id", auth, catchAsync(async (req, res, next) => {
 
