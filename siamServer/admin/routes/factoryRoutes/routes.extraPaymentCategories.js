@@ -116,6 +116,7 @@ router.put("/update/:id", auth, catchAsync(async (req, res, next) => {
   try{
 
 
+    
       const extraPaymentCategories = await ExtraPaymentCategories.find({_id : req.params.id});
       if(extraPaymentCategories.length < 1){
         return res.json({
