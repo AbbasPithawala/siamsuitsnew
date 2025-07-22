@@ -43,7 +43,7 @@ const extraPaymentsSchema = new mongoose.Schema({
     },
     approved: {
       type: Boolean,
-      default: false
+      default: true
     },
     paid: {
       type: Boolean,
