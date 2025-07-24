@@ -3,6 +3,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { Button } from "@mui/material";
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
+import './Measurements.css';
 
 
 export default function Measurements({
@@ -101,8 +102,8 @@ export default function Measurements({
     }
   };
 
-  const handleOnClick = async (e) => {
-    e.target.value = "";
+  const handleOnFocus = (e) => {
+    e.target.select();
   };
 
   const handleChangeType = async (e) => {
@@ -219,7 +220,7 @@ export default function Measurements({
                       handleValueChange({ target: { name: e.target.name, value: newValue } });
                     }}
                     // onChange={handleValueChange}
-                    onClick={handleOnClick}
+                    onFocus={handleOnFocus}
 
                   />
 
@@ -241,7 +242,7 @@ export default function Measurements({
                       const newValue = Math.max(0, Number(e.target.value)); // Prevents negative values
                       handleValueChange({ target: { name: e.target.name, value: newValue } });
                     }}
-                    onClick={handleOnClick}
+                    onFocus={handleOnFocus}
                   />
 
                   <input
@@ -259,7 +260,7 @@ export default function Measurements({
                     value={productMeasurements[measurement.name]?.total_value || 0}
                     name={measurement.name + "-total_value"}
                     onChange={handleValueChange}
-                    onClick={handleOnClick}
+                    onFocus={handleOnFocus}
                   />
 
                   {draftMeasurementsObject &&
@@ -377,7 +378,7 @@ export default function Measurements({
               : ""
           }
           onChange={handleNoteChange}
-          onClick={handleOnClick}
+          onFocus={handleOnFocus}
         />
       </div>
 

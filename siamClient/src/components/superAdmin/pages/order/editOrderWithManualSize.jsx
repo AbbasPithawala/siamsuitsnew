@@ -1175,13 +1175,13 @@ console.log("sdasd:", suitcustomerMeasurements)
       retailer: JSON.stringify(res1.data.data[0])
     })
 
-    if(pdfString.data.status == true){
-      const sendMail = await axiosInstance.post('customerOrders/sendMail', {
-        token: user.data.token,
-        order: res.data.data[0]['orderId']
-      })
-      console.log('done')
-    }
+    // if(pdfString.data.status == true){
+    //   const sendMail = await axiosInstance.post('customerOrders/sendMail', {
+    //     token: user.data.token,
+    //     order: res.data.data[0]['orderId']
+    //   })
+    //   console.log('done')
+    // }
     
   };
 

@@ -279,6 +279,7 @@ router.post("/fetchCustomerByID/:id", async (req, res) => {
   try {
     // const [firstname, lastname] = req.body.custName.split(' ')
     const customer = await Customer.find({ _id: req.params.id });
+    console.log("customer: ", customer)
 
     if (customer.length > 0) {
 

@@ -3,6 +3,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { Button } from "@mui/material";
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
+import './TuxedoMeasurements.css';
 
 export default function TuxedoMeasurements({
   newTuxedoMeasurement,
@@ -97,8 +98,8 @@ export default function TuxedoMeasurements({
       
       setNewTuxedoMeasurement([...newTuxedoMeasurement]);
     };
-    const handleOnClick = async (e) => {
-      e.target.value = "";
+    const handleOnFocus = (e) => {
+      e.target.select();
     };
     const handleSuitTypeChangeType = async (name, e) => {
       if (name === "pant") {
@@ -259,7 +260,7 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                                     value={measurement.m[data]["value"]}
                                     // value={productMeasurements1[data]['value']}
                                     onChange={suithandleValueChange}
-                                    onClick={handleOnClick}
+                                    onFocus={handleOnFocus}
                 
                                   />
                 
@@ -283,7 +284,7 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                                     // disabled={adjustmentValueImmutable}
                                     name={data + "-adjustment_value"}
                                     onChange={suithandleValueChange}
-                                    onClick={handleOnClick}
+                                    onFocus={handleOnFocus}
                                   />
                 
                                   <input
@@ -304,7 +305,7 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                                     // value={productMeasurements1[data]['total_value']}
                                     name={data + "-total_value"}
                                     onChange={suithandleValueChange}
-                                    onClick={handleOnClick}
+                                    onFocus={handleOnFocus}
                                   />
                 
                                   {draftMeasurementsObject  && draftMeasurementsObject[measurement.name] && draftMeasurementsObject[measurement.name]['measurements'][data] && Number(draftMeasurementsObject[measurement.name]['measurements'][data]['total_value']) !== Number(measurement.m[data]["total_value"]) ? (
@@ -599,6 +600,7 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                 onChange={(event) =>
                   handleSuitNoteChange(measurement.name, event)
                 }
+                onFocus={handleOnFocus}
               />
             </div>
           </div>

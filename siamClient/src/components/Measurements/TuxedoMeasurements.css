@@ -1,0 +1,20 @@
+/* Hide number input spinners */
+.searchinput-measurement::-webkit-outer-spin-button,
+.searchinput-measurement::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.searchinput-measurement[type=number] {
+  -moz-appearance: textfield;
+}
+
+.searchinput::-webkit-outer-spin-button,
+.searchinput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.searchinput[type=number] {
+  -moz-appearance: textfield;
+}

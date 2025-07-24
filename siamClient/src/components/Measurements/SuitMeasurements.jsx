@@ -3,6 +3,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { Button } from "@mui/material";
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
+import './SuitMeasurements.css';
 
 export default function SuitMeasurements({
   newMeasurement,
@@ -97,8 +98,8 @@ export default function SuitMeasurements({
       
       setNew([...newMeasurement]);
     };
-    const handleOnClick = async (e) => {
-      e.target.value = "";
+    const handleOnFocus = (e) => {
+      e.target.select();
     };
     const handleSuitTypeChangeType = async (name, e) => {
       if (name === "pant") {
@@ -260,7 +261,7 @@ export default function SuitMeasurements({
                                     value={measurement.m[data]["value"]}
                                     // value={productMeasurements1[data]['value']}
                                     onChange={suithandleValueChange}
-                                    onClick={handleOnClick}
+                                    onFocus={handleOnFocus}
                 
                                   />
                 
@@ -284,7 +285,7 @@ export default function SuitMeasurements({
                                     // disabled={adjustmentValueImmutable}
                                     name={data + "-adjustment_value"}
                                     onChange={suithandleValueChange}
-                                    onClick={handleOnClick}
+                                    onFocus={handleOnFocus}
                                   />
                 
                                   <input
@@ -305,7 +306,7 @@ export default function SuitMeasurements({
                                     // value={productMeasurements1[data]['total_value']}
                                     name={data + "-total_value"}
                                     onChange={suithandleValueChange}
-                                    onClick={handleOnClick}
+                                    onFocus={handleOnFocus}
                                   />
                 
                                   {draftMeasurementsObject  && draftMeasurementsObject[measurement.name] && draftMeasurementsObject[measurement.name]['measurements'][data] && Number(draftMeasurementsObject[measurement.name]['measurements'][data]['total_value']) !== Number(measurement.m[data]["total_value"]) ? (
@@ -600,6 +601,7 @@ export default function SuitMeasurements({
                 onChange={(event) =>
                   handleSuitNoteChange(measurement.name, event)
                 }
+                onFocus={handleOnFocus}
               />
             </div>
           </div>

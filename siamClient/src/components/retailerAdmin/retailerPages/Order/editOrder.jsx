@@ -188,15 +188,7 @@ export default function Step4() {
     fetchUserMeasurements();
   }, [path]);
 
-  useEffect(() => {
-    const fetchCustomerData = async () => {
-      const res1 = await axiosInstance.post(
-        "/userMeasurement/fetchCustomerByID/" + path
-      );
-      setCustomerData(res1.data.data[0]);
-    };
-    fetchCustomerData();
-  }, []);
+
 
 
   const IncNum = (e) => {
@@ -939,13 +931,13 @@ export default function Step4() {
       retailer: JSON.stringify(res1.data.data[0])
     })
 
-    if(pdfString.data.status == true){
-      const sendMail = await axiosInstance.post('customerOrders/sendMail', {
-        token: user.data.token,
-        order: res.data.data[0]['orderId']
-      })
-      console.log('done')
-    }
+    // if(pdfString.data.status == true){
+    //   const sendMail = await axiosInstance.post('customerOrders/sendMail', {
+    //     token: user.data.token,
+    //     order: res.data.data[0]['orderId']
+    //   })
+    //   console.log('done')
+    // }
     
   };
 
