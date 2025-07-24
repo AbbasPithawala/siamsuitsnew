@@ -1,5 +1,5 @@
 import React from "react";
-import {useState, useContext, useEffect } from 'react';
+import {useState, useContext, useEffect, useCallback, useRef } from 'react';
 import "./RetailerHeader.css"
 import Logo from "./../../../images/retailerLogo.jpg";
 import { axiosInstance } from './../../../config'
@@ -30,6 +30,7 @@ export default function RetailerHeader(){
     const [allCustomers, setAllCustomers] = useState([])
     const [justAnArrayOfID, setJustAnArrayOfID] = useState([])
     const [abstractSearchListOrders, setAbstractSearchListOrders]   = useState([])
+    const debounceTimeout = useRef(null)
 
     useEffect(() => {
       const fetchRetailer = async () => {
@@ -39,14 +40,41 @@ export default function RetailerHeader(){
       fetchRetailer()
   },[])
 
-    const handleSearchAbstract = async(e) => {
-      
-      if(e.target.value.length > 2){
-        setAbstractSearchList(() => {
-          return []
-        })
+    // Cleanup timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (debounceTimeout.current) {
+          clearTimeout(debounceTimeout.current);
+        }
+      };
+    }, [])
 
-          const res = await axiosInstance.post("/userMeasurement/fetchCustomerByLike/" + e.target.value , { token:user.data.token })
+    const handleSearchAbstract = useCallback((e) => {
+      const searchValue = e.target.value;
+      
+      // Clear existing timeout
+      if (debounceTimeout.current) {
+        clearTimeout(debounceTimeout.current);
+      }
+      
+      // Handle immediate clear for short inputs
+      if(searchValue.length <= 2){
+        setShowCustomerList("none")
+        setAllCustomers([])
+        setAbstractSearchList([])
+        setAbstractSearchListOrders([])
+        return;
+      }
+
+      // Debounce the API calls
+      debounceTimeout.current = setTimeout(async () => {
+        try {
+          setAbstractSearchList(() => {
+            return []
+          })
+
+          // Search customers
+          const res = await axiosInstance.post("/userMeasurement/fetchCustomerByLike/" + searchValue , { token:user.data.token })
           console.log("result : ", res.data.data)
           if(res.data.status == true && res.data.data.length > 0){
             const jar = []
@@ -58,16 +86,15 @@ export default function RetailerHeader(){
               jar.push(obj)
             }
             
-            // abstractSearchList.push(obj)
             setAbstractSearchList(jar)
-
             setShowCustomerList("block")
           }
           if(res.data.status ==false){
             setAbstractSearchList([])
           }
 
-          const resOrders = await axiosInstance.post("/customerOrders/fetchOrderByLikeRetailer/" + user.data.id + "/" + e.target.value, {token: user.data.token})
+          // Search orders
+          const resOrders = await axiosInstance.post("/customerOrders/fetchOrderByLikeRetailer/" + user.data.id + "/" + searchValue, {token: user.data.token})
           console.log(resOrders.data)
           if(resOrders.data.status == true && resOrders.data.data.length > 0){
             const jar = []
@@ -79,21 +106,19 @@ export default function RetailerHeader(){
               jar.push(obj)
             }
             
-            // abstractSearchList.push(obj)
             setAbstractSearchListOrders(jar)
-
             setShowCustomerList("block")
           }
           if(resOrders.data.status ==false){
             setAbstractSearchListOrders([])
           }
-      } 
-      if(e.target.value.length <= 2){
-        setShowCustomerList("none")
-        setAllCustomers([])
-        setAbstractSearchList([])
-      }
-    }
+        } catch (error) {
+          console.error("Search error:", error);
+          setAbstractSearchList([])
+          setAbstractSearchListOrders([])
+        }
+      }, 500); // 500ms debounce delay
+    }, [user.data.token, user.data.id])
 
     const handleAbstract = (e) => {
       if(e.target.dataset.type == 'customers'){

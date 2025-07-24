@@ -1,7 +1,7 @@
 import React from 'react'
 import "./dashboard.css";
 import { Link } from "react-router-dom";
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, useMemo } from "react";
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import LocationSearchingIcon from '@mui/icons-material/LocationSearching';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [docLength, setDoc] = useState(Number);
   const [limit, setLimit] = useState(5);
   const [index, setIndex] = useState(0);
+  const [allOrdersData, setAllOrdersData] = useState([]);
 
   
   const [l0, setLength0] = useState(Number);
@@ -73,6 +74,57 @@ export default function Dashboard() {
   const [showCustomerList, setShowCustomerList] = useState("none");
   const [showOrders, setShowOrders] = useState(false)
   const [allCustomers, setAllCustomers] = useState([]);
+
+  // Optimized order status counts using useMemo
+  const orderStatusCounts = useMemo(() => {
+    if (!allOrdersData || allOrdersData.length === 0) {
+      return {
+        total: 0,
+        newOrder: 0,
+        rush: 0,
+        modified: 0,
+        processing: 0,
+        shipment: 0,
+        sent: 0
+      };
+    }
+
+    // Single pass through the array instead of 6 separate filter operations
+    const counts = allOrdersData.reduce((acc, order) => {
+      acc.total++;
+      switch(order.order_status) {
+        case "New Order":
+          acc.newOrder++;
+          break;
+        case "Rush":
+          acc.rush++;
+          break;
+        case "Modified":
+          acc.modified++;
+          break;
+        case "Processing":
+          acc.processing++;
+          break;
+        case "Shipment":
+          acc.shipment++;
+          break;
+        case "Sent":
+          acc.sent++;
+          break;
+      }
+      return acc;
+    }, {
+      total: 0,
+      newOrder: 0,
+      rush: 0,
+      modified: 0,
+      processing: 0,
+      shipment: 0,
+      sent: 0
+    });
+
+    return counts;
+  }, [allOrdersData]); // Only recalculate when allOrdersData changes
 
   const fetchData = async() => {
     const par = {
@@ -153,6 +205,17 @@ export default function Dashboard() {
     par['retailer_code'] =  user.data.retailer_code
     fetchAllOrders(par);
   }, [])
+
+  // Update individual state variables from memoized counts
+  useEffect(() => {
+    setLength0(orderStatusCounts.total);
+    setLength1(orderStatusCounts.newOrder);
+    setLength2(orderStatusCounts.rush);
+    setLength3(orderStatusCounts.modified);
+    setLength4(orderStatusCounts.processing);
+    setLength5(orderStatusCounts.shipment);
+    setLength6(orderStatusCounts.sent);
+  }, [orderStatusCounts]);
   
   const count = Math.ceil(docLength / limit);
 
@@ -619,26 +682,10 @@ const fetchAllOrders = async (par) => {
     par: par
   });
   if(res.data.status === true){
-    setDoc(res.data.data ? res.data.data.length : 0)
-    setLength0(res.data.data.length)
-    let L = res.data.data.filter((x) => x.order_status == "New Order");
-    setLength1(L.length);
-
-    let L2 = res.data.data.filter((x) => x.order_status == "Modified");
-    setLength3(L2.length);
-
-    let L1 = res.data.data.filter((x) => x.order_status == "Rush");
-    setLength2(L1.length);
-    
-    let L3 = res.data.data.filter((x) => x.order_status == "Processing");
-    setLength4(L3.length);
-
-    let L4 = res.data.data.filter((x) => x.order_status == "Shipment");
-    setLength5(L4.length); 
-
-    let L5 = res.data.data.filter((x) => x.order_status == "Sent");
-    setLength6(L5.length);
-
+    // Store the raw data instead of immediately processing it
+    setAllOrdersData(res.data.data || []);
+    // Document count can still be set directly
+    setDoc(res.data.data ? res.data.data.length : 0);
   }
 
 };
