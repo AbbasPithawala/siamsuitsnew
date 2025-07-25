@@ -992,42 +992,6 @@ export default function Step4() {
            singleOrderArray.push(itemsObject2);
 
        }
-      }  else if (m.item_name == "tuxedo") {
-        for (let n = 1; n <= Object.keys(m["styles"][0]).length; n++) {
-
-          let itemsObject1 = {
-             item_name: m["item_name"],
-             item_code: "tuxedojacket " + n,
-             quantity: m["quantity"],
-             styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
-             measurementsObject: res.data.data[0].Tuxedomeasurements['tuxedojacket'],
-             manualSize:
-               res.data.data[0].manualSize == null ? (
-                 <></>
-               ) : (
-                 res.data.data[0].manualSize["tuxedojacket"]
-               ),
-           };
-
-           let itemsObject2 = {
-             item_name: m["item_name"],
-             item_code: "pant " + n,
-             quantity: m["quantity"],
-             styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
-             measurementsObject: res.data.data[0].Tuxedomeasurements['pant'],
-             manualSize:
-               res.data.data[0].manualSize == null ? (
-                 <></>
-               ) : (
-                 res.data.data[0].manualSize["pant"]
-               ),
-           };
-           
-           singleOrderArray.push(itemsObject1);
-           
-           singleOrderArray.push(itemsObject2);
-
-       }
       } else {
         for (let n = 1; n <= Object.keys(m["styles"][0]).length; n++) {
           let itemsObject = {

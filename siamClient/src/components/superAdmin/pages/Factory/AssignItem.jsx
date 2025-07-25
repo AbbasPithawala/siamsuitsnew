@@ -14,10 +14,8 @@ import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
-import { renderToString } from "react-dom/server";
-import jsPDF from "jspdf";
-import Logo from "../../../../images/logo.png";
-import mainQR from "../../../../images/PDFQR.png";
+
+import { generateJobPDF } from "../../../../utils/pdfGenerator";
 
 
 const Alert = React.forwardRef(function Alert(props, ref) {
@@ -125,13 +123,16 @@ export default function AssignItem(){
   //   // fetchJobs(obj);
   //   setTailorAdvance(tailor['advancePayment'])
   // }
-
+console.log("checkboxItem", checkboxItem)
   const handleCheckboxChange = async(e, cst) =>{
+    
     if(e.target.checked){
+      if(!checkboxItem.includes(e.target.value)){
       setCheckboxItem([...checkboxItem, e.target.value])
       let epcsc = extraPaymentCategoriesSelectedCost
       epcsc = epcsc + Number(cst)
       setExtraPaymentCategoriesSelectedCost(epcsc)
+      }
     }else{
       const updatedSelectedItem = checkboxItem.filter(
         (selectedItem) => selectedItem !== e.target.value
@@ -531,6 +532,16 @@ export default function AssignItem(){
     </React.Fragment>
   );
 
+  const handleGeneratePDF = async (job) => {
+    await generateJobPDF({
+      job,
+      extraPaymentCategories,
+      selectedExtraPayments: checkboxItem,
+      selectedExtraPaymentsCost: extraPaymentCategoriesSelectedCost,
+      jobType: 'job'
+    });
+  }
+
   return (
     <main className="main-panel">
       <div className="content-wrapper">
@@ -615,6 +626,12 @@ export default function AssignItem(){
               }else{
                 itemName = code + " " + Number(job['item_code'].split("/")[1].split("_")[1]) + 1
               }
+
+              // Get selected extra payment categories details
+              const selectedExtraPayments = extraPaymentCategories.filter(epc => 
+                checkboxItem.includes(epc['_id'])
+              );
+
               return(
                 <div style={{width:"calc(100% - 40px)",marginLeft:"20px",marginBottom:"20px",borderRadius:"5px!important",color: "#000",border:"1px solid #e1e1e1", backgroundColor: "rgb(28 77 143 / 8%)",borderRadius:"10px",boxShadow:"px 6px 16px rgba(00,00,00,0.09)", display:"flex", flexDirection: "row", padding:"15px",borderLeft:"5px solid #1c4d8f"}}>
                 {/* sfdsfs */}
@@ -633,21 +650,59 @@ export default function AssignItem(){
                   
                   <p style={{fontSize:"24px",fontWeight:"700",color:"#000", margin:"0"}}>{job['order_id'] ? job['order_id']['orderId'] : job['group_order_id']['orderId']}</p>
                   <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}} >Amount: <span style={{marginLeft:"auto",fontWeight:"700"}}>{job['cost']}</span></p>
-                  <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}} >Extra Amount: <span style={{marginLeft:"auto",fontWeight:"700"}}>{costTotal + extraPaymentCategoriesSelectedCost}</span></p>
-                  {
-                    job['process']['name'].includes('stitching') && !showConfirmButton 
-                      ? 
-                      <>
-                    <button onClick={handleOpenExtraPaymentCategories} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none", marginRight: "10px"}} >Create Extra Payment</button>
-                    <button onClick={handleConfirmJob2} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Finish</button>
-                    </>
-                      :
-                      job['process']['name'].includes('stitching') && showConfirmButton
-                      ?
+                  
+                  {/* Extra Payments Breakdown */}
+                  {(job['extraPayments'].length > 0 || selectedExtraPayments.length > 0) && (
+                    <div style={{marginBottom:"10px"}}>
+                      <p style={{fontSize:"14px",fontWeight:"600",color:"#1c4d8f",marginBottom:"5px",borderBottom:"1px solid #e1e1e1",paddingBottom:"5px"}}>Extra Payments:</p>
+                      
+                      {/* Existing Extra Payments */}
+                      {job['extraPayments'].map((extraPayment, index) => {
+                        if(extraPayment['approved'] == true && extraPayment['status'] !== false){
+                          return (
+                            <div key={index} style={{fontSize:"13px",fontWeight:"500",display:"flex",width:"100%",paddingBottom:"8px",paddingTop:"4px",backgroundColor:"rgba(0, 0, 0, 0.02)",padding:"6px 8px",borderRadius:"4px",marginBottom:"4px"}}>
+                              <span style={{fontWeight:"600"}}>{extraPayment['name'] || 'Extra Payment'}</span>
+                              <span style={{marginLeft:"auto",fontWeight:"700"}}>THB {extraPayment['cost']}</span>
+                            </div>
+                          )
+                        }
+                        return null;
+                      })}
+                      
+                      {/* Newly Selected Extra Payments */}
+                      {selectedExtraPayments.map((extraPayment, index) => (
+                        <div key={`new-${index}`} style={{fontSize:"13px",fontWeight:"500",display:"flex",width:"100%",paddingBottom:"8px",paddingTop:"4px",color:"#1c4d8f",backgroundColor:"rgba(28, 77, 143, 0.05)",padding:"6px 8px",borderRadius:"4px",marginBottom:"4px"}}>
+                          <span style={{fontWeight:"600"}}>{extraPayment['name']} {extraPayment['thai_name'] && `/ ${extraPayment['thai_name']}`}</span>
+                          <span style={{marginLeft:"auto",fontWeight:"700"}}>THB {extraPayment['cost']}</span>
+                        </div>
+                      ))}
+                      
+                      {/* Total Amount */}
+                      <div style={{fontSize:"15px",fontWeight:"700",display:"flex",width:"100%",borderTop:"2px solid #1c4d8f",paddingTop:"10px",paddingBottom:"6px",color:"#1c4d8f",marginTop:"8px"}}>
+                        <span style={{fontWeight:"700"}}>Total Amount:</span>
+                        <span style={{marginLeft:"auto",fontWeight:"800"}}>THB {job['cost'] + costTotal + extraPaymentCategoriesSelectedCost}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div style={{display: "flex", flexWrap: "wrap", gap: "8px"}}>
+                    <button onClick={() => handleGeneratePDF(job)} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Print Slip</button>
+                    {
+                      job['process']['name'].includes('stitching')
+                      //  && !showConfirmButton 
+                        ? 
+                        <>
+                      <button onClick={handleOpenExtraPaymentCategories} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Create Extra Payment</button>
                       <button onClick={handleConfirmJob2} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Finish</button>
-                      :
-                    <button onClick={handleConfirmJob} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Finish</button>
-                  }
+                      </>
+                        :
+                        job['process']['name'].includes('stitching') && showConfirmButton
+                        ?
+                        <button onClick={handleConfirmJob2} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Finish</button>
+                        :
+                      <button onClick={handleConfirmJob} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Finish</button>
+                    }
+                  </div>
                 </div>
               </div>
               )
@@ -796,7 +851,7 @@ export default function AssignItem(){
                       return(
                         <div style={{padding: "20px 10px", fontSize: "16px", fontWeight: "500", backgroundColor: "#EDF1F6", marginBottom: "5px", borderRadius:"5px"}}>
                           <label className="full_label">
-                            <input type="checkbox" id={epc['_id']} value={epc['_id']} onChange={(e) => handleCheckboxChange(e, epc['cost'])}/>
+                            <input type="checkbox" id={epc['_id']} value={epc['_id']} checked={checkboxItem.includes(epc['_id'])} onChange={(e) => handleCheckboxChange(e, epc['cost'])}/>
                             <span style={{paddingLeft: "10px"}}> <label htmlFor={epc['_id']}>{epc['name']} / {epc['thai_name']} - THB {epc['cost']}</label> </span>                           
                           </label>
                         </div>

@@ -736,7 +736,7 @@ export default function Step4() {
       draftMeasurementsObj = previousOrder.data.data[0]['measurements']
     }else{
       const existingOrders = await axiosInstance.post("/customerOrders/fetchCustomerOrders/" + res.data.data[0]['customer_id']['_id'], {token: user.data.token})
-  
+
       if(existingOrders.data.status == true){
         let ind = 0;
         let ourIndex ;
@@ -748,7 +748,7 @@ export default function Step4() {
         }
         if(existingOrders.data.data.length > 1)
         {
-          draftMeasurementsObj = existingOrders.data.data[ourIndex + 1]['measurements']
+          draftMeasurementsObj = existingOrders.data.data[ourIndex - 1]['measurements']
         }
       }
     }
@@ -763,6 +763,23 @@ export default function Step4() {
           let itemsObject1 = {
             item_name: m["item_name"],
             item_code: "jacket " + n,
+            quantity: m["quantity"],
+            styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
+          };
+          let itemsObject2 = {
+            item_name: m["item_name"],
+            item_code: "pant " + n,
+            quantity: m["quantity"],
+            styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
+          };
+          orderItemsArray.push(itemsObject1);          
+          orderItemsArray.push(itemsObject2);
+        }
+      }else if (m.item_name == "tuxedo") {
+        for (let n = 1; n <= Object.keys(m["styles"][0]).length; n++) {
+          let itemsObject1 = {
+            item_name: m["item_name"],
+            item_code: "tuxedojacket " + n,
             quantity: m["quantity"],
             styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
           };
@@ -796,6 +813,44 @@ export default function Step4() {
           let itemsObject1 = {
             item_name: m["item_name"],
             item_code: "jacket " + n,
+            quantity: m["quantity"],
+            repeatOrder: res.data.data[0]["repeatOrder"],
+            styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
+          };
+
+          if (j % 5 == 0 || orderItemsArray.length == j) {
+            justAnArray.push(itemsObject1);
+            orderItemsArrayPDF.push(justAnArray);
+            justAnArray = [];
+          } else {
+            justAnArray.push(itemsObject1);
+          }
+
+          j = j + 1;
+
+          let itemsObject2 = {
+            item_name: m["item_name"],
+            item_code:  "pant " + n,
+            quantity: m["quantity"],
+            repeatOrder: res.data.data[0]["repeatOrder"],
+            styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
+          };
+
+          if (j % 5 == 0 || orderItemsArray.length == j) {
+            justAnArray.push(itemsObject2);
+            orderItemsArrayPDF.push(justAnArray);
+            justAnArray = [];
+          } else {
+            justAnArray.push(itemsObject2);
+          }
+
+          j = j + 1;
+        }
+      } else if (m.item_name == "tuxedo") {
+        for (let n = 1; n <= Object.keys(m["styles"][0]).length; n++) {
+          let itemsObject1 = {
+            item_name: m["item_name"],
+            item_code: "tuxedojacket " + n,
             quantity: m["quantity"],
             repeatOrder: res.data.data[0]["repeatOrder"],
             styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
@@ -890,6 +945,42 @@ export default function Step4() {
            singleOrderArray.push(itemsObject2);
 
        }
+      } else if (m.item_name == "tuxedo") {
+        for (let n = 1; n <= Object.keys(m["styles"][0]).length; n++) {
+
+          let itemsObject1 = {
+             item_name: m["item_name"], 
+             item_code: "tuxedojacket " + n,
+             quantity: m["quantity"],
+             styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
+             measurementsObject: res.data.data[0].Tuxedomeasurements['tuxedojacket'],
+             manualSize:
+               res.data.data[0].manualSize == null ? (
+                 <></>
+               ) : (
+                 res.data.data[0].manualSize['jacket']
+               ),
+           };
+
+           let itemsObject2 = {
+             item_name: m["item_name"],
+             item_code: "pant " + n,
+             quantity: m["quantity"],
+             styles: m["styles"][0][Object.keys(m["styles"][0])[n - 1]],
+             measurementsObject: res.data.data[0].Tuxedomeasurements['pant'],
+             manualSize:
+               res.data.data[0].manualSize == null ? (
+                 <></>
+               ) : (
+                 res.data.data[0].manualSize['pant']
+               ),
+           };
+           
+           singleOrderArray.push(itemsObject1);
+           
+           singleOrderArray.push(itemsObject2);
+
+       }
       } else {
         for (let n = 1; n <= Object.keys(m["styles"][0]).length; n++) {
           let itemsObject = {
@@ -919,7 +1010,7 @@ export default function Step4() {
     const draftMeasurementsObjString = JSON.stringify(draftMeasurementsObj)
 
     // console.log("orderItemsArrayPDF: ", orderItemsArrayPDF)
-    // console.log("singleOrderArray: ", singleOrderArray)
+    console.log("singleOrderArray: ", singleOrderArray)
     const pdfString = await axiosInstance.post('customerOrders/createPdf', {
       token: user.data.token,
       // pdfStringJ : JSON.stringify(elementAsString)

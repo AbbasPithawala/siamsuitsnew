@@ -966,6 +966,41 @@ router.put("/updateOrder/:id", auth, async (req, res) => {
           manufacturing[x['item_name']+"_jacket_"+i] = productProcessObject['jacket']
           manufacturing[x['item_name']+"_pant_"+i] = productProcessObject['pant']
         } 
+      }else if(x['item_name'] == 'tuxedo'){
+        productProcessObject['tuxedojacket'] = {}
+        for(let m of processObject['tuxedojacket']){
+          const obj = {}     
+          obj['status'] = 0;
+          obj['tailer_id'] = "";  
+          if(Object.keys(productProcessObject).length > 0){
+            productProcessObject['tuxedojacket'][m] = obj
+          }else{
+            productProcessObject['tuxedojacket'] = {
+              m: obj
+            }
+          }
+          
+         }
+         
+        productProcessObject['pant'] = {}
+         for(let m of processObject['pant']){
+          const obj = {}     
+          obj['status'] = 0;
+          obj['tailer_id'] = "";  
+          if(Object.keys(productProcessObject).length > 0){
+            productProcessObject['pant'][m] = obj
+          }else{
+            productProcessObject['pant'] = {
+              m: obj
+            }
+          }
+          
+         }
+        
+        for(let i =0; i < x['quantity']; i++){
+          manufacturing[x['item_name']+"_jacket_"+i] = productProcessObject['jacket']
+          manufacturing[x['item_name']+"_pant_"+i] = productProcessObject['pant']
+        } 
       }else{
         productProcessObject[x['item_name']] = {}
         for(let m of processObject[x['item_name']]){
@@ -1100,6 +1135,7 @@ router.put("/updateOrder/:id", auth, async (req, res) => {
     })
   }
   catch (err) {
+    console.log(err)
     return res.json({
       status: true,
       message: err.message,
