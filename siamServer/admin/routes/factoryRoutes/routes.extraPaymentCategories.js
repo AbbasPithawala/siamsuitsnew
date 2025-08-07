@@ -118,6 +118,7 @@ router.put("/update/:id", auth, catchAsync(async (req, res, next) => {
 
     
       const extraPaymentCategories = await ExtraPaymentCategories.find({_id : req.params.id});
+      
       if(extraPaymentCategories.length < 1){
         return res.json({
           status: false,
@@ -138,7 +139,12 @@ router.put("/update/:id", auth, catchAsync(async (req, res, next) => {
       // }
   
       // req.body.extraPaymentCategory.username = req.body.tailer.username.toLowerCase()
-  
+      if (req.body.extraPaymentCategory.feature === "") {
+        delete req.body.extraPaymentCategory.feature;
+      }
+      if (req.body.extraPaymentCategory.style === "") {
+        delete req.body.extraPaymentCategory.style;
+      }
       const updatedExtraPaymentCategories = await ExtraPaymentCategories.findOneAndUpdate({_id: req.params.id}, req.body.extraPaymentCategory)
   
       return res.json({

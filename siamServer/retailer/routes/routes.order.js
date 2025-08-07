@@ -1482,7 +1482,7 @@ router.post("/fetchRetailerPaginateNew/:skip", auth, async(req, res) => {
 
     obj['type'] = "normal"
     obj2['type'] = "normal"
-    const orders = await Order.find(obj).sort({date: -1}).limit(5).skip(req.params.skip)
+    const orders = await Order.find(obj).sort({date: -1}).limit(20).skip(req.params.skip)
     const ordersCount = await Order.find(obj2)
     const count = ordersCount.length
     if(orders.length < 1){
@@ -1513,7 +1513,7 @@ router.post("/fetchAdminPaginateNew/:skip", auth, async(req, res) => {
 
   try{
     req.body.par.type = "normal"
-    const orders = await Order.find(req.body.par).sort({date: -1}).limit(5).skip(req.params.skip)
+    const orders = await Order.find(req.body.par).sort({date: -1}).limit(20).skip(req.params.skip)
     req.body.count.type = "normal"
     // const ordersCount = await Order.find({order_status: req.body.par.order_status})
     const ordersCount = await Order.find(req.body.count)

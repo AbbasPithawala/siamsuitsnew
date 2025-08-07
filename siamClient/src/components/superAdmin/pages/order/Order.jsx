@@ -62,7 +62,7 @@ export default function Order() {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [docLength, setDoc] = useState(Number);
-  const [limit, setLimit] = useState(5);
+  const [limit, setLimit] = useState(20);
   const [index, setIndex] = useState(0);
   const [statusName, setStatusName] = useState("New Order");
   const [orderItemString, setOrderItemString] = useState("")
@@ -104,7 +104,7 @@ export default function Order() {
       count['OrderDate'] = d
     }
 
-    fetchPageOrders(par, count, (page - 1) * 5)
+    fetchPageOrders(par, count, (page - 1) * 20)
 
   }, [statusName, page]);
 
@@ -114,7 +114,7 @@ export default function Order() {
     fetchAllOrders(par);
     fetchProducts();
   }, []);
-
+console.log("orders: ",orders)
 
   const count = Math.ceil(docLength / limit);
 
@@ -124,7 +124,6 @@ export default function Order() {
     setPage(p);
 
   };
-
 
   const searchSelectChange = async (event) => {
     const { value } = event.target;
@@ -182,7 +181,7 @@ export default function Order() {
 
 
     setPage(1)
-    fetchPageOrders(par, count, (1 - 1) * 5)
+    fetchPageOrders(par, count, (1 - 1) * 20)
     fetchAllOrders(parForTabs)
     // const obj = {
     //   tailor: tailor['_id']
@@ -324,7 +323,7 @@ export default function Order() {
         // if(d.length > 0){
         //   par['OrderDate'] = d
         // }
-        fetchPageOrders(par, count, (page - 1) * 5)
+        fetchPageOrders(par, count, (page - 1) * 20)
 
         fetchAllOrders(parForTabs);
         setCheckboxItem([])
@@ -775,7 +774,7 @@ export default function Order() {
                           />
                         </th>
                         <td>
-                          <strong>{i + 1 + ((page - 1) * 5)}</strong>
+                          <strong>{i + 1 + ((page - 1) * 20)}</strong>
                         </td>
                         {/* <td>{order.retailerName ? order.retailerName.charAt(0).toUpperCase() + order.retailerName.slice(1) : ""}</td> */}
                         <td>{order.orderId}</td>

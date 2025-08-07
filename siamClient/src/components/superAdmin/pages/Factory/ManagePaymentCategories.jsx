@@ -699,8 +699,8 @@ export default function ManagePaymentCategories() {
   const handleSubmit = async () => {
     if (
       !extraPayementCategoryObject["product"].length > 0 ||
-      !extraPayementCategoryObject["feature"] ||
-      !extraPayementCategoryObject["style"] ||
+      // !extraPayementCategoryObject["feature"] ||
+      // !extraPayementCategoryObject["style"] ||
       !extraPayementCategoryObject["thai_name"].length > 0 ||
       !extraPayementCategoryObject["name"].length > 0 ||
       !extraPayementCategoryObject["cost"].length > 0
@@ -720,6 +720,8 @@ export default function ManagePaymentCategories() {
         setSuccess(true);
         setSuccessMsg(res.data.message);
         fetchExtraPaymentCategories();
+        setOpen(false);
+        setExtraPaymentCategoryObject({});
       } else {
         setSuccess(false);
         setError(true);
@@ -754,6 +756,8 @@ export default function ManagePaymentCategories() {
         setSuccessMsg(res.data.message);
         fetchExtraPaymentCategories();
         setEditing(false)
+        setOpen(false)
+        setExtraPaymentCategoryObject({})
       } else {
         setSuccess(false);
         setError(true);
@@ -827,7 +831,7 @@ export default function ManagePaymentCategories() {
       { token: user.data.token }
     );
     if (res.data.status) {
-      setExtraPaymentCategories(res.data.data);
+      fetchExtraPaymentCategories();
       setError(false);
       setSuccess(true);
       setSuccessMsg(res.data.message);

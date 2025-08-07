@@ -45,7 +45,7 @@ export default function Dashboard() {
   const [orderId, setOrderId] = useState("")
   const [page, setPage] = useState(1);
   const [docLength, setDoc] = useState(Number);
-  const [limit, setLimit] = useState(5);
+  const [limit, setLimit] = useState(20);
   const [index, setIndex] = useState(0);
   const [allOrdersData, setAllOrdersData] = useState([]);
 
@@ -194,7 +194,7 @@ export default function Dashboard() {
       par['orderId'] = orderId
       count['orderId'] = orderId
     }
-    fetchPageOrders(par, count, (page - 1)*5)
+    fetchPageOrders(par, count, (page - 1)*20)
 
     // fetchData(page, statusName, user.data.retailer_code);
   }, [page, statusName]);
@@ -257,7 +257,7 @@ export default function Dashboard() {
 
 
     setPage(1)
-    fetchPageOrders(par, count, (1 - 1) * 5)
+    fetchPageOrders(par, count, (1 - 1) * 20)
     fetchAllOrders(parForTabs);
     // const obj = {
     //   tailor: tailor['_id']
@@ -306,7 +306,7 @@ export default function Dashboard() {
         par['orderId'] = orderId
         count['orderId'] = orderId
       }
-      fetchPageOrders(par, count, (page - 1)*5)
+      fetchPageOrders(par, count, (page - 1)*20)
       setOpen2(false)
       setOpen(true)
       setSuccess(true)
