@@ -616,6 +616,12 @@ console.log("checkboxItem", checkboxItem)
                   }
                 }
               }
+              if(job['stylingprice'] && Object.keys(job['stylingprice']).length > 0){
+                type = "Both"
+                for(const price of Object.values(job['stylingprice'])){
+                  costTotal = costTotal + Number(price)
+                }
+              }
 
               const code = job['item_code'].split("/")[1].split("_")[0]
               let itemName = "";
@@ -652,7 +658,7 @@ console.log("checkboxItem", checkboxItem)
                   <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}} >Amount: <span style={{marginLeft:"auto",fontWeight:"700"}}>{job['cost']}</span></p>
                   
                   {/* Extra Payments Breakdown */}
-                  {(job['extraPayments'].length > 0 || selectedExtraPayments.length > 0) && (
+                  {(job['extraPayments'].length > 0 || selectedExtraPayments.length > 0 || (job['stylingprice'] && Object.keys(job['stylingprice']).length > 0) ) && (
                     <div style={{marginBottom:"10px"}}>
                       <p style={{fontSize:"14px",fontWeight:"600",color:"#1c4d8f",marginBottom:"5px",borderBottom:"1px solid #e1e1e1",paddingBottom:"5px"}}>Extra Payments:</p>
                       
@@ -663,6 +669,19 @@ console.log("checkboxItem", checkboxItem)
                             <div key={index} style={{fontSize:"13px",fontWeight:"500",display:"flex",width:"100%",paddingBottom:"8px",paddingTop:"4px",backgroundColor:"rgba(0, 0, 0, 0.02)",padding:"6px 8px",borderRadius:"4px",marginBottom:"4px"}}>
                               <span style={{fontWeight:"600"}}>{extraPayment['name'] || 'Extra Payment'}</span>
                               <span style={{marginLeft:"auto",fontWeight:"700"}}>THB {extraPayment['cost']}</span>
+                            </div>
+                          )
+                        }
+                        return null;
+                      })}
+                      
+                      {/* Styling Prices */}
+                      {job['stylingprice'] && Object.entries(job['stylingprice']).map(([style, price], index) => {
+                        if (Number(price) > 0) {
+                          return (
+                            <div key={`styling-${index}`} style={{fontSize:"13px",fontWeight:"500",display:"flex",width:"100%",paddingBottom:"8px",paddingTop:"4px",backgroundColor:"rgba(0, 0, 0, 0.02)",padding:"6px 8px",borderRadius:"4px",marginBottom:"4px"}}>
+                              <span style={{fontWeight:"600", textTransform: "capitalize"}}>{style.replace(/([A-Z])/g, ' $1').trim()}</span>
+                              <span style={{marginLeft:"auto",fontWeight:"700"}}>THB {price}</span>
                             </div>
                           )
                         }

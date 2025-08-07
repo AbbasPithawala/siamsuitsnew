@@ -303,10 +303,14 @@ router.post("/assignItem", auth, async(req, res) => {
         cost: currentProcess['price']
       }
   
-      if(currentProcess['name'].includes('stitching')){
-        job['cost'] = Number(job['cost']) + Number(order[0]['workerprice'][item])
-      }
+      // if(currentProcess['name'].includes('stitching')){
+      //   job['cost'] = Number(job['cost']) + Number(order[0]['workerprice'][item])
+      // }
   
+      if(currentProcess['name'].includes('stitching')){
+        job['cost'] = Number(job['cost'])
+        job['stylingprice'] = order[0]['stylingprice'][item]
+      }
       const newJob = new Jobs(job)
   
       await newJob.save()
