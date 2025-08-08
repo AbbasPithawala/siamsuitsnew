@@ -442,7 +442,8 @@ export default function ManageJobs() {
       extraPaymentCategories,
       selectedExtraPayments: [], // ManageJobs doesn't have selected extra payments
       selectedExtraPaymentsCost: 0,
-      jobType: 'job'
+      jobType: 'job',
+      printType: 'copy'
     });
   }
   const [qrCode, setQrCode] = useState("")

@@ -538,7 +538,8 @@ console.log("checkboxItem", checkboxItem)
       extraPaymentCategories,
       selectedExtraPayments: checkboxItem,
       selectedExtraPaymentsCost: extraPaymentCategoriesSelectedCost,
-      jobType: 'job'
+      jobType: 'job',
+      printType: 'new'
     });
   }
 

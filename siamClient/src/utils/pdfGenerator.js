@@ -11,11 +11,13 @@ export const generateJobPDF = async (options) => {
     extraPaymentCategories = [],
     selectedExtraPayments = [], // Array of selected extra payment category IDs
     selectedExtraPaymentsCost = 0,
-    jobType = 'job'
+    jobType = 'job',
+    printType = 'new' // 'new' for first print, 'copy' for reprint
   } = options;
 
   console.log("=== PDF Generation Debug ===");
   console.log("jobType:", jobType);
+  console.log("printType:", printType);
   console.log("job_id:", job?._id);
   console.log("typeof job_id:", typeof job?._id);
 
@@ -226,6 +228,44 @@ export const generateJobPDF = async (options) => {
   doc.setFontSize(12);
   renderText(doc, 'Total:', 5, yPos + 5, { fontStyle: 'bold' });
   renderText(doc, String(totalCost), 65, yPos + 5, { align: 'right', fontStyle: 'bold' });
+
+  // Add watermark if it's a copy
+  if (printType === 'copy') {
+    // Save current state
+    const currentFontSize = doc.getFontSize();
+    const currentTextColor = doc.getTextColor();
+    
+    // Set watermark style
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(60);
+    doc.setTextColor(180, 180, 180); // Light gray color
+    
+    // Add watermark text
+    doc.saveGraphicsState();
+    doc.setGState(new doc.GState({opacity: 0.4})); // Set transparency
+    
+    // Position watermark in center horizontally and lower vertically
+    const watermarkX = 50; // Center of page width (80mm / 2)
+    const watermarkY = 80; // Position lower but not in vertical center
+    
+    // Set outline style for text
+    doc.setDrawColor(180, 180, 180); // Same color for outline
+    doc.setLineWidth(0.3); // Thin outline
+    
+    // Rotate and add watermark text with outline style
+    doc.text('COPY', watermarkX, watermarkY, {
+      angle: 45,
+      align: 'center',
+      baseline: 'middle',
+      renderingMode: 'stroke' // This creates outline text instead of filled
+    });
+    
+    doc.restoreGraphicsState();
+    
+    // Restore original state
+    doc.setFontSize(currentFontSize);
+    doc.setTextColor(currentTextColor);
+  }
 
   // Open print dialog directly with hidden iframe
   const pdfBlob = doc.output('blob');
