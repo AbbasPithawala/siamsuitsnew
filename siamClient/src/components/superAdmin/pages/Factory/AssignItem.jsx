@@ -50,7 +50,7 @@ export default function AssignItem(){
   const [unfinishedJobs, setUnfinishedJobs] = useState([])
   const [showUnfinishedJobs, setShowUnfinishedJobs] = useState(false)
   const [extraPaymentCategoriesSelectedCost, setExtraPaymentCategoriesSelectedCost] = useState(0)
-  const [showConfirmButton, setShowConfirmButton] = useState(false)
+
   // extra payment states=======================================
 
   // const [workerExtraPayment, setWorkerExtraPayment] = useState({});
@@ -146,59 +146,8 @@ console.log("checkboxItem", checkboxItem)
 
 
    const handleCreateExtraPayment = async(e) => {
- 
     setShowExtraPaymentCategories(false)
-    setShowConfirmButton(true)
-
    }
-
-   const handleConfirmJob = () => {
-
-    setJobs([])
-    setQrCode("")
-    setShowJob(false)
-    fetchUnfinishedJobs(tailor['_id'])
-  }
-   const handleConfirmJob2 = async() => {
-
-    let orderID = ""
-    let type = "normal"
-    if(jobs[0]['order_id']){
-      orderID = jobs[0]['order_id'] 
-    }else{
-      type = "group"
-      orderID = jobs[0]['group_order_id'] 
-    }
-      const res = await axiosInstance.post("/tailer/createExtraPayment", {
-        token: user.data.token,
-        tailor: tailor['_id'],
-        item: jobs[0]['item_code'],
-        type: type,
-        order: orderID,
-        extraPayments: checkboxItem,
-        job: jobs[0]['_id']
-      })
-
-      if(res.data.status === true){
-        setShowJob(false)
-        fetchUnfinishedJobs(tailor['_id'])
-        setShowConfirmButton(false)
-        setExtraPaymentCategoriesSelectedCost(0)
-        setJobs([])
-        setCheckboxItem([])
-        setTailor({})
-        setSuccess(true)
-        setError(false)
-        setSuccessMsg(res.data.message)
-      }else{
-        setSuccess(false)
-        setError(true)
-        setErrorMsg(res.data.message)
-      }
-
-   }
-
-
 
   const handleClose = (event, reason) => {
     if (reason === "clickaway") {
@@ -400,14 +349,6 @@ console.log("checkboxItem", checkboxItem)
    
   }
 
-  const handleFinishJob = async(e, jid) => {
-    const par = {
-      status: true
-    }
-    updateJobs(par, jid)
-  }
-
-
   // ======================================================================
   // ========================== static function ===========================
   // ======================================================================
@@ -542,6 +483,101 @@ console.log("checkboxItem", checkboxItem)
       printType: 'new'
     });
   }
+
+  const handlePrintSlipWithCompletion = async (job, jobId = null) => {
+    try {
+      const currentJobId = jobId || job['_id']; // Handle both contexts
+      
+      // Step 1: Create extra payments ONLY if:
+      // - Process includes 'stitching' AND
+      // - User has selected extra payments (checkboxItem.length > 0)
+      if (job['process']['name'].includes('stitching') && checkboxItem.length > 0) {
+        let orderID = "";
+        let type = "normal";
+        
+        if(job['order_id']){
+          orderID = job['order_id'];
+        } else {
+          type = "group";
+          orderID = job['group_order_id'];
+        }
+        
+        const extraPaymentRes = await axiosInstance.post("/tailer/createExtraPayment", {
+          token: user.data.token,
+          tailor: tailor['_id'],
+          item: job['item_code'],
+          type: type,
+          order: orderID,
+          extraPayments: checkboxItem,
+          job: currentJobId
+        });
+        
+        if (!extraPaymentRes.data.status) {
+          setError(true);
+          setSuccess(false);
+          setErrorMsg(extraPaymentRes.data.message);
+          return;
+        }
+      }
+
+      // Step 2: Update job status to finished (similar to handleFinishJob/updateJobs)
+      let orderType = "normal";
+      if(job['group_order_id']){
+        orderType = "group";
+      }
+      
+      const jobFinishRes = await axiosInstance.post("/job/processFinish", {
+        token: user.data.token,
+        order: job['order_id'] ? job['order_id']['orderId'] : job['group_order_id']['orderId'],
+        item: job['item_code'].split("/")[1],
+        type: orderType,
+        customer: job['customer'],
+        process: {
+          name: job['process']['name']
+        }
+      });
+      
+      if (!jobFinishRes.data.status) {
+        setError(true);
+        setSuccess(false);
+        setErrorMsg("Failed to complete job");
+        return;
+      }
+
+      // Step 3: Generate PDF
+      await generateJobPDF({
+        job,
+        extraPaymentCategories,
+        selectedExtraPayments: checkboxItem,
+        selectedExtraPaymentsCost: extraPaymentCategoriesSelectedCost,
+        jobType: 'job',
+        printType: 'new'
+      });
+
+      // Step 4: Reset UI state and refresh data
+      if (jobId) {
+        // Called from unfinished jobs table
+        fetchUnfinishedJobs(tailor["_id"]);
+      } else {
+        // Called from single job view
+        setShowJob(false);
+        setExtraPaymentCategoriesSelectedCost(0);
+        setJobs([]);
+        setCheckboxItem([]);
+        setTailor({});
+        fetchUnfinishedJobs(tailor['_id']);
+      }
+      
+      setSuccess(true);
+      setError(false);
+      setSuccessMsg("Job completed and slip printed successfully");
+      
+    } catch (error) {
+      setError(true);
+      setSuccess(false);
+      setErrorMsg("An error occurred while processing the job");
+    }
+  };
 
   return (
     <main className="main-panel">
@@ -706,22 +742,22 @@ console.log("checkboxItem", checkboxItem)
                   )}
                   
                   <div style={{display: "flex", flexWrap: "wrap", gap: "8px"}}>
-                    <button onClick={() => handleGeneratePDF(job)} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Print Slip</button>
-                    {
-                      job['process']['name'].includes('stitching')
-                      //  && !showConfirmButton 
-                        ? 
-                        <>
-                      <button onClick={handleOpenExtraPaymentCategories} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Create Extra Payment</button>
-                      <button onClick={handleConfirmJob2} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Finish</button>
-                      </>
-                        :
-                        job['process']['name'].includes('stitching') && showConfirmButton
-                        ?
-                        <button onClick={handleConfirmJob2} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Finish</button>
-                        :
-                      <button onClick={handleConfirmJob} className="custom-btn" style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}} >Finish</button>
-                    }
+                    <button 
+                      onClick={() => handlePrintSlipWithCompletion(job)} 
+                      className="custom-btn" 
+                      style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}}
+                    >
+                      Print Slip & Complete Job
+                    </button>
+                    {job['process']['name'].includes('stitching') && (
+                      <button 
+                        onClick={handleOpenExtraPaymentCategories} 
+                        className="custom-btn" 
+                        style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}}
+                      >
+                        Create Extra Payment
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -815,7 +851,12 @@ console.log("checkboxItem", checkboxItem)
                     <td>{type}</td>
                     <td>{costTotal}</td>
                     <td>
-                    <button data-type="job" data-jobid={singleUnfinishedJob['_id']} onClick={(e) => handleFinishJob(e, singleUnfinishedJob['_id'])} className="custom-btn-new" >Finish</button>
+                    <button 
+                      onClick={(e) => handlePrintSlipWithCompletion(singleUnfinishedJob, singleUnfinishedJob['_id'])} 
+                      className="custom-btn-new"
+                    >
+                      Print Slip & Finish
+                    </button>
                     </td>
                   </tr>
                 );
