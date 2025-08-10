@@ -145,17 +145,26 @@ export default function ManageEditStyling(props) {
   // ===================static function ======================
   // ===================static function ======================
 
-    const fetchStyle = async(id) => {
+      const fetchStyle = async(id) => {
 
-      const res = await axiosInstance.post("/style/fetch/" + id, {token : user.data.token})
-      console.log(res.data.data[0]['style_options'])
-      setCurrentStyle(res.data.data[0])
-      setStyleOptions(res.data.data[0]['style_options'])
-      if(res.data.data[0]['image'].length > 0){
-        setImageFound(true)
-      }
+    const res = await axiosInstance.post("/style/fetch/" + id, {token : user.data.token})
+    console.log(res.data.data[0]['style_options'])
+    setCurrentStyle(res.data.data[0])
+    setStyleOptions(res.data.data[0]['style_options'])
     
+    // New logic: Check if ANY option has an image first, then check main style image
+    const hasOptionImages = res.data.data[0]['style_options'].some(option => option.image && option.image.length > 0)
+    const hasMainStyleImage = res.data.data[0]['image'] && res.data.data[0]['image'].length > 0
+    
+    // Only set imageFound to true if main style has image AND no options have images
+    // This allows option images to take priority
+    if(hasMainStyleImage && !hasOptionImages){
+      setImageFound(true)
+    } else {
+      setImageFound(false)
     }
+  
+  }
 
   // ===================static function ends ======================
   // ===================static function ends ======================
@@ -167,7 +176,7 @@ return (
     <div className="content-wrapper">
       <div className="order-table manage-page">
         <div className="top-heading-title">
-          <strong> Edit Styling </strong>
+          <strong> Edit Styling check </strong>
         </div>
         <div className="factory-user-from-NM pd-15">
           <div className="modal-box-NM">
@@ -198,13 +207,14 @@ return (
                             height = "50" 
                             width = "50" 
                             src={
-                              imageFound
-                              ?
-                              PicBaseUrl + currentStyle['image']
-                              :
+                              // Priority: 1) Option image, 2) Main style image, 3) Placeholder
                               options.image 
                               ? 
                               PicBaseUrl + options.image
+                              :
+                              currentStyle['image'] && currentStyle['image'].length > 0
+                              ?
+                              PicBaseUrl + currentStyle['image']
                               : 
                               ImageUpload
                             } 
@@ -278,7 +288,14 @@ return (
         <label htmlFor={`inputfile-${option._id}`}>
                             {
                               <img
-                                src={imageFound ? PicBaseUrl + currentStyle['image'] : option.image ? PicBaseUrl + option.image : ImageUpload }
+                                src={
+                                  // Priority: 1) Option image, 2) Main style image, 3) Placeholder
+                                  option.image 
+                                  ? PicBaseUrl + option.image 
+                                  : currentStyle['image'] && currentStyle['image'].length > 0
+                                  ? PicBaseUrl + currentStyle['image'] 
+                                  : ImageUpload 
+                                }
                                 width={60}
                                 height={60}
                               />
@@ -291,7 +308,7 @@ return (
                             id={`inputfile-${option._id}`}
                             style={{ display: "" }}
                             onChange = {(e) => handleAddImage(e)}
-                            disabled = {imageFound ? true : false}
+                            disabled = {false}
                           />
 
                           
@@ -343,7 +360,12 @@ return (
         <label htmlFor={`inputfile-${option._id}`}>
                             {
                               <img
-                                src={ imageFound ? PicBaseUrl + currentStyle['image'] : ImageUpload }
+                                src={ 
+                                  // For new options, show main style image as fallback if available
+                                  currentStyle['image'] && currentStyle['image'].length > 0
+                                  ? PicBaseUrl + currentStyle['image'] 
+                                  : ImageUpload 
+                                }
                                 width={60}
                                 height={60}
                               />
@@ -356,7 +378,7 @@ return (
                             id={`inputfile-${option._id}`}
                             style={{ display: "none" }}
                             onChange = {(e) => handleAddImage(e)}
-                            disabled = {imageFound ? true : false}
+                            disabled = {false}
                           />
 
                           

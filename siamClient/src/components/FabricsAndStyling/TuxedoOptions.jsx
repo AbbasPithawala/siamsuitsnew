@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
 import { PicBaseUrl } from "./../../imageBaseURL";
+import ImageUpload from "../../images/ImageUpload.png";
 
 const styleOptions = {
   display: "flex",
@@ -110,7 +111,67 @@ const handleStyleChangeRadio =(e) =>{
       {
         styles['_id'] == styleID
         ?
-        styles['image'].length > 0
+        // New logic: Check if ANY option has an image first
+        styles['style_options'].some(option => option.image && option.image.length > 0)
+        ?
+        // If options have images, show them as individual image choices
+        styles['style_options'].map((options) => {
+            return(
+              <div className="styleOptions2" style={{display: "flex", flexDirection:"column", marginLeft: "15px", border:"solid 1px #e1e1e1", borderRadius: "5px", padding: "5px"}}>
+
+                <label for={options['_id']}>
+                  <img src={
+                    // Priority: 1) Option image, 2) Main style image as fallback
+                    options['image'] && options['image'].length > 0
+                    ? PicBaseUrl + options['image']
+                    : styles['image'] && styles['image'].length > 0
+                    ? PicBaseUrl + styles['image']
+                    : ImageUpload
+                  } width={100} height={130} alt="" />
+                </label>
+                <input 
+                data-for="groupStyle" 
+                data-image={options.image} 
+                data-thainame={options['name']} 
+                data-addtional={false} 
+                data-feature={feature.name} 
+                data-workerprice = {styles['worker_price'] ? styles['worker_price'] : 0}
+                data-style={styles.name} 
+                value={options['name']} 
+                type="radio" 
+                name={styles['_id']} 
+                id={options['_id']} 
+                style={{ display: "none" }}
+                onChange={(e) => handleSuitStyleChange(e, productIndex)}
+                checked={
+                  TuxedostylesArray[
+                    "tuxedo_" + productIndex
+                    ][product]
+                      &&
+                      TuxedostylesArray[
+                  "tuxedo_" + productIndex
+                  ][product].groupStyle
+                    &&
+                    TuxedostylesArray[
+                    "tuxedo_" + productIndex
+                    ][product].groupStyle[feature.name]
+                    &&
+                    TuxedostylesArray[
+                    "tuxedo_" + productIndex
+                    ][product].groupStyle[feature.name][styles.name]
+                    &&
+                    TuxedostylesArray["tuxedo" + productIndex][product].groupStyle[feature.name][styles.name]["value"]
+                    ==
+                    options.name
+                    ? true
+                    : false
+                }/><span>{options['name']}</span>
+              </div>
+            )
+        })
+        :
+        // If no options have images, check if main style has image for dropdown mode
+        styles['image'] && styles['image'].length > 0
         ?
         <div style={{display: "flex", flexDirection:"column", alignItems: "center"}}>
         <label for=""><img src={PicBaseUrl + styles['image']} width={100} height={130} alt="" /></label>
@@ -162,50 +223,51 @@ const handleStyleChangeRadio =(e) =>{
         </select>
         </div>
         :
+        // If neither options nor main style have images, show text-only options
         styles['style_options'].map((options) => {
-            return(
-              <div className="styleOptions2" style={{display: "flex", flexDirection:"column", marginLeft: "15px", border:"solid 1px #e1e1e1", borderRadius: "5px", padding: "5px"}}>
-
-                <label for={options['_id']}><img src={PicBaseUrl + options['image']} width={100} height={130} alt="" /></label>
-                <input 
-                data-for="groupStyle" 
-                data-image={options.image} 
-                data-thainame={options['name']} 
-                data-addtional={false} 
-                data-feature={feature.name} 
-                data-workerprice = {styles['worker_price'] ? styles['worker_price'] : 0}
-                data-style={styles.name} 
-                value={options['name']} 
-                type="radio" 
-                name={styles['_id']} 
-                id={options['_id']} 
-                style={{ display: "none" }}
-                onChange={(e) => handleSuitStyleChange(e, productIndex)}
-                checked={
-                  TuxedostylesArray[
-                    "tuxedo_" + productIndex
-                    ][product]
-                      &&
-                      TuxedostylesArray[
+          return(
+            <div className="styleOptions2" style={{display: "flex", flexDirection:"column", marginLeft: "15px", border:"solid 1px #e1e1e1", borderRadius: "5px", padding: "5px"}}>
+              <input 
+              data-for="groupStyle" 
+              data-image={options.image} 
+              data-thainame={options['name']} 
+              data-addtional={false} 
+              data-feature={feature.name} 
+              data-workerprice = {styles['worker_price'] ? styles['worker_price'] : 0}
+              data-style={styles.name} 
+              value={options['name']} 
+              type="radio" 
+              name={styles['_id']} 
+              id={options['_id']} 
+              onChange={(e) => handleSuitStyleChange(e, productIndex, product)}
+              checked={
+                TuxedostylesArray[
                   "tuxedo_" + productIndex
-                  ][product].groupStyle
+                  ][product]
                     &&
                     TuxedostylesArray[
-                    "tuxedo_" + productIndex
-                    ][product].groupStyle[feature.name]
-                    &&
-                    TuxedostylesArray[
-                    "tuxedo_" + productIndex
-                    ][product].groupStyle[feature.name][styles.name]
-                    &&
-                    TuxedostylesArray["tuxedo" + productIndex][product].groupStyle[feature.name][styles.name]["value"]
-                    ==
-                    options.name
-                    ? true
-                    : false
-                }/><span>{options['name']}</span>
-              </div>
-            )
+                "tuxedo_" + productIndex
+                ][product].groupStyle
+                  &&
+                  TuxedostylesArray[
+                  "tuxedo_" + productIndex
+                  ][product].groupStyle[feature.name]
+                  &&
+                  TuxedostylesArray[
+                  "tuxedo_" + productIndex
+                  ][product].groupStyle[feature.name][styles.name]
+                  &&
+                  TuxedostylesArray["tuxedo_" + productIndex][product].groupStyle[feature.name][styles.name]["value"]
+                  ==
+                  options.name
+                  ? true
+                  : false
+              }/>
+              <label for={options['_id']}>
+                <span>{options['name']}</span>
+              </label>
+            </div>
+          )
         })
         :
         <></>

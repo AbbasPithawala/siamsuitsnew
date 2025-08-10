@@ -1,6 +1,7 @@
 import React, {useEffect} from 'react';
 import { PicBaseUrl } from "./../../imageBaseURL";
 import SuitStyles from './SuitStyles';
+import ImageUpload from "../../images/ImageUpload.png";
 import "./MissingFabric.css"
 
 const styleOptions = {
@@ -109,52 +110,10 @@ console.log("styles array : ", stylesArray)
       {
         styles['_id'] == styleID
         ?
-        styles['image'].length > 0
+        // New logic: Check if ANY option has an image first
+        styles['style_options'].some(option => option.image && option.image.length > 0)
         ?
-        <div style={{display: "flex", flexDirection:"column", alignItems: "center"}}>
-        <label for=""><img src={PicBaseUrl + styles['image']} width={100} height={130} alt="" /></label>
-        <select 
-        name="" 
-        data-style={styles.name} 
-        data-workerprice= {styles['worker_price'] ? styles['worker_price'] : 0}
-        data-for="groupStyle" 
-        data-feature={feature.name} 
-        data-image={styles['image']}
-        data-additional={false} 
-        onChange={(e) => handleStyleChange(e, productIndex)}>
-          <option value="" selected disabled>Select an option</option>
-          
-        {styles['style_options'].map((options) => {
-            return(
-              <option  
-              value={options['name']}
-              data-set={options['thai_name']}
-              selected={
-                stylesArray[
-                  product.name + "_" + productIndex
-                ].groupStyle
-                &&
-                stylesArray[
-                  product.name + "_" + productIndex
-                ].groupStyle[feature.name]
-                &&
-                stylesArray[
-                  product.name + "_" + productIndex
-                ].groupStyle[feature.name][styles.name]
-                &&
-                stylesArray[product.name + "_" + productIndex].groupStyle[feature.name][styles.name]["value"]
-                ==
-                options.name
-                ? true
-                : false
-            }
-              >{options['name']}</option>
-                
-            )
-        })}
-        </select>
-        </div>
-        :
+        // If options have images, show them as individual image choices
         styles['style_options'].map((options) => {
           // console.log("options name: " , options.name)
           // console.log(" value: ",  options.name == stylesArray[product.name + "_" + productIndex].groupStyle[feature.name]["value"])
@@ -180,7 +139,14 @@ console.log("styles array : ", stylesArray)
                 }
 
                 for={options['_id']}>
-                  <img src={PicBaseUrl + options['image']} width={100} height={130} alt="" />
+                  <img src={
+                    // Priority: 1) Option image, 2) Main style image as fallback
+                    options['image'] && options['image'].length > 0
+                    ? PicBaseUrl + options['image']
+                    : styles['image'] && styles['image'].length > 0
+                    ? PicBaseUrl + styles['image']
+                    : ImageUpload
+                  } width={100} height={130} alt="" />
                 </label>
                 <input 
                 checked={
@@ -233,6 +199,94 @@ console.log("styles array : ", stylesArray)
                 <span>{options['name']}</span>
               </div>
             )
+        })
+        :
+        // If no options have images, check if main style has image for dropdown mode
+        styles['image'] && styles['image'].length > 0
+        ?
+        <div style={{display: "flex", flexDirection:"column", alignItems: "center"}}>
+        <label for=""><img src={PicBaseUrl + styles['image']} width={100} height={130} alt="" /></label>
+        <select 
+        name="" 
+        data-style={styles.name} 
+        data-workerprice= {styles['worker_price'] ? styles['worker_price'] : 0}
+        data-for="groupStyle" 
+        data-feature={feature.name} 
+        data-image={styles['image']}
+        data-additional={false} 
+        onChange={(e) => handleStyleChange(e, productIndex)}>
+          <option value="" selected disabled>Select an option</option>
+          
+        {styles['style_options'].map((options) => {
+            return(
+              <option  
+              value={options['name']}
+              data-set={options['thai_name']}
+              selected={
+                stylesArray[
+                  product.name + "_" + productIndex
+                ].groupStyle
+                &&
+                stylesArray[
+                  product.name + "_" + productIndex
+                ].groupStyle[feature.name]
+                &&
+                stylesArray[
+                  product.name + "_" + productIndex
+                ].groupStyle[feature.name][styles.name]
+                &&
+                stylesArray[product.name + "_" + productIndex].groupStyle[feature.name][styles.name]["value"]
+                ==
+                options.name
+                ? true
+                : false
+            }
+              >{options['name']}</option>
+                
+            )
+        })}
+        </select>
+        </div>
+        :
+        // If neither options nor main style have images, show text-only options
+        styles['style_options'].map((options) => {
+          return(
+            <div className="styleOptions2 frontbutton-info" style={{display: "flex", flexDirection:"column"}}>
+              <input 
+              checked={
+                stylesArray[
+                  product.name + "_" + productIndex
+                ].groupStyle
+                  &&
+                  stylesArray[
+                    product.name + "_" + productIndex
+                  ].groupStyle[feature.name]
+                  &&
+                  stylesArray[product.name + "_" + productIndex].groupStyle[feature.name]
+                  ["value"]
+                  ==
+                  options.name
+                  ? true
+                  : false
+              }
+              data-for="groupStyle" 
+              data-image={options.image} 
+              data-thainame={options['thai_name']} 
+              data-additional={false} 
+              data-feature={feature.name} 
+              data-style={styles.name} 
+              data-workerprice= {styles['worker_price'] ? styles['worker_price'] : 0}
+              value={options['name']} 
+              type="radio" 
+              name={styles['_id']} 
+              id={options['_id']} 
+              onChange={(e) => handleStyleChange(e, productIndex)}
+              />
+              <label for={options['_id']}>
+                <span>{options['name']}</span>
+              </label>
+            </div>
+          )
         })
         :
         <></>
