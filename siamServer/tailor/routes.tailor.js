@@ -90,7 +90,6 @@ router.get("/fetchOrders", auth, async(req, res) => {
 router.post("/assignItem", auth, async(req, res) => {
 
   try{
-
     if(req.body.type == "normal"){
       const orderid = req.body.order
     
