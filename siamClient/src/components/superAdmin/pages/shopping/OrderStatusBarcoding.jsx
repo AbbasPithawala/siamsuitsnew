@@ -9,6 +9,7 @@ import { Context } from "./../../../../context/Context";
 import CancelIcon from '@mui/icons-material/Cancel';
 import { QRCodeCanvas } from "qrcode.react";
 import jsPDF from "jspdf";
+import QRCode from 'qrcode';
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
 import IconButton from "@mui/material/IconButton";
@@ -234,66 +235,75 @@ export default function OrderStatusBarcoding() {
 
 
       if((res.data.status == true && res.data.data.length == 1) || (res2.data.status == true && res2.data.data.length == 1)){
-        const itemArray1 = text.split("/")[1]
-        const itemArray = itemArray1.split("_")
-        let itemNumber = ""
-        let itemQuantity = ""
-        let itemName = ""
-        if(itemArray.length == 2){
-          itemNumber = Number(itemArray[1]) + 1
-          itemName = itemArray[0]
-        }else if(itemArray.length == 3){
-          itemNumber = Number(itemArray[2]) + 1
-          itemName = itemArray[0]
-        }
-        
+      
+      const orderDetails = (res.data.status == true && res.data.data.length == 1) ? res.data.data[0] : res2.data.data[0];
+      
+      const itemArray1 = text.split("/")[1]
+      const itemArray = itemArray1.split("_")
+      let itemNumber = ""
+      let itemQuantity = ""
+      let itemName = ""
+      if(itemArray.length == 2){
+        itemNumber = Number(itemArray[1]) + 1
+        itemName = itemArray[0]
+      }else if(itemArray.length == 3){
+        itemNumber = Number(itemArray[2]) + 1
+        itemName = itemArray[0]
+      }
+      
 
-        for(let x of res.data.data[0]['order_items']){
+      if(orderDetails.order_items){
+        for(let x of orderDetails['order_items']){
           if(x['item_name'] == itemName){
             itemQuantity = x['quantity']
           }
         }
-      let html = '<div style="width:200px;">'+
-      '<p style="font-size:8px; font-weight:700;  text-align:center;">' + res.data.data[0]["orderId"] +  '</p>'+
-      '<p style="font-size:8px; font-weight:700; text-align:center;">'+ res.data.data[0]["customerName"] +'</p>'+
-      '<p style="font-size:8px; font-weight:700;  text-align:center;">'+ itemNumber + " / " + itemQuantity + itemName +'</p>'+
-      '</div>';
-
-    //   let doc = new jsPDF('l','px',[200, 65]);
-    // doc.html(html, {
-    //   async callback(doc) {
-    //     window.open(doc.output("bloburl"), "_blank");
-    //   },
-    // });
-    let doc = new jsPDF('l', 'px', [200, 65]);
-
-doc.html(html, {
-  async callback(doc) {
-    const blob = doc.output("blob");
-    const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
-
-    // Open popup window
-    const popup = window.open("", "pdfPopup", "width=800,height=600");
-
-    if (popup) {
-      // Write HTML that embeds the PDF
-      popup.document.write(`
-        <html>
-          <head><title>PDF Preview</title></head>
-          <body style="margin:0">
-            <embed width="100%" height="100%" src="${blobUrl}" type="application/pdf" />
-          </body>
-        </html>
-      `);
-    } else {
-      alert("Popup blocked! Please allow popups for this site.");
-    }
-  }
-});
-      }else{
       }
-      setQRCodeValue(text)
-  }
+
+      const orderId = orderDetails["orderId"];
+      const customerName = orderDetails["customerName"];
+      const itemText = itemQuantity ? `${itemNumber} / ${itemQuantity} ${itemName}` : `${itemName}`;
+      
+      try {
+        const qrDataUrl = await QRCode.toDataURL(orderId, { errorCorrectionLevel: 'H', width: 150, margin: 1 });
+        
+        const doc = new jsPDF('l', 'mm', [107, 35]);
+
+        doc.addImage(qrDataUrl, 'PNG', 2, 2.5, 30, 30);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(orderId, 35, 10);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(customerName, 35, 18);
+        doc.text(itemText, 35, 26);
+        
+        const blob = doc.output("blob");
+        const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+
+        const popup = window.open("", "pdfPopup", "width=800,height=600");
+        
+        if (popup) {
+          popup.document.write(`
+            <html>
+              <head><title>PDF Preview</title></head>
+              <body style="margin:0">
+                <embed width="100%" height="100%" src="${blobUrl}" type="application/pdf" />
+              </body>
+            </html>
+          `);
+        } else {
+          alert("Popup blocked! Please allow popups for this site.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Failed to generate QR code.");
+    }
+    }else{
+    }
+    setQRCodeValue(text)
+}
 
   const handlePrintQR = () => {
     let doc = new jsPDF('l','mm',[107, 35.0]
