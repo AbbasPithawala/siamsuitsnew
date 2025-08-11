@@ -269,33 +269,36 @@ export default function OrderStatusBarcoding() {
         
         const doc = new jsPDF('l', 'mm', [107, 35]);
 
-        doc.addImage(qrDataUrl, 'PNG', 2, 2.5, 30, 30);
-
+        const qrCodeWidth = 30;
+        
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.text(orderId, 35, 10);
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.text(customerName, 35, 18);
-        doc.text(itemText, 35, 26);
         
-        const blob = doc.output("blob");
-        const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+        const orderIdWidth = doc.getTextWidth(orderId);
+        const customerNameWidth = doc.getTextWidth(customerName);
+        const itemTextWidth = doc.getTextWidth(itemText);
+        const textBlockWidth = Math.max(orderIdWidth, customerNameWidth, itemTextWidth);
 
-        const popup = window.open("", "pdfPopup", "width=800,height=600");
+        const totalContentWidth = qrCodeWidth + textBlockWidth + 2;
+        const horizontalMargin = (107 - totalContentWidth) / 2;
         
-        if (popup) {
-          popup.document.write(`
-            <html>
-              <head><title>PDF Preview</title></head>
-              <body style="margin:0">
-                <embed width="100%" height="100%" src="${blobUrl}" type="application/pdf" />
-              </body>
-            </html>
-          `);
-        } else {
-          alert("Popup blocked! Please allow popups for this site.");
-        }
+        const qrCodeX = horizontalMargin;
+        const textX = qrCodeX + qrCodeWidth + 2;
+
+        doc.addImage(qrDataUrl, 'PNG', qrCodeX, 2.5, qrCodeWidth, 30);
+        
+        doc.text(orderId, textX, 10);
+        doc.text(customerName, textX, 18);
+        doc.text(itemText, textX, 26);
+        
+        const pdfBlob = doc.output('blob');
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+        iframe.contentWindow.print();
+
     } catch (err) {
         console.error(err);
         alert("Failed to generate QR code.");
