@@ -14,6 +14,7 @@ import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
+import QrReader from "react-qr-scanner";
 
 import { generateJobPDF } from "../../../../utils/pdfGenerator";
 
@@ -48,6 +49,11 @@ export default function AssignItem(){
   const [checkboxItem, setCheckboxItem] = useState([])
   const [orderType, setOrderType] = useState("normal")
   const [unfinishedJobs, setUnfinishedJobs] = useState([])
+  
+  // QR Scanner states
+  const [showCamera, setShowCamera] = useState(false);
+  const [scanResult, setScanResult] = useState("");
+  const [cameraError, setCameraError] = useState("");
   const [showUnfinishedJobs, setShowUnfinishedJobs] = useState(false)
   const [extraPaymentCategoriesSelectedCost, setExtraPaymentCategoriesSelectedCost] = useState(0)
 
@@ -339,15 +345,56 @@ console.log("checkboxItem", checkboxItem)
     setShowRetailers(true)
   }
 
-  const handleEditJob = async (e) => {
+    const handleEditJob = async (e) => {
     const par = {
       tailor: e.target.dataset.tailorid
     }
     updateJobsForWorkers(par)
 
  
-   
+  
   }
+
+  // ======================================================================
+  // ========================== QR Scanner Functions ===========================
+  // ======================================================================
+
+  const handleScan = (data) => {
+    if (data) {
+      setQrCode(data.text);
+      setScanResult(data.text);
+      setShowCamera(false);
+      setCameraError("");
+      
+      // Show success message
+      setSuccess(true);
+      setSuccessMsg("QR Code scanned successfully!");
+    }
+  };
+
+  const handleError = (err) => {
+    console.error("QR Scanner Error:", err);
+    setCameraError("Camera access failed. Please ensure camera permissions are granted.");
+    setError(true);
+    setErrorMsg("Camera access failed. Please check your camera permissions.");
+  };
+
+  const toggleCamera = () => {
+    if (showCamera) {
+      setShowCamera(false);
+      setCameraError("");
+    } else {
+      setShowCamera(true);
+      setCameraError("");
+      setError(false);
+    }
+  };
+
+  const clearQrCode = () => {
+    setQrCode("");
+    setScanResult("");
+    setCameraError("");
+  };
 
   // ======================================================================
   // ========================== static function ===========================
@@ -629,9 +676,118 @@ console.log("checkboxItem", checkboxItem)
             {showQRInput
             ?
             <div className="searchinput-inner">
-            <p>QR Code</p>
-            <input type="text" className="searchinput" value={qrCode} onChange={(e) => setQrCode(e.target.value)}/>
-            <button className="btn-history2" onClick={handleAssignItem} >Assign</button>
+              <p>QR Code</p>
+              <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+                <input 
+                  type="text" 
+                  className="searchinput" 
+                  value={qrCode} 
+                  onChange={(e) => setQrCode(e.target.value)}
+                  placeholder="Enter QR code or scan with camera"
+                />
+                <button 
+                  type="button"
+                  className="custom-btn" 
+                  onClick={toggleCamera}
+                  style={{
+                    padding: '10px 15px',
+                    backgroundColor: showCamera ? '#ff4444' : '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                  title={showCamera ? "Close Camera" : "Open Camera Scanner"}
+                >
+                  {showCamera ? (
+                    <i className="fa-solid fa-times"></i>
+                  ) : (
+                    <i className="fa-solid fa-camera"></i>
+                  )}
+                </button>
+                {qrCode && (
+                  <button 
+                    type="button"
+                    className="custom-btn" 
+                    onClick={clearQrCode}
+                    style={{
+                      padding: '10px 15px',
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer'
+                    }}
+                    title="Clear QR Code"
+                  >
+                    <i className="fa-solid fa-trash"></i>
+                  </button>
+                )}
+              </div>
+              
+              {/* Camera Scanner View */}
+              {showCamera && (
+                <div style={{
+                  marginTop: '15px',
+                  padding: '20px',
+                  border: '2px solid #007bff',
+                  borderRadius: '10px',
+                  backgroundColor: '#f8f9fa'
+                }}>
+                  <div style={{textAlign: 'center', marginBottom: '15px'}}>
+                    <strong>QR Code Scanner</strong>
+                    <p style={{margin: '5px 0', fontSize: '14px', color: '#666'}}>
+                      Position QR code within the camera view
+                    </p>
+                  </div>
+                  
+                  {cameraError ? (
+                    <div style={{
+                      textAlign: 'center',
+                      color: '#dc3545',
+                      padding: '20px',
+                      backgroundColor: '#f8d7da',
+                      borderRadius: '5px',
+                      marginBottom: '15px'
+                    }}>
+                      <i className="fa-solid fa-exclamation-triangle" style={{marginRight: '10px'}}></i>
+                      {cameraError}
+                      <br />
+                      <small>Please check camera permissions in your browser settings</small>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      marginBottom: '15px'
+                    }}>
+                      <QrReader
+                        delay={300}
+                        style={{
+                          width: '300px',
+                          height: '300px'
+                        }}
+                        onError={handleError}
+                        onScan={handleScan}
+                      />
+                    </div>
+                  )}
+                  
+                  <div style={{textAlign: 'center'}}>
+                    <button 
+                      className="btn-history2" 
+                      onClick={() => setShowCamera(false)}
+                      style={{marginRight: '10px'}}
+                    >
+                      Close Camera
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              <button className="btn-history2" onClick={handleAssignItem} style={{marginTop: '10px'}}>
+                Assign
+              </button>
             </div>
             :
             <></>
@@ -676,9 +832,9 @@ console.log("checkboxItem", checkboxItem)
               );
 
               return(
-                <div style={{width:"calc(100% - 40px)",marginLeft:"20px",marginBottom:"20px",borderRadius:"5px!important",color: "#000",border:"1px solid #e1e1e1", backgroundColor: "rgb(28 77 143 / 8%)",borderRadius:"10px",boxShadow:"px 6px 16px rgba(00,00,00,0.09)", display:"flex", flexDirection: "row", padding:"15px",borderLeft:"5px solid #1c4d8f"}}>
+                <div className="job-card-container" style={{width:"calc(100% - 40px)",marginLeft:"20px",marginBottom:"20px",borderRadius:"5px!important",color: "#000",border:"1px solid #e1e1e1", backgroundColor: "rgb(28 77 143 / 8%)",borderRadius:"10px",boxShadow:"px 6px 16px rgba(00,00,00,0.09)", display:"flex", flexDirection: "row", padding:"15px",borderLeft:"5px solid #1c4d8f"}}>
                 {/* sfdsfs */}
-                <div style={{width:"65%",}}>
+                <div className="job-card-left" style={{width:"65%",}}>
                   <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}} >Item: <span style={{marginLeft:"auto",fontWeight:"700", textTransform: "capitalize"}}>{itemName}</span></p>
                   
                   <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}}  >Description: <span style={{marginLeft:"auto",fontWeight:"700", textTransform: "capitalize"}}>{job['process']['description']}</span></p>
@@ -689,7 +845,7 @@ console.log("checkboxItem", checkboxItem)
                 
                 </div>
                 
-                <div style={{width:"30%",marginLeft:"auto",padding:"20px 16px",textAlign:"left",backgroundColor:"#fff",borderRadius:"10px",boxShadow:"0px 6px 18px rgba(00,00,00,0.09)"}}>
+                <div className="job-card-right" style={{width:"30%",marginLeft:"auto",padding:"20px 16px",textAlign:"left",backgroundColor:"#fff",borderRadius:"10px",boxShadow:"0px 6px 18px rgba(00,00,00,0.09)"}}>
                   
                   <p style={{fontSize:"24px",fontWeight:"700",color:"#000", margin:"0"}}>{job['order_id'] ? job['order_id']['orderId'] : job['group_order_id']['orderId']}</p>
                   <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}} >Amount: <span style={{marginLeft:"auto",fontWeight:"700"}}>{job['cost']}</span></p>
@@ -741,11 +897,11 @@ console.log("checkboxItem", checkboxItem)
                     </div>
                   )}
                   
-                  <div style={{display: "flex", flexWrap: "wrap", gap: "8px"}}>
+                  <div style={{display: "flex", flexWrap: "wrap", gap: "8px", flexDirection: "column"}}>
                     <button 
                       onClick={() => handlePrintSlipWithCompletion(job)} 
                       className="custom-btn" 
-                      style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}}
+                      style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none", marginBottom: "8px"}}
                     >
                       Print Slip & Complete Job
                     </button>
@@ -770,6 +926,7 @@ console.log("checkboxItem", checkboxItem)
 
           {showUnfinishedJobs
             ?
+            <div className="table-responsive">
             <table className="table">
             <thead>
               <tr>
@@ -864,6 +1021,7 @@ console.log("checkboxItem", checkboxItem)
               }
             </tbody>
           </table>
+          </div>
             :
               <></>
           }
@@ -910,7 +1068,7 @@ console.log("checkboxItem", checkboxItem)
                     }
                     if(itemName == epc['product']['name']){
                       return(
-                        <div style={{padding: "20px 10px", fontSize: "16px", fontWeight: "500", backgroundColor: "#EDF1F6", marginBottom: "5px", borderRadius:"5px"}}>
+                        <div className="extra-payment-item" style={{padding: "20px 10px", fontSize: "16px", fontWeight: "500", backgroundColor: "#EDF1F6", marginBottom: "5px", borderRadius:"5px"}}>
                           <label className="full_label">
                             <input type="checkbox" id={epc['_id']} value={epc['_id']} checked={checkboxItem.includes(epc['_id'])} onChange={(e) => handleCheckboxChange(e, epc['cost'])}/>
                             <span style={{paddingLeft: "10px"}}> <label htmlFor={epc['_id']}>{epc['name']} / {epc['thai_name']} - THB {epc['cost']}</label> </span>                           

@@ -36,6 +36,10 @@ export default function Header(){
     const handleLogout = () => {
       dispatch({ type: "LOGOUT" });
     }
+
+    const handleSidebarToggle = () => {
+      dispatch({ type: "TOGGLE_SIDEBAR" });
+    }
     const menuId = 'primary-search-account-menu';
     return (
         <header>
@@ -43,9 +47,10 @@ export default function Header(){
                 <div className="logo-box">
                     <Link to="/"><img src={Logo} alt="SiamSuits Logo" /></Link>
                     <div className="navigation-toggle">
-                       <a href="#" id="togglemenu"> <i className="fa-solid fa-bars"></i> </a>
+                       <a id="togglemenu" onClick={handleSidebarToggle}> <i className="fa-solid fa-bars"></i> </a>
                     </div> 
                 </div>   
+                {/* just */}
                 {/* <div className="navigation-navm">
                     <div className="top-search-box">
                         <form className="expanding-search-form">

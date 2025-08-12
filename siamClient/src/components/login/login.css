@@ -4,13 +4,20 @@
     display: flex;
     justify-content: center;
     flex-direction: column;
+    padding: 20px;
 }
 .logobox {
     text-align: center;
+    margin-bottom: 20px;
+}
+.logobox img {
+    max-width: 200px;
+    height: auto;
 }
 .form-width-nav {
-    margin: 60px auto;
-    width: 410px;
+    margin: 20px auto;
+    width: 100%;
+    max-width: 410px;
     padding: 30px 40px;
     border-radius: 30px !important;
 }
@@ -53,4 +60,148 @@
 }
 .title-name {
     text-align: center;
+}
+
+/* Mobile devices (320px - 480px) */
+@media screen and (max-width: 480px) {
+    .login-section {
+        padding: 10px;
+    }
+    
+    .logobox img {
+        max-width: 150px;
+    }
+    
+    .form-width-nav {
+        margin: 10px auto;
+        padding: 20px 15px;
+        border-radius: 20px !important;
+    }
+    
+    .title-name h1 {
+        font-size: 24px;
+        margin-bottom: 20px;
+    }
+    
+    .custom-form-group .form-control {
+        height: 50px;
+        margin-bottom: 15px;
+    }
+    
+    .custom-btn-nav {
+        padding: 15px !important;
+        font-size: 16px;
+    }
+    
+    .forget-pd {
+        flex-direction: column;
+        text-align: center;
+        gap: 5px;
+    }
+    
+    .forget-pd p {
+        padding-left: 0;
+        font-size: 12px;
+    }
+}
+
+/* Small tablets and large phones (481px - 768px) */
+@media screen and (min-width: 481px) and (max-width: 768px) {
+    .login-section {
+        padding: 15px;
+    }
+    
+    .logobox img {
+        max-width: 180px;
+    }
+    
+    .form-width-nav {
+        margin: 30px auto;
+        padding: 25px 30px;
+        max-width: 380px;
+    }
+    
+    .title-name h1 {
+        font-size: 28px;
+    }
+    
+    .custom-form-group .form-control {
+        height: 52px;
+    }
+    
+    .custom-btn-nav {
+        padding: 14px !important;
+    }
+}
+
+/* iPads and tablets (769px - 1024px) */
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+    .login-section {
+        padding: 20px;
+    }
+    
+    .logobox img {
+        max-width: 220px;
+    }
+    
+    .form-width-nav {
+        margin: 40px auto;
+        padding: 35px 45px;
+        max-width: 450px;
+    }
+    
+    .title-name h1 {
+        font-size: 32px;
+    }
+    
+    .custom-form-group .form-control {
+        height: 58px;
+    }
+    
+    .custom-btn-nav {
+        padding: 16px !important;
+        font-size: 18px;
+    }
+}
+
+/* Landscape orientation adjustments */
+@media screen and (max-height: 600px) and (orientation: landscape) {
+    .login-section {
+        padding: 10px;
+    }
+    
+    .logobox {
+        margin-bottom: 10px;
+    }
+    
+    .logobox img {
+        max-width: 120px;
+    }
+    
+    .form-width-nav {
+        margin: 10px auto;
+        padding: 15px 25px;
+    }
+    
+    .title-name h1 {
+        font-size: 20px;
+        margin-bottom: 15px;
+    }
+    
+    .custom-form-group .form-control {
+        height: 45px;
+        margin-bottom: 8px;
+    }
+    
+    .pd-20 {
+        padding-bottom: 8px;
+    }
+    
+    .custom-btn-nav {
+        padding: 10px !important;
+    }
+    
+    .forget-pd {
+        padding: 5px;
+    }
 }

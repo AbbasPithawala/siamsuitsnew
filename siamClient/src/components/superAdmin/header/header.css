@@ -5,7 +5,14 @@
 .navigation-toggle a {
     color: #242424;
     font-size: 22px;
+    cursor: pointer;
+    transition: color 0.3s ease;
 }
+
+.navigation-toggle a:hover {
+    color: #1c4d8f;
+}
+
 .navigation-toggle {
     padding: 14px 40px;
 }

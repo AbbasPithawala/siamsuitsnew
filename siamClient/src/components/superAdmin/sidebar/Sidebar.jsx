@@ -54,7 +54,7 @@ export default function Sidebar() {
   const [selectedSidebarLink, setSelectedSidebarLink] = React.useState("")
   const [roleModule, setRoleModule] = useState([])
 
-  const { user } = useContext(Context)
+  const { user, sidebarOpen, dispatch } = useContext(Context)
   const roleData = {
     name: user.data.role,
     token: user.data.token
@@ -73,8 +73,20 @@ export default function Sidebar() {
     setExpanded(newExpanded ? panel : false);
   };
 
+  const handleOverlayClick = () => {
+    dispatch({ type: "TOGGLE_SIDEBAR" });
+  };
+
   return (
-    <aside className="sidebar">
+    <>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-overlay show" 
+          onClick={handleOverlayClick}
+        />
+      )}
+      <aside className={`sidebar ${!sidebarOpen ? 'collapsed' : ''}`}>
       <div id="leftside-navigation" className="nano">
         <Accordion expanded={expanded === 'panel1'} onChange={handleChange('panel1')} className="Accrodian-main">
           <AccordionSummary aria-controls="panel1d-content" id="panel1d-header" className="sidebarmenu">
@@ -174,5 +186,6 @@ export default function Sidebar() {
         </Accordion>
       </div>
     </aside>
+    </>
   );
 }
