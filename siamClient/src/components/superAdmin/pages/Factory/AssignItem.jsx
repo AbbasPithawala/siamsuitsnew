@@ -14,6 +14,7 @@ import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
+import QrReader from "react-qr-scanner";
 
 import { generateJobPDF } from "../../../../utils/pdfGenerator";
 
@@ -48,6 +49,11 @@ export default function AssignItem(){
   const [checkboxItem, setCheckboxItem] = useState([])
   const [orderType, setOrderType] = useState("normal")
   const [unfinishedJobs, setUnfinishedJobs] = useState([])
+  
+  // QR Scanner states
+  const [showCamera, setShowCamera] = useState(false);
+  const [scanResult, setScanResult] = useState("");
+  const [cameraError, setCameraError] = useState("");
   const [showUnfinishedJobs, setShowUnfinishedJobs] = useState(false)
   const [extraPaymentCategoriesSelectedCost, setExtraPaymentCategoriesSelectedCost] = useState(0)
 
@@ -339,15 +345,56 @@ console.log("checkboxItem", checkboxItem)
     setShowRetailers(true)
   }
 
-  const handleEditJob = async (e) => {
+    const handleEditJob = async (e) => {
     const par = {
       tailor: e.target.dataset.tailorid
     }
     updateJobsForWorkers(par)
 
  
-   
+  
   }
+
+  // ======================================================================
+  // ========================== QR Scanner Functions ===========================
+  // ======================================================================
+
+  const handleScan = (data) => {
+    if (data) {
+      setQrCode(data.text);
+      setScanResult(data.text);
+      setShowCamera(false);
+      setCameraError("");
+      
+      // Show success message
+      setSuccess(true);
+      setSuccessMsg("QR Code scanned successfully!");
+    }
+  };
+
+  const handleError = (err) => {
+    console.error("QR Scanner Error:", err);
+    setCameraError("Camera access failed. Please ensure camera permissions are granted.");
+    setError(true);
+    setErrorMsg("Camera access failed. Please check your camera permissions.");
+  };
+
+  const toggleCamera = () => {
+    if (showCamera) {
+      setShowCamera(false);
+      setCameraError("");
+    } else {
+      setShowCamera(true);
+      setCameraError("");
+      setError(false);
+    }
+  };
+
+  const clearQrCode = () => {
+    setQrCode("");
+    setScanResult("");
+    setCameraError("");
+  };
 
   // ======================================================================
   // ========================== static function ===========================
@@ -629,9 +676,118 @@ console.log("checkboxItem", checkboxItem)
             {showQRInput
             ?
             <div className="searchinput-inner">
-            <p>QR Code</p>
-            <input type="text" className="searchinput" value={qrCode} onChange={(e) => setQrCode(e.target.value)}/>
-            <button className="btn-history2" onClick={handleAssignItem} >Assign</button>
+              <p>QR Code</p>
+              <div style={{display: 'flex', gap: '10px', alignItems: 'center'}}>
+                <input 
+                  type="text" 
+                  className="searchinput" 
+                  value={qrCode} 
+                  onChange={(e) => setQrCode(e.target.value)}
+                  placeholder="Enter QR code or scan with camera"
+                />
+                <button 
+                  type="button"
+                  className="custom-btn" 
+                  onClick={toggleCamera}
+                  style={{
+                    padding: '10px 15px',
+                    backgroundColor: showCamera ? '#ff4444' : '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer'
+                  }}
+                  title={showCamera ? "Close Camera" : "Open Camera Scanner"}
+                >
+                  {showCamera ? (
+                    <i className="fa-solid fa-times"></i>
+                  ) : (
+                    <i className="fa-solid fa-camera"></i>
+                  )}
+                </button>
+                {qrCode && (
+                  <button 
+                    type="button"
+                    className="custom-btn" 
+                    onClick={clearQrCode}
+                    style={{
+                      padding: '10px 15px',
+                      backgroundColor: '#6c757d',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '5px',
+                      cursor: 'pointer'
+                    }}
+                    title="Clear QR Code"
+                  >
+                    <i className="fa-solid fa-trash"></i>
+                  </button>
+                )}
+              </div>
+              
+              {/* Camera Scanner View */}
+              {showCamera && (
+                <div style={{
+                  marginTop: '15px',
+                  padding: '20px',
+                  border: '2px solid #007bff',
+                  borderRadius: '10px',
+                  backgroundColor: '#f8f9fa'
+                }}>
+                  <div style={{textAlign: 'center', marginBottom: '15px'}}>
+                    <strong>QR Code Scanner</strong>
+                    <p style={{margin: '5px 0', fontSize: '14px', color: '#666'}}>
+                      Position QR code within the camera view
+                    </p>
+                  </div>
+                  
+                  {cameraError ? (
+                    <div style={{
+                      textAlign: 'center',
+                      color: '#dc3545',
+                      padding: '20px',
+                      backgroundColor: '#f8d7da',
+                      borderRadius: '5px',
+                      marginBottom: '15px'
+                    }}>
+                      <i className="fa-solid fa-exclamation-triangle" style={{marginRight: '10px'}}></i>
+                      {cameraError}
+                      <br />
+                      <small>Please check camera permissions in your browser settings</small>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      marginBottom: '15px'
+                    }}>
+                      <QrReader
+                        delay={300}
+                        style={{
+                          width: '300px',
+                          height: '300px'
+                        }}
+                        onError={handleError}
+                        onScan={handleScan}
+                      />
+                    </div>
+                  )}
+                  
+                  <div style={{textAlign: 'center'}}>
+                    <button 
+                      className="btn-history2" 
+                      onClick={() => setShowCamera(false)}
+                      style={{marginRight: '10px'}}
+                    >
+                      Close Camera
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              <button className="btn-history2" onClick={handleAssignItem} style={{marginTop: '10px'}}>
+                Assign
+              </button>
             </div>
             :
             <></>

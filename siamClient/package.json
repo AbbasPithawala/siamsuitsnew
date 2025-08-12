@@ -44,6 +44,7 @@
     "react-loader-spinner": "^5.3.4",
     "react-loading": "^2.0.3",
     "react-loading-skeleton": "^3.1.0",
+    "react-qr-scanner": "^1.0.0-alpha.11",
     "react-router-dom": "^6.3.0",
     "react-scripts": "^5.0.1",
     "react-spinners": "^0.13.6",
