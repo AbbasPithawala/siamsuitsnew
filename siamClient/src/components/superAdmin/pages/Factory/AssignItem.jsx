@@ -676,9 +676,9 @@ console.log("checkboxItem", checkboxItem)
               );
 
               return(
-                <div style={{width:"calc(100% - 40px)",marginLeft:"20px",marginBottom:"20px",borderRadius:"5px!important",color: "#000",border:"1px solid #e1e1e1", backgroundColor: "rgb(28 77 143 / 8%)",borderRadius:"10px",boxShadow:"px 6px 16px rgba(00,00,00,0.09)", display:"flex", flexDirection: "row", padding:"15px",borderLeft:"5px solid #1c4d8f"}}>
+                <div className="job-card-container" style={{width:"calc(100% - 40px)",marginLeft:"20px",marginBottom:"20px",borderRadius:"5px!important",color: "#000",border:"1px solid #e1e1e1", backgroundColor: "rgb(28 77 143 / 8%)",borderRadius:"10px",boxShadow:"px 6px 16px rgba(00,00,00,0.09)", display:"flex", flexDirection: "row", padding:"15px",borderLeft:"5px solid #1c4d8f"}}>
                 {/* sfdsfs */}
-                <div style={{width:"65%",}}>
+                <div className="job-card-left" style={{width:"65%",}}>
                   <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}} >Item: <span style={{marginLeft:"auto",fontWeight:"700", textTransform: "capitalize"}}>{itemName}</span></p>
                   
                   <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}}  >Description: <span style={{marginLeft:"auto",fontWeight:"700", textTransform: "capitalize"}}>{job['process']['description']}</span></p>
@@ -689,7 +689,7 @@ console.log("checkboxItem", checkboxItem)
                 
                 </div>
                 
-                <div style={{width:"30%",marginLeft:"auto",padding:"20px 16px",textAlign:"left",backgroundColor:"#fff",borderRadius:"10px",boxShadow:"0px 6px 18px rgba(00,00,00,0.09)"}}>
+                <div className="job-card-right" style={{width:"30%",marginLeft:"auto",padding:"20px 16px",textAlign:"left",backgroundColor:"#fff",borderRadius:"10px",boxShadow:"0px 6px 18px rgba(00,00,00,0.09)"}}>
                   
                   <p style={{fontSize:"24px",fontWeight:"700",color:"#000", margin:"0"}}>{job['order_id'] ? job['order_id']['orderId'] : job['group_order_id']['orderId']}</p>
                   <p style={{fontSize:"16px",fontWeight:"500",display:"flex",width:"100%",borderBottom:"1px solid #e1e1e1",paddingBottom:"8PX"}} >Amount: <span style={{marginLeft:"auto",fontWeight:"700"}}>{job['cost']}</span></p>
@@ -741,11 +741,11 @@ console.log("checkboxItem", checkboxItem)
                     </div>
                   )}
                   
-                  <div style={{display: "flex", flexWrap: "wrap", gap: "8px"}}>
+                  <div style={{display: "flex", flexWrap: "wrap", gap: "8px", flexDirection: "column"}}>
                     <button 
                       onClick={() => handlePrintSlipWithCompletion(job)} 
                       className="custom-btn" 
-                      style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}}
+                      style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none", marginBottom: "8px"}}
                     >
                       Print Slip & Complete Job
                     </button>
@@ -770,6 +770,7 @@ console.log("checkboxItem", checkboxItem)
 
           {showUnfinishedJobs
             ?
+            <div className="table-responsive">
             <table className="table">
             <thead>
               <tr>
@@ -864,6 +865,7 @@ console.log("checkboxItem", checkboxItem)
               }
             </tbody>
           </table>
+          </div>
             :
               <></>
           }
@@ -910,7 +912,7 @@ console.log("checkboxItem", checkboxItem)
                     }
                     if(itemName == epc['product']['name']){
                       return(
-                        <div style={{padding: "20px 10px", fontSize: "16px", fontWeight: "500", backgroundColor: "#EDF1F6", marginBottom: "5px", borderRadius:"5px"}}>
+                        <div className="extra-payment-item" style={{padding: "20px 10px", fontSize: "16px", fontWeight: "500", backgroundColor: "#EDF1F6", marginBottom: "5px", borderRadius:"5px"}}>
                           <label className="full_label">
                             <input type="checkbox" id={epc['_id']} value={epc['_id']} checked={checkboxItem.includes(epc['_id'])} onChange={(e) => handleCheckboxChange(e, epc['cost'])}/>
                             <span style={{paddingLeft: "10px"}}> <label htmlFor={epc['_id']}>{epc['name']} / {epc['thai_name']} - THB {epc['cost']}</label> </span>                           

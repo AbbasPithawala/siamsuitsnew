@@ -324,3 +324,175 @@ button.decline-button:hover {
     cursor: pointer;
     border-color: #1C4D8F;
 }
+
+/* Responsive Design for AssignItem Component */
+
+/* iPad and tablet landscape */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .job-card-container {
+        flex-direction: row !important;
+    }
+    
+    .job-card-left {
+        width: 60% !important;
+    }
+    
+    .job-card-right {
+        width: 38% !important;
+        margin-left: 2% !important;
+    }
+    
+    .table th, .table td {
+        padding: 10px !important;
+        font-size: 13px !important;
+    }
+    
+    .custom-btn-new {
+        font-size: 11px !important;
+        padding: 5px 10px !important;
+    }
+}
+
+/* General tablet styles */
+@media (max-width: 1024px) {
+    .top-heading-title {
+        flex-direction: column !important;
+    }
+    
+    .top-heading-title > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+    }
+    
+    .searchinput-inner {
+        margin-bottom: 15px !important;
+        width: 100% !important;
+    }
+    
+    .searchinput {
+        width: 100% !important;
+        max-width: none !important;
+    }
+    
+    .btn-history2 {
+        margin-left: 10px !important;
+        margin-top: 10px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-panel {
+        padding: 10px !important;
+    }
+    
+    .order-table {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Job Card Responsive */
+    .job-card-container {
+        width: calc(100% - 20px) !important;
+        margin: 10px !important;
+        flex-direction: column !important;
+        padding: 15px !important;
+    }
+    
+    .job-card-left {
+        width: 100% !important;
+        margin-bottom: 20px !important;
+    }
+    
+    .job-card-right {
+        width: 100% !important;
+        margin-left: 0 !important;
+        padding: 15px !important;
+    }
+    
+    /* Table Responsive */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .table {
+        min-width: 600px;
+    }
+    
+    .table th, .table td {
+        padding: 8px !important;
+        font-size: 12px !important;
+        white-space: nowrap;
+    }
+    
+    /* Button adjustments */
+    .custom-btn-new {
+        font-size: 10px !important;
+        padding: 4px 8px !important;
+    }
+    
+    /* Dialog responsive */
+    .MuiDialog-paper {
+        margin: 16px !important;
+        width: calc(100% - 32px) !important;
+        max-width: none !important;
+    }
+    
+    /* Extra payment dialog styles */
+    .extra-payment-item {
+        padding: 15px 10px !important;
+        margin-bottom: 10px !important;
+        font-size: 14px !important;
+    }
+    
+    .extra-payment-item label {
+        display: flex !important;
+        align-items: center !important;
+        flex-wrap: wrap !important;
+    }
+    
+    .extra-payment-item input[type="checkbox"] {
+        margin-right: 10px !important;
+        transform: scale(1.2) !important;
+    }
+    
+    /* Form inputs */
+    .searchinput-inner p {
+        margin-bottom: 5px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .order-table {
+        padding: 0 5px !important;
+    }
+    
+    .job-card-container {
+        margin: 5px !important;
+        padding: 10px !important;
+    }
+    
+    .job-card-right {
+        padding: 10px !important;
+    }
+    
+    .table th, .table td {
+        padding: 4px !important;
+        font-size: 10px !important;
+    }
+    
+    .btn-history2 {
+        padding: 6px 12px !important;
+        font-size: 12px !important;
+    }
+    
+    /* Stack form elements vertically */
+    .top-heading-title > div {
+        gap: 10px;
+    }
+    
+    .searchinput-inner {
+        margin-bottom: 10px !important;
+    }
+}

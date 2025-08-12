@@ -118,6 +118,7 @@ a:hover{
      width: calc(100% - 235px);
      -webkit-flex-direction: column;
      flex-direction: column;
+     flex: 1;
 }
 
 .content-wrapper {
@@ -139,6 +140,32 @@ a:hover{
     padding-left: 0;
     padding-right: 0;
     padding-top: 80px;
+    transition: all 0.3s ease;
+}
+
+.Main-page-body-wrapper-complussry.sidebar-collapsed .main-panel {
+    width: 100%;
+}
+
+.Main-page-body-wrapper-complussry.sidebar-collapsed .content-wrapper {
+    width: 98%;
+}
+
+/* Mobile improvements */
+@media (max-width: 768px) {
+    .Main-page-body-wrapper-complussry {
+        flex-direction: row !important;
+    }
+    
+    .main-panel {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+    
+    .content-wrapper {
+        width: calc(100% - 20px) !important;
+        margin: 10px !important;
+    }
 }
 a{text-decoration:none;}
 .order-top-tabs ul {

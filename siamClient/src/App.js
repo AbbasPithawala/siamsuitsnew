@@ -94,7 +94,7 @@ import SingleOrder from './components/retailerAdmin/retailerPages/singleOrder/Si
 
 function App() {
 
-const { user, isLoggedIn } = useContext(Context);
+const { user, isLoggedIn, sidebarOpen } = useContext(Context);
 
 
 return (
@@ -105,7 +105,7 @@ return (
 
           <HashRouter >
             <RetailerHeader />
-            <div className="Main-page-body-wrapper-complussry">
+            <div className={`Main-page-body-wrapper-complussry ${!sidebarOpen ? 'sidebar-collapsed' : ''}`}>
               <RetailerSidebar />
               <Routes>
                 <Route exact path="/" element={<RetailerDashboard />}></Route>
@@ -136,7 +136,7 @@ return (
 
           <HashRouter >
             <Header />
-            <div className="Main-page-body-wrapper-complussry">
+            <div className={`Main-page-body-wrapper-complussry ${!sidebarOpen ? 'sidebar-collapsed' : ''}`}>
               <Sidebar />
               <Routes>
                 {/* <Route exact path="/" element={ <Dashboard/> }></Route> */}

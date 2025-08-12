@@ -75,7 +75,12 @@ const Reducer = (state, action) => {
           isLoggedIn:false,
           isFetching: false,
           error: true,
-        };  
+        };
+      case "TOGGLE_SIDEBAR":
+        return {
+          ...state,
+          sidebarOpen: !state.sidebarOpen,
+        };
       default:
           return state;
   }

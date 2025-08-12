@@ -7,6 +7,7 @@ const INITIAL_STATE = {
   isLoggedIn: false,
   isFetching: false,
   error: false,
+  sidebarOpen: true,
 };
 
 export const Context = createContext(INITIAL_STATE);
@@ -25,6 +26,7 @@ export const ContextProvider = ({ children }) => {
         isLoggedIn: state.isLoggedIn,
         isFetching: state.isFetching,
         error: state.error,
+        sidebarOpen: state.sidebarOpen,
         dispatch,
       }}
     >
