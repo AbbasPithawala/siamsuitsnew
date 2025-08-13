@@ -15,6 +15,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
 import QrScanner from "qr-scanner";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 import { generateJobPDF } from "../../../../utils/pdfGenerator";
 
@@ -55,8 +56,10 @@ export default function AssignItem(){
   const [scanResult, setScanResult] = useState("");
   const [cameraError, setCameraError] = useState("");
   const [isScanning, setIsScanning] = useState(false);
+  const [useAlternativeScanner, setUseAlternativeScanner] = useState(false);
   const videoRef = useRef(null);
   const qrScannerRef = useRef(null);
+  const html5QrScannerRef = useRef(null);
   const [showUnfinishedJobs, setShowUnfinishedJobs] = useState(false)
   const [extraPaymentCategoriesSelectedCost, setExtraPaymentCategoriesSelectedCost] = useState(0)
 
@@ -362,10 +365,43 @@ console.log("checkboxItem", checkboxItem)
   // ========================== QR Scanner Functions ===========================
   // ======================================================================
 
+  const checkCameraPermissions = async () => {
+    try {
+      // First check if navigator.mediaDevices is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera not supported on this device");
+      }
+
+      // Check camera permission status
+      if (navigator.permissions) {
+        const permission = await navigator.permissions.query({ name: 'camera' });
+        console.log("Camera permission status:", permission.state);
+      }
+
+      // Try to get user media first to ensure camera access
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment' // Prefer back camera
+        } 
+      });
+      
+      // Stop the stream immediately - we just needed to check permissions
+      stream.getTracks().forEach(track => track.stop());
+      
+      return true;
+    } catch (error) {
+      console.error("Camera permission check failed:", error);
+      throw error;
+    }
+  };
+
   const startScanner = async () => {
     try {
       setIsScanning(true);
       setCameraError("");
+      
+      // First check camera permissions explicitly
+      await checkCameraPermissions();
       
       if (videoRef.current && !qrScannerRef.current) {
         // Create new QR scanner instance
@@ -397,13 +433,30 @@ console.log("checkboxItem", checkboxItem)
 
         // Start scanning
         await qrScannerRef.current.start();
+        setIsScanning(true);
       }
     } catch (error) {
       console.error("QR Scanner Error:", error);
       setIsScanning(false);
-      setCameraError("Camera access failed. Please ensure camera permissions are granted and try again.");
+      
+      let errorMessage = "Camera access failed. Please ensure camera permissions are granted.";
+      
+      // Provide more specific error messages
+      if (error.name === 'NotAllowedError' || error.message.includes('Permission denied')) {
+        errorMessage = "Camera permission denied. Please allow camera access in your browser settings and refresh the page.";
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = "No camera found on this device.";
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = "Camera not supported on this device or browser.";
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = "Camera is already in use by another application.";
+      } else if (error.message.includes('not supported')) {
+        errorMessage = "Camera not supported on this device.";
+      }
+      
+      setCameraError(errorMessage);
       setError(true);
-      setErrorMsg("Camera access failed. Please check your camera permissions.");
+      setErrorMsg(errorMessage);
     }
   };
 
@@ -418,14 +471,124 @@ console.log("checkboxItem", checkboxItem)
     setCameraError("");
   };
 
+  const startAlternativeScanner = () => {
+    try {
+      setIsScanning(true);
+      setCameraError("");
+      
+      if (!html5QrScannerRef.current) {
+        html5QrScannerRef.current = new Html5QrcodeScanner(
+          "qr-reader",
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+            showTorchButtonIfSupported: true,
+            showZoomSliderIfSupported: true,
+            defaultZoomValueIfSupported: 2,
+          },
+          false
+        );
+
+        html5QrScannerRef.current.render(
+          (decodedText, decodedResult) => {
+            // Handle successful scan
+            setQrCode(decodedText);
+            setScanResult(decodedText);
+            setShowCamera(false);
+            setIsScanning(false);
+            
+            // Clear scanner
+            if (html5QrScannerRef.current) {
+              html5QrScannerRef.current.clear();
+              html5QrScannerRef.current = null;
+            }
+            
+            // Show success message
+            setSuccess(true);
+            setSuccessMsg("QR Code scanned successfully!");
+          },
+          (error) => {
+            // Handle scan error (but don't show error for every failed attempt)
+            console.log("Scan attempt:", error);
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Alternative scanner failed:", error);
+      setIsScanning(false);
+      setCameraError("Unable to start camera scanner. Please try manual input.");
+    }
+  };
+
+  const stopAlternativeScanner = () => {
+    if (html5QrScannerRef.current) {
+      html5QrScannerRef.current.clear();
+      html5QrScannerRef.current = null;
+    }
+    setIsScanning(false);
+  };
+
+  const requestCameraPermission = async () => {
+    try {
+      setCameraError("");
+      setIsScanning(true);
+      
+      // Request camera permission explicitly
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment' 
+        } 
+      });
+      
+      // Stop the stream immediately
+      stream.getTracks().forEach(track => track.stop());
+      
+      // If successful, start the scanner
+      setTimeout(() => {
+        if (useAlternativeScanner) {
+          startAlternativeScanner();
+        } else {
+          startScanner();
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error("Permission request failed:", error);
+      setIsScanning(false);
+      
+      if (error.name === 'NotAllowedError') {
+        setCameraError("Camera permission denied. Please go to your browser settings and allow camera access for this site, then refresh the page.");
+      } else {
+        setCameraError("Unable to access camera. Please check your device settings.");
+      }
+    }
+  };
+
+  const tryAlternativeScanner = () => {
+    setUseAlternativeScanner(true);
+    setCameraError("");
+    setTimeout(() => {
+      startAlternativeScanner();
+    }, 100);
+  };
+
   const toggleCamera = async () => {
     if (showCamera) {
-      stopScanner();
+      if (useAlternativeScanner) {
+        stopAlternativeScanner();
+      } else {
+        stopScanner();
+      }
     } else {
       setShowCamera(true);
       // Small delay to ensure video element is rendered
       setTimeout(() => {
-        startScanner();
+        if (useAlternativeScanner) {
+          startAlternativeScanner();
+        } else {
+          startScanner();
+        }
       }, 100);
     }
   };
@@ -442,6 +605,9 @@ console.log("checkboxItem", checkboxItem)
       if (qrScannerRef.current) {
         qrScannerRef.current.stop();
         qrScannerRef.current.destroy();
+      }
+      if (html5QrScannerRef.current) {
+        html5QrScannerRef.current.clear();
       }
     };
   }, []);
@@ -809,22 +975,58 @@ console.log("checkboxItem", checkboxItem)
                       <i className="fa-solid fa-exclamation-triangle" style={{marginRight: '10px'}}></i>
                       {cameraError}
                       <br />
-                      <small>Please check camera permissions in your browser settings</small>
-                      <br />
-                      <button 
-                        onClick={toggleCamera}
-                        style={{
-                          marginTop: '10px',
-                          padding: '8px 16px',
-                          backgroundColor: '#007bff',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Try Again
-                      </button>
+                      <div style={{marginTop: '15px'}}>
+                        <strong>How to fix:</strong>
+                        <ol style={{textAlign: 'left', margin: '10px 0', paddingLeft: '20px'}}>
+                          <li>Tap the camera icon in your browser's address bar</li>
+                          <li>Select "Allow" for camera access</li>
+                          <li>Refresh the page if needed</li>
+                          <li>Try again using the button below</li>
+                        </ol>
+                      </div>
+                      <div style={{display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '15px'}}>
+                        <button 
+                          onClick={requestCameraPermission}
+                          style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#28a745',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Request Camera Permission
+                        </button>
+                        <button 
+                          onClick={tryAlternativeScanner}
+                          style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#ffc107',
+                            color: 'black',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Try Alternative Scanner
+                        </button>
+                        <button 
+                          onClick={toggleCamera}
+                          style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Try Again
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div style={{
@@ -832,19 +1034,29 @@ console.log("checkboxItem", checkboxItem)
                       justifyContent: 'center',
                       marginBottom: '15px'
                     }}>
-                      <video
-                        ref={videoRef}
-                        style={{
-                          width: '100%',
-                          maxWidth: '300px',
-                          height: '300px',
-                          objectFit: 'cover',
-                          borderRadius: '8px',
-                          backgroundColor: '#000'
-                        }}
-                        playsInline
-                        muted
-                      />
+                      {useAlternativeScanner ? (
+                        <div 
+                          id="qr-reader" 
+                          style={{
+                            width: '100%',
+                            maxWidth: '350px'
+                          }}
+                        ></div>
+                      ) : (
+                        <video
+                          ref={videoRef}
+                          style={{
+                            width: '100%',
+                            maxWidth: '300px',
+                            height: '300px',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            backgroundColor: '#000'
+                          }}
+                          playsInline
+                          muted
+                        />
+                      )}
                     </div>
                   )}
                   
