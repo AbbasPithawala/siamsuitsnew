@@ -30,6 +30,7 @@
     "jspdf": "^2.5.1",
     "jspdf-customfonts": "^0.0.4-rc.4",
     "material-ui-popup-state": "^5.0.4",
+    "qr-scanner": "^1.4.2",
     "qrcode": "^1.5.4",
     "qrcode.react": "^3.1.0",
     "randomcolor": "^0.6.2",
@@ -55,6 +56,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start-ngrok": "set HOST=0.0.0.0&& set DANGEROUSLY_DISABLE_HOST_CHECK=true&& npm start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
