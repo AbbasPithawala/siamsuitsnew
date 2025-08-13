@@ -1,7 +1,7 @@
 import React from "react";
 import "./factory.css";
 import { Link } from "react-router-dom";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { axiosInstance } from "./../../../../config";
 import { Context } from "../../../../context/Context";
 import Button from "@mui/material/Button";
@@ -14,7 +14,7 @@ import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
-import QrReader from "react-qr-scanner";
+import QrScanner from "qr-scanner";
 
 import { generateJobPDF } from "../../../../utils/pdfGenerator";
 
@@ -54,6 +54,9 @@ export default function AssignItem(){
   const [showCamera, setShowCamera] = useState(false);
   const [scanResult, setScanResult] = useState("");
   const [cameraError, setCameraError] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const videoRef = useRef(null);
+  const qrScannerRef = useRef(null);
   const [showUnfinishedJobs, setShowUnfinishedJobs] = useState(false)
   const [extraPaymentCategoriesSelectedCost, setExtraPaymentCategoriesSelectedCost] = useState(0)
 
@@ -359,34 +362,71 @@ console.log("checkboxItem", checkboxItem)
   // ========================== QR Scanner Functions ===========================
   // ======================================================================
 
-  const handleScan = (data) => {
-    if (data) {
-      setQrCode(data.text);
-      setScanResult(data.text);
-      setShowCamera(false);
+  const startScanner = async () => {
+    try {
+      setIsScanning(true);
       setCameraError("");
       
-      // Show success message
-      setSuccess(true);
-      setSuccessMsg("QR Code scanned successfully!");
+      if (videoRef.current && !qrScannerRef.current) {
+        // Create new QR scanner instance
+        qrScannerRef.current = new QrScanner(
+          videoRef.current,
+          (result) => {
+            // Handle successful scan
+            setQrCode(result.data);
+            setScanResult(result.data);
+            setShowCamera(false);
+            setIsScanning(false);
+            
+            // Stop the scanner
+            if (qrScannerRef.current) {
+              qrScannerRef.current.stop();
+            }
+            
+            // Show success message
+            setSuccess(true);
+            setSuccessMsg("QR Code scanned successfully!");
+          },
+          {
+            preferredCamera: 'environment', // Use back camera on mobile
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
+            returnDetailedScanResult: true,
+          }
+        );
+
+        // Start scanning
+        await qrScannerRef.current.start();
+      }
+    } catch (error) {
+      console.error("QR Scanner Error:", error);
+      setIsScanning(false);
+      setCameraError("Camera access failed. Please ensure camera permissions are granted and try again.");
+      setError(true);
+      setErrorMsg("Camera access failed. Please check your camera permissions.");
     }
   };
 
-  const handleError = (err) => {
-    console.error("QR Scanner Error:", err);
-    setCameraError("Camera access failed. Please ensure camera permissions are granted.");
-    setError(true);
-    setErrorMsg("Camera access failed. Please check your camera permissions.");
+  const stopScanner = () => {
+    if (qrScannerRef.current) {
+      qrScannerRef.current.stop();
+      qrScannerRef.current.destroy();
+      qrScannerRef.current = null;
+    }
+    setIsScanning(false);
+    setShowCamera(false);
+    setCameraError("");
   };
 
-  const toggleCamera = () => {
+  const toggleCamera = async () => {
     if (showCamera) {
-      setShowCamera(false);
-      setCameraError("");
+      stopScanner();
     } else {
       setShowCamera(true);
-      setCameraError("");
-      setError(false);
+      // Small delay to ensure video element is rendered
+      setTimeout(() => {
+        startScanner();
+      }, 100);
     }
   };
 
@@ -395,6 +435,16 @@ console.log("checkboxItem", checkboxItem)
     setScanResult("");
     setCameraError("");
   };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      if (qrScannerRef.current) {
+        qrScannerRef.current.stop();
+        qrScannerRef.current.destroy();
+      }
+    };
+  }, []);
 
   // ======================================================================
   // ========================== static function ===========================
@@ -739,6 +789,12 @@ console.log("checkboxItem", checkboxItem)
                     <p style={{margin: '5px 0', fontSize: '14px', color: '#666'}}>
                       Position QR code within the camera view
                     </p>
+                    {isScanning && (
+                      <p style={{margin: '5px 0', fontSize: '12px', color: '#007bff'}}>
+                        <i className="fa-solid fa-spinner fa-spin" style={{marginRight: '5px'}}></i>
+                        Scanning for QR codes...
+                      </p>
+                    )}
                   </div>
                   
                   {cameraError ? (
@@ -754,6 +810,21 @@ console.log("checkboxItem", checkboxItem)
                       {cameraError}
                       <br />
                       <small>Please check camera permissions in your browser settings</small>
+                      <br />
+                      <button 
+                        onClick={toggleCamera}
+                        style={{
+                          marginTop: '10px',
+                          padding: '8px 16px',
+                          backgroundColor: '#007bff',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Try Again
+                      </button>
                     </div>
                   ) : (
                     <div style={{
@@ -761,14 +832,18 @@ console.log("checkboxItem", checkboxItem)
                       justifyContent: 'center',
                       marginBottom: '15px'
                     }}>
-                      <QrReader
-                        delay={300}
+                      <video
+                        ref={videoRef}
                         style={{
-                          width: '300px',
-                          height: '300px'
+                          width: '100%',
+                          maxWidth: '300px',
+                          height: '300px',
+                          objectFit: 'cover',
+                          borderRadius: '8px',
+                          backgroundColor: '#000'
                         }}
-                        onError={handleError}
-                        onScan={handleScan}
+                        playsInline
+                        muted
                       />
                     </div>
                   )}
@@ -776,7 +851,7 @@ console.log("checkboxItem", checkboxItem)
                   <div style={{textAlign: 'center'}}>
                     <button 
                       className="btn-history2" 
-                      onClick={() => setShowCamera(false)}
+                      onClick={stopScanner}
                       style={{marginRight: '10px'}}
                     >
                       Close Camera

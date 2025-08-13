@@ -4,12 +4,20 @@
   "description": "SIAM Suits - Custom Tailoring Application",
   "scripts": {
     "dev:server": "cd siamServer && npm run dev",
-    "dev:client": "cd siamClient && npm start", 
+    "dev:client": "cd siamClient && npm start",
     "start": "cd siamServer && npm start",
     "build": "cd siamClient && npm run build",
     "install:all": "cd siamServer && npm install && cd ../siamClient && npm install"
   },
-  "keywords": ["tailoring", "suits", "react", "node"],
+  "keywords": [
+    "tailoring",
+    "suits",
+    "react",
+    "node"
+  ],
   "author": "",
-  "license": "ISC"
-} 
+  "license": "ISC",
+  "dependencies": {
+    "qr-scanner": "^1.4.2"
+  }
+}
