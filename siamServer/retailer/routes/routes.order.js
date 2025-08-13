@@ -2464,6 +2464,35 @@ html = html +
   
   '<div class="fabric-details" style="width:100%; display:flex; align-items:center; justify-content:flex-start; flex-wrape:wrap; margin:1rem 0;">';
 
+  if(singleOrderArray[i]['item_name'] == 'suit' && singleOrderArray[i].item_code.split(" ")[0] == "pant"){
+    for(let x of Object.keys(singleOrderArray[i]["styles"]["pant"]["style"])){
+      if (singleOrderArray[i]["styles"]["pant"]["style"][x]["additional"] == "true") {
+        html = html + 
+        
+      '<div class="fabric-note" style="width: auto;height:50px; min-height:80px; text-align:center; border: 1px solid #000000;">'+
+      '<h5 style="font-size:12px; font-family:Montserrat,sans-serif; font-weight:400; margin:0 0 10px 0; padding:5px; text-align:center;border-bottom: 1px solid;">'+ x + 
+      '</h5>'+
+      '<h5 style="font-size:12px; font-family:Montserrat,sans-serif; font-weight:400; margin:10px 0 0px 0; padding:5px; 0 text-align:center;">'+ singleOrderArray[i]["styles"]['pant']["style"][x]["thai_name"] +"/" + singleOrderArray[i]["styles"]['pant']["style"][x]["value"] +
+      '</h5>'+
+      '</div>';
+      }
+    }
+  }
+
+  if(singleOrderArray[i]['item_name'] == 'suit' && singleOrderArray[i].item_code.split(" ")[0] == "jacket"){
+    for(let x of Object.keys(singleOrderArray[i]["styles"]["jacket"]["style"])){
+      if (singleOrderArray[i]["styles"]["jacket"]["style"][x]["additional"] == "true") {
+        html = html + 
+        
+      '<div class="fabric-note" style="width: auto;height:50px; min-height:80px; text-align:center; border: 1px solid #000000;">'+
+      '<h5 style="font-size:12px; font-family:Montserrat,sans-serif; font-weight:400; margin:0 0 10px 0; padding:5px; text-align:center;border-bottom: 1px solid;">'+ x + 
+      '</h5>'+
+      '<h5 style="font-size:12px; font-family:Montserrat,sans-serif; font-weight:400; margin:10px 0 0px 0; padding:5px; 0 text-align:center;">'+ singleOrderArray[i]["styles"]['jacket']["style"][x]["thai_name"] +"/" + singleOrderArray[i]["styles"]['jacket']["style"][x]["value"] +
+      '</h5>'+
+      '</div>';
+      }
+    }
+  }
 
   if(singleOrderArray[i]['item_name'] == 'tuxedo' && singleOrderArray[i].item_code.split(" ")[0] == "pant"){
     for(let x of Object.keys(singleOrderArray[i]["styles"]["pant"]["style"])){
