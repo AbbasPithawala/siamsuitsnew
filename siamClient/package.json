@@ -27,6 +27,7 @@
     "downloadjs": "^1.4.7",
     "html-to-image": "^1.10.8",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "jspdf": "^2.5.1",
     "jspdf-customfonts": "^0.0.4-rc.4",
     "material-ui-popup-state": "^5.0.4",
