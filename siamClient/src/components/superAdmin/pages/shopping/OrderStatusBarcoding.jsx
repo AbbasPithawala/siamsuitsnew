@@ -269,13 +269,9 @@ export default function OrderStatusBarcoding() {
         
         const doc = new jsPDF('l', 'mm', [107, 35]);
 
-        const pageMargin = 1;
-        doc.setLineWidth(0.5);
-        doc.rect(pageMargin, pageMargin, 107 - (pageMargin * 2), 35 - (pageMargin * 2));
-
         const qrCodeWidth = 30;
         
-        doc.setFontSize(10);
+        doc.setFontSize(12.5);
         doc.setFont("helvetica", "bold");
         
         const orderIdWidth = doc.getTextWidth(orderId);

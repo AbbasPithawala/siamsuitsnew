@@ -195,7 +195,7 @@ const colorData = [
   },
   {
     id: "11",
-    color: "#2C3C81",
+    color: "#ffffff",
     value: "1902",
   },
   {
