@@ -299,6 +299,9 @@ export default function OrderStatusBarcoding() {
         document.body.appendChild(iframe);
         iframe.contentWindow.print();
 
+        // Update order status to "Shipment" after successful QR generation
+        await updateOrderStatus(orderDetails._id, "Shipment");
+
     } catch (err) {
         console.error(err);
         alert("Failed to generate QR code.");
@@ -332,6 +335,37 @@ export default function OrderStatusBarcoding() {
 
   // ===========static function=================
   // ===========================================
+
+  const updateOrderStatus = async (orderId, status) => {
+    try {
+      const statusChange = {
+        order_status: status,
+        token: user.data.token,
+      };
+      const res = await axiosInstance.put(
+        `/customerOrders/updateStatus/${orderId}`,
+        statusChange
+      );
+      if (res.data.status) {
+        setOpen(true);
+        setSuccess(true);
+        setErrorMsg("");
+        setError(false);
+        setSuccessMsg(`QR code generated and order status updated to ${status} successfully!`);
+      } else {
+        setOpen(true);
+        setSuccess(false);
+        setErrorMsg("QR code generated but failed to update order status");
+        setError(true);
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      setOpen(true);
+      setSuccess(false);
+      setErrorMsg("QR code generated but failed to update order status");
+      setError(true);
+    }
+  };
 
   const fetchRetailers = async () => {
     const res = await axiosInstance.post("/retailer/fetchAll", {
