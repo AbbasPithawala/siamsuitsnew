@@ -87,15 +87,17 @@ export const generateJobPDF = async (options) => {
     return thaiRegex.test(text);
   }
 
-  // Helper function to render text with appropriate font
+  // Helper function to render text with appropriate font and handle long text
   function renderText(doc, text, x, y, options = {}) {
+    const maxWidth = options.maxWidth || 55; // Default max width for text
+    
     if (isThaiText(text)) {
       // Set Thai font with enhanced styling
       doc.setFont('THSarabunNewRegular', 'normal');
       
       // Increase font size for Thai text to match visual weight
       const currentFontSize = doc.getFontSize();
-      doc.setFontSize(currentFontSize + 3);
+      doc.setFontSize(currentFontSize + 3.6);
       
       // Add character spacing for Thai text
       const modifiedOptions = { 
@@ -103,14 +105,26 @@ export const generateJobPDF = async (options) => {
         charSpace: 0.2 // Reduced character spacing
       };
       
-      // Render once without bold effect
-      doc.text(text, x, y, modifiedOptions);
+      // Handle text wrapping for Thai text
+      if (options.maxWidth) {
+        const textLines = doc.splitTextToSize(text, maxWidth);
+        doc.text(textLines, x, y, modifiedOptions);
+      } else {
+        doc.text(text, x, y, modifiedOptions);
+      }
       
       // Reset font size
       doc.setFontSize(currentFontSize);
     } else {
       doc.setFont('helvetica', options.fontStyle || 'normal');
-      doc.text(text, x, y, options);
+      
+      // Handle text wrapping for regular text
+      if (options.maxWidth) {
+        const textLines = doc.splitTextToSize(text, maxWidth);
+        doc.text(textLines, x, y, options);
+      } else {
+        doc.text(text, x, y, options);
+      }
     }
   }
 
@@ -140,7 +154,7 @@ export const generateJobPDF = async (options) => {
   }
 
   // Order Info
-  doc.setFontSize(10);
+  doc.setFontSize(12);
   renderText(doc, `Name: ${ArrayPDF?.tailor?.firstname || ''} ${ArrayPDF?.tailor?.lastname || ''}`, 5, 45);
   renderText(doc, `Date: ${new Date(ArrayPDF?.date).toLocaleDateString()}`, 5, 51);
   renderText(doc, `Order No.: ${ArrayPDF?.order_id?.orderId || ArrayPDF?.group_order_id?.orderId || ''}`, 5, 57);
@@ -148,11 +162,11 @@ export const generateJobPDF = async (options) => {
   // Category
   doc.setFont('helvetica', 'bold');
   doc.text('Category', 5, 67);
-  doc.text('Price', 65, 67, { align: 'right' });
+  doc.text('Price', 70, 67, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
-  renderText(doc, `${toTitleCase(ArrayPDF?.process?.name)}`, 5, 75);
-  renderText(doc, `${ArrayPDF?.cost || 0}`, 65, 75, { align: 'right' });
+  renderText(doc, `${toTitleCase(ArrayPDF?.process?.name)}`, 5, 75, { maxWidth: 55 });
+  renderText(doc, `${ArrayPDF?.cost || 0}`, 70, 75, { align: 'right' });
 
   let yPos = 85;
 
@@ -160,19 +174,19 @@ export const generateJobPDF = async (options) => {
   if (ArrayPDF['extraPayments']?.length > 0) {
     doc.setFont('helvetica', 'bold');
     doc.text('Extra Category', 5, yPos);
-    doc.text('Price', 65, yPos, { align: 'right' });
+    doc.text('Price', 70, yPos, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     yPos += 7;
 
     ArrayPDF['extraPayments'].forEach((item) => {
       if (item['approved'] && item['status'] !== false) {
-        renderText(doc, toTitleCase(item.nameOfCategory), 5, yPos);
-        renderText(doc, String(item.cost), 65, yPos, { align: 'right' });
+        renderText(doc, toTitleCase(item.nameOfCategory), 5, yPos, { maxWidth: 55 });
+        renderText(doc, String(item.cost), 70, yPos, { align: 'right' });
         yPos += 5;
 
         if (item['thai_category_name']) {
-          renderText(doc, item['thai_category_name'], 5, yPos);
+          renderText(doc, item['thai_category_name'], 5, yPos, { maxWidth: 55 });
           yPos += 5;
         }
       }
@@ -189,18 +203,18 @@ export const generateJobPDF = async (options) => {
       if (ArrayPDF['extraPayments']?.length === 0) {
         doc.setFont('helvetica', 'bold');
         doc.text('Extra Category', 5, yPos);
-        doc.text('Price', 65, yPos, { align: 'right' });
+        doc.text('Price', 70, yPos, { align: 'right' });
         doc.setFont('helvetica', 'normal');
         yPos += 7;
       }
 
       selectedExtraPaymentDetails.forEach((item) => {
-        renderText(doc, toTitleCase(item.name), 5, yPos);
-        renderText(doc, String(item.cost), 65, yPos, { align: 'right' });
+        renderText(doc, toTitleCase(item.name), 5, yPos, { maxWidth: 55 });
+        renderText(doc, String(item.cost), 70, yPos, { align: 'right' });
         yPos += 5;
 
         if (item['thai_name']) {
-          renderText(doc, item['thai_name'], 5, yPos);
+          renderText(doc, item['thai_name'], 5, yPos, { maxWidth: 55 });
           yPos += 5;
         }
       });
@@ -211,23 +225,23 @@ export const generateJobPDF = async (options) => {
   if (ArrayPDF['stylingprice'] && Object.keys(ArrayPDF['stylingprice']).length > 0) {
     doc.setFont('helvetica', 'bold');
     doc.text('Stylings', 5, yPos);
-    doc.text('Price', 65, yPos, { align: 'right' });
+    doc.text('Price', 70, yPos, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     yPos += 7;
 
     Object.entries(ArrayPDF['stylingprice']).forEach(([key, value]) => {
-      renderText(doc, toTitleCase(key), 5, yPos);
-      renderText(doc, String(value), 65, yPos, { align: 'right' });
+      renderText(doc, toTitleCase(key), 5, yPos, { maxWidth: 55 });
+      renderText(doc, String(value), 70, yPos, { align: 'right' });
       yPos += 5;
     });
   }
 
   // Total
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(14.4);
   renderText(doc, 'Total:', 5, yPos + 5, { fontStyle: 'bold' });
-  renderText(doc, String(totalCost), 65, yPos + 5, { align: 'right', fontStyle: 'bold' });
+  renderText(doc, String(totalCost), 70, yPos + 5, { align: 'right', fontStyle: 'bold' });
 
   // Add watermark if it's a copy
   if (printType === 'copy') {
@@ -237,7 +251,7 @@ export const generateJobPDF = async (options) => {
     
     // Set watermark style
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(60);
+    doc.setFontSize(72);
     doc.setTextColor(180, 180, 180); // Light gray color
     
     // Add watermark text
