@@ -22,6 +22,10 @@ const extraPaymentCategoriesSchema = new mongoose.Schema({
         type: mongoose.Types.ObjectId,
             ref: "Style"
     },
+    process: {
+        type: mongoose.Types.ObjectId,
+        ref: "Process"
+    },
     option_value: {
         type: String,
         required: false

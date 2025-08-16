@@ -42,7 +42,6 @@ import ManageUserFormEdit from './components/superAdmin/pages/adminForm/ManageUs
 import ManageRetailerForm from './components/superAdmin/pages/adminForm/ManageRetailerForm';
 import ManageRetailerFormEdit from './components/superAdmin/pages/adminForm/ManageRetailerFormEdit';
 import ManageStyleOptionFrom from './components/superAdmin/pages/adminForm/ManageStyleOptionForm';
-import ManageStyleOptionFormEdit from './components/superAdmin/pages/adminForm/ManageStyleOptionFormEdit';
 import ManageProductForm from './components/superAdmin/pages/adminForm/ManageProductForm';
 import ManageProductFormEdit from './components/superAdmin/pages/adminForm/ManageProductFormEdit';
 import SearchOrder from './components/superAdmin/pages/order/SearchOrder';
@@ -162,7 +161,7 @@ return (
                 <Route exact path="/admin/addProduct/:id" element={<ManageProductFormEdit />}></Route>
                 <Route exact path="/admin/editPiping/:id" element={<ManageEditPipingForm />}></Route>
                 <Route exact path="/admin/addStyleOption" element={<ManageStyleOptionFrom />}></Route>
-                <Route exact path="/admin/addStyleOption/:id" element={<ManageStyleOptionFormEdit />}></Route>
+                <Route exact path="/admin/addStyleOption/:id" element={<ManageStyleOptionFrom />}></Route>
                 <Route exact path="/admin/addGroupStyle" element={<ManageGroupFeaturesForm />}></Route>
                 <Route exact path="/admin/editGroupStyle/:id" element={<ManageGroupFeaturesEdit />}></Route>
                 <Route exact path="/admin/GroupStyle" element={<ManageGroupStyling />}></Route>

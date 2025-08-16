@@ -307,10 +307,27 @@ router.post("/assignItem", auth, async(req, res) => {
       //   job['cost'] = Number(job['cost']) + Number(order[0]['workerprice'][item])
       // }
   
-      if(currentProcess['name'].includes('stitching')){
+      // if(currentProcess['name'].includes('stitching')){
+      //   job['cost'] = Number(job['cost'])
+      //   job['stylingprice'] = order[0]['stylingprice']?.[item] || {}
+      // }
+      if(order[0]['stylingprice'][item]){
+        for(let x of Object.keys(order[0]['stylingprice'][item])){
+          if(order[0]['stylingprice'][item][x]['process'] === currentProcess['_id']){
+            job['cost'] = Number(job['cost'])
+            // job['cost'] = Number(job['cost']) + Number(order[0]['stylingprice'][item][x]['workerprice'])
+            let newObj = {}
+            newObj[x] = order[0]['stylingprice'][item][x]['workerprice']
+            job['stylingprice'] = {...job['stylingprice'], ...newObj}
+          }
+        }
+      }else{
         job['cost'] = Number(job['cost'])
-        job['stylingprice'] = order[0]['stylingprice']?.[item] || {}
+        job['stylingprice'] = {}
       }
+    
+
+
       const newJob = new Jobs(job)
   
       await newJob.save()

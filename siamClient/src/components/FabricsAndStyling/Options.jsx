@@ -47,6 +47,7 @@ const handleStyleChange = (event, i) => {
         styleInfoObject.thai_name = event.target.dataset.thainame || event.target.selectedOptions[0].getAttribute('data-set');
         styleInfoObject.additional = event.target.dataset.additional;
         styleInfoObject.workerprice = event.target.dataset.workerprice;
+        styleInfoObject.process = event.target.dataset.process;
         stylesArray[itemNameID]["groupStyle"][event.target.dataset.feature] = styleInfoObject
         // stylesArray[itemNameID]["groupStyle"][event.target.dataset.feature][event.target.dataset.style] = styleInfoObject
         setStylesArray({ ...stylesArray });
@@ -61,6 +62,7 @@ const handleStyleChange = (event, i) => {
         styleInfoObject.thai_name = event.target.dataset.thainame || event.target.selectedOptions[0].getAttribute('data-set');
         styleInfoObject.additional = event.target.dataset.additional;
         styleInfoObject.workerprice = event.target.dataset.workerprice;
+        styleInfoObject.process = event.target.dataset.process;
         // let object = {}
         // object[event.target.dataset.style] = styleInfoObject
         stylesArray[itemNameID]["groupStyle"][event.target.dataset.feature] = styleInfoObject
@@ -78,6 +80,7 @@ const handleStyleChange = (event, i) => {
       styleInfoObject.thai_name = event.target.dataset.thainame || event.target.selectedOptions[0].getAttribute('data-set');
       styleInfoObject.additional = event.target.dataset.additional;
       styleInfoObject.workerprice = event.target.dataset.workerprice;
+      styleInfoObject.process = event.target.dataset.process;
 
       // object[event.target.dataset.style] = styleInfoObject;
       let parentObject = {}
@@ -171,6 +174,7 @@ console.log("styles array : ", stylesArray)
                 data-additional={false} 
                 data-feature={feature.name} 
                 data-style={styles.name} 
+                data-process={feature.process}
                 data-workerprice= {styles['worker_price'] ? styles['worker_price'] : 0}
                 value={options['name']} 
                 type="radio" 
@@ -214,6 +218,7 @@ console.log("styles array : ", stylesArray)
         data-feature={feature.name} 
         data-image={styles['image']}
         data-additional={false} 
+        data-process={feature.process}
         onChange={(e) => handleStyleChange(e, productIndex)}>
           <option value="" selected disabled>Select an option</option>
           
@@ -275,6 +280,7 @@ console.log("styles array : ", stylesArray)
               data-additional={false} 
               data-feature={feature.name} 
               data-style={styles.name} 
+              data-process={feature.process}
               data-workerprice= {styles['worker_price'] ? styles['worker_price'] : 0}
               value={options['name']} 
               type="radio" 

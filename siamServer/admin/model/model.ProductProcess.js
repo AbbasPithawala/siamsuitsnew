@@ -14,10 +14,14 @@ const productProcessSchema = new mongoose.Schema(
     type: Number,
     required: true
   },
+  extraPaymentCategories: [{
+    type: mongoose.Types.ObjectId,
+    ref: "ExtraPaymentCategories"
+  }],
   description: {
     type: String,
     required: false
-  },  
+  },
   status: {
     type: Boolean,
     default: true

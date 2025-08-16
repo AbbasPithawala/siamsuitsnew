@@ -299,7 +299,7 @@ export default function ManageEditStyling() {
       <div className="content-wrapper">
         <div className="order-table manage-page">
           <div className="top-heading-title">
-            <strong> Edit Styling check </strong>
+            <strong> Edit Styling</strong>
           </div>
           <div className="factory-user-from-NM pd-15">
             <div className="modal-box-NM">

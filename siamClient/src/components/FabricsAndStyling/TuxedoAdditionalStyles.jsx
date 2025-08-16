@@ -81,6 +81,7 @@ const handleSuitStyleChange = (event, i, suitPro) => {
       styleInfoObject.thai_name = event.target.dataset.thainame;
       styleInfoObject.additional = event.target.dataset.addtional;
       styleInfoObject.workerprice = event.target.dataset.workerprice;
+      styleInfoObject.process = event.target.dataset.process;
       TuxedostylesArray[itemNameID][suitPro]["style"][name] = styleInfoObject;
 
       setTuxedostylesArray({ ...TuxedostylesArray });
@@ -94,6 +95,7 @@ const handleSuitStyleChange = (event, i, suitPro) => {
       styleInfoObject.thai_name = event.target.dataset.thaiName;
       styleInfoObject.additional = event.target.dataset.addtional;
       styleInfoObject.workerprice = event.target.dataset.workerprice;
+      styleInfoObject.process = event.target.dataset.process;
       object[name] = styleInfoObject;
       TuxedostylesArray[itemNameID][suitPro]["style"] = object;
       setTuxedostylesArray({ ...TuxedostylesArray });
@@ -182,6 +184,7 @@ const handleTabChange = (event, newValue) => {
                         data-addtional={true}
                         name={feature.name + "_" + productIndex}
                         data-workerprice = {style['worker_price'] ? style['worker_price'] : 0}
+                        data-process={feature.process}
                         id={style.name + "_" + productIndex}
                         onChange={(event) =>
                           handleSuitStyleChange(event, productIndex, product)

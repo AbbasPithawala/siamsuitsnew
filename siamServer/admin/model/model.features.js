@@ -27,6 +27,11 @@ const featureSchema = new mongoose.Schema({
     default: false
   },
 
+  process:{
+    type: mongoose.Types.ObjectId,
+    ref: "Process"
+  },
+
   styles:[{
     type: mongoose.Types.ObjectId,
     ref: "Style"

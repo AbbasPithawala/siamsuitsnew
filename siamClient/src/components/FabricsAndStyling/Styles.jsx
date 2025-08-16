@@ -106,6 +106,7 @@ const handleStyleChange = (event, i) => {
   if (event.target.dataset.for == "style") {
     console.log("dataset: ", event.target.dataset)
     if (stylesArray[itemNameID] && stylesArray[itemNameID]["style"]) {
+      console.log("event.target.process", event.target.dataset.process)
       const name = event.target.name.split("_")[0];
       let styleInfoObject = {};
       styleInfoObject.value = event.target.value;
@@ -113,6 +114,7 @@ const handleStyleChange = (event, i) => {
       styleInfoObject.thai_name = event.target.dataset.thainame;
       styleInfoObject.additional = event.target.dataset.addtional;
       styleInfoObject.workerprice = event.target.dataset.workerprice;
+      styleInfoObject.process = event.target.dataset.process;
       stylesArray[itemNameID]["style"][name] = styleInfoObject;
       if(!justFeaturesArray.includes(name)){
         justFeaturesArray.push(name)
@@ -121,6 +123,7 @@ const handleStyleChange = (event, i) => {
 
       setStylesArray({ ...stylesArray });
     } else {
+      console.log("event.target.process", event.target.dataset.process)
       const object = {};
       const name = event.target.name.split("_")[0];
       let styleInfoObject = {};
@@ -129,6 +132,7 @@ const handleStyleChange = (event, i) => {
       styleInfoObject.thai_name = event.target.dataset.thainame;
       styleInfoObject.additional = event.target.dataset.addtional;
       styleInfoObject.workerprice = event.target.dataset.workerprice;
+      styleInfoObject.process = event.target.dataset.process;
       object[name] = styleInfoObject;   
       stylesArray[itemNameID]['style'] = object;
       if(!justFeaturesArray.includes(name)){
@@ -139,7 +143,7 @@ const handleStyleChange = (event, i) => {
     }
   }
 };
-
+console.log("featuresStyle", featuresStyle)
 const handleTabChange = (event, newValue) => {
   setValue(newValue);
 };
@@ -198,6 +202,7 @@ const handleTabChange = (event, newValue) => {
                         data-addtional={false}
                         name={feature.name + "_" + productIndex}
                         data-workerprice={style['worker_price'] ? style['worker_price'] : 0}
+                        data-process={feature.process}
                         id={style.name + "_" + productIndex}
                         onChange={(event) =>
                           handleStyleChange(event, productIndex)

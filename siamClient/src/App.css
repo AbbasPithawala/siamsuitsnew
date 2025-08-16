@@ -43,6 +43,17 @@ a:hover{
 	cursor: pointer;
 }
 
+.custom-btn-red {
+    background: red;
+    border: 0;
+    padding: 12px 24px;
+    color: #fff;
+    font-family: 'Montserrat', sans-serif;
+    border-radius: 7px;
+    font-weight: 600;
+	transition:0.4s ease;
+	cursor: pointer;
+}
 .b-btn {
     background: #1c4d8f;
     border: 0;

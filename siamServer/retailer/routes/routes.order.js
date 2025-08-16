@@ -456,7 +456,10 @@ router.post("/create", auth, async (req, res) => {
               
               if(Number(product['styles'][items]['jacket']['style'][styles]['workerprice']) > 0){
                 // console.og()
-                stylingPriceObjectJacket[product['styles'][items]['jacket']['style'][styles]['value']] = Number(product['styles'][items]['jacket']['style'][styles]['workerprice'])
+                stylingPriceObjectJacket[product['styles'][items]['jacket']['style'][styles]['value']] = {
+                  workerprice: Number(product['styles'][items]['jacket']['style'][styles]['workerprice']),
+                  process: product['styles'][items]['jacket']['style'][styles]['process']
+                }
               }
               
 
@@ -469,7 +472,10 @@ router.post("/create", auth, async (req, res) => {
 
               if(Number(product['styles'][items]['jacket']['groupStyle'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectJacket[product['styles'][items]['jacket']['groupStyle'][styles]['value']] = Number(product['styles'][items]['jacket']['groupStyle'][styles]['workerprice'])
+                stylingPriceObjectJacket[product['styles'][items]['jacket']['groupStyle'][styles]['value']] = {
+                  workerprice: Number(product['styles'][items]['jacket']['groupStyle'][styles]['workerprice']),
+                  process: product['styles'][items]['jacket']['groupStyle'][styles]['process']
+                }
               }
           }
           }
@@ -479,7 +485,10 @@ router.post("/create", auth, async (req, res) => {
               pantPrice = Number(pantPrice) + Number(product['styles'][items]['pant']['style'][styles]['workerprice'])
               if(Number(product['styles'][items]['pant']['style'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectPant[product['styles'][items]['pant']['style'][styles]['value']] = Number(product['styles'][items]['pant']['style'][styles]['workerprice'])
+                stylingPriceObjectPant[product['styles'][items]['pant']['style'][styles]['value']] = {
+                  workerprice: Number(product['styles'][items]['pant']['style'][styles]['workerprice']),
+                  process: product['styles'][items]['pant']['style'][styles]['process']
+                }
               }
             }
           }
@@ -488,7 +497,10 @@ router.post("/create", auth, async (req, res) => {
               pantPrice = Number(pantPrice) + Number(product['styles'][items]['pant']['groupStyle'][styles]['workerprice'])
               if(Number(product['styles'][items]['pant']['groupStyle'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectPant[product['styles'][items]['pant']['groupStyle'][styles]['value']] = Number(product['styles'][items]['pant']['groupStyle'][styles]['workerprice'])
+                stylingPriceObjectPant[product['styles'][items]['pant']['groupStyle'][styles]['value']] = {
+                  workerprice: Number(product['styles'][items]['pant']['groupStyle'][styles]['workerprice']),
+                  process: product['styles'][items]['pant']['groupStyle'][styles]['process']
+                }
               }
           }
           }
@@ -513,7 +525,10 @@ router.post("/create", auth, async (req, res) => {
               
               if(Number(product['styles'][items]['tuxedojacket']['style'][styles]['workerprice']) > 0){
                 // console.og()
-                stylingPriceObjectTuxedoJacket[product['styles'][items]['tuxedojacket']['style'][styles]['value']] = Number(product['styles'][items]['tuxedojacket']['style'][styles]['workerprice'])
+                stylingPriceObjectTuxedoJacket[product['styles'][items]['tuxedojacket']['style'][styles]['value']] = {
+                  workerprice: Number(product['styles'][items]['tuxedojacket']['style'][styles]['workerprice']),
+                  process: product['styles'][items]['tuxedojacket']['style'][styles]['process']
+                }
               }
               
 
@@ -526,7 +541,10 @@ router.post("/create", auth, async (req, res) => {
 
               if(Number(product['styles'][items]['tuxedojacket']['groupStyle'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectTuxedoJacket[product['styles'][items]['tuxedojacket']['groupStyle'][styles]['value']] = Number(product['styles'][items]['tuxedojacket']['groupStyle'][styles]['workerprice'])
+                stylingPriceObjectTuxedoJacket[product['styles'][items]['tuxedojacket']['groupStyle'][styles]['value']] = {
+                  workerprice: Number(product['styles'][items]['tuxedojacket']['groupStyle'][styles]['workerprice']),
+                  process: product['styles'][items]['tuxedojacket']['groupStyle'][styles]['process']
+                }
               }
           }
           }
@@ -536,7 +554,10 @@ router.post("/create", auth, async (req, res) => {
               pantPrice = Number(pantPrice) + Number(product['styles'][items]['pant']['style'][styles]['workerprice'])
               if(Number(product['styles'][items]['pant']['style'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectPant[product['styles'][items]['pant']['style'][styles]['value']] = Number(product['styles'][items]['pant']['style'][styles]['workerprice'])
+                stylingPriceObjectPant[product['styles'][items]['pant']['style'][styles]['value']] = {
+                  workerprice: Number(product['styles'][items]['pant']['style'][styles]['workerprice']),
+                  process: product['styles'][items]['pant']['style'][styles]['process']
+                }
               }
             }
           }
@@ -545,7 +566,10 @@ router.post("/create", auth, async (req, res) => {
               pantPrice = Number(pantPrice) + Number(product['styles'][items]['pant']['groupStyle'][styles]['workerprice'])
               if(Number(product['styles'][items]['pant']['groupStyle'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectPant[product['styles'][items]['pant']['groupStyle'][styles]['value']] = Number(product['styles'][items]['pant']['groupStyle'][styles]['workerprice'])
+                stylingPriceObjectPant[product['styles'][items]['pant']['groupStyle'][styles]['value']] = {
+                  workerprice: Number(product['styles'][items]['pant']['groupStyle'][styles]['workerprice']),
+                  process: product['styles'][items]['pant']['groupStyle'][styles]['process']
+                }
               }
           }
           }
@@ -557,13 +581,17 @@ router.post("/create", auth, async (req, res) => {
         }
       }else{
         for(let items of Object.keys(product['styles'])){
+          console.log(product['styles'][items])
           const styleObj = {}
             let price = 0;
             if(product['styles'][items]['style']){
                 for(let styles of Object.keys(product['styles'][items]['style'])){
                   price = Number(price) + Number(product['styles'][items]['style'][styles]['workerprice'])
                   if(Number(product['styles'][items]['style'][styles]['workerprice']) > 0){
-                    styleObj[product['styles'][items]['style'][styles]['value']] = Number(product['styles'][items]['style'][styles]['workerprice'])
+                    styleObj[product['styles'][items]['style'][styles]['value']] = {
+                      workerprice: Number(product['styles'][items]['style'][styles]['workerprice']),
+                      process: product['styles'][items]['style'][styles]['process']
+                    }
                   }
                 }                
             }
@@ -571,7 +599,10 @@ router.post("/create", auth, async (req, res) => {
               for(let styles of Object.keys(product['styles'][items]['groupStyle'])){
                 price = Number(price) + Number(product['styles'][items]['groupStyle'][styles]['workerprice'])
                 if(Number(product['styles'][items]['groupStyle'][styles]['workerprice']) > 0){
-                  styleObj[product['styles'][items]['groupStyle'][styles]['value']] = Number(product['styles'][items]['groupStyle'][styles]['workerprice'])
+                  styleObj[product['styles'][items]['groupStyle'][styles]['value']] = {
+                    workerprice: Number(product['styles'][items]['groupStyle'][styles]['workerprice']),
+                    process: product['styles'][items]['groupStyle'][styles]['process']
+                  }
                 }
               }
             }
@@ -581,7 +612,8 @@ router.post("/create", auth, async (req, res) => {
       }
     } 
 
-    console.log(req.body.order)
+    
+
 
     if(fetchExistingOrder.length > 0 ) {
       let date = new Date();
@@ -662,6 +694,13 @@ router.post("/create", auth, async (req, res) => {
         data: order
       });
     }
+
+    
+      return res.json({
+        status: false,
+        message: "Stopped Currently",
+        data: null
+      });
 
 
   } catch (err) {
@@ -760,7 +799,10 @@ router.post("/createRepeat", auth, async (req, res) => {
               for(let styles of Object.keys(product['styles'][0][items]['jacket']['style'])){
               jacketPrice = Number(jacketPrice) + Number(product['styles'][0][items]['jacket']['style'][styles]['workerprice'])
               if(Number(product['styles'][0][items]['jacket']['style'][styles]['workerprice']) > 0){
-                stylingPriceObjectJacket[product['styles'][0][items]['jacket']['style'][styles]['value']] = Number(product['styles'][0][items]['jacket']['style'][styles]['workerprice'])
+                stylingPriceObjectJacket[product['styles'][0][items]['jacket']['style'][styles]['value']] = {
+                  workerprice: Number(product['styles'][0][items]['jacket']['style'][styles]['workerprice']),
+                  process: product['styles'][0][items]['jacket']['style'][styles]['process']
+                }
               }
           }
            
@@ -770,7 +812,10 @@ router.post("/createRepeat", auth, async (req, res) => {
               jacketPrice = Number(jacketPrice) + Number(product['styles'][0][items]['jacket']['groupStyle'][styles]['workerprice'])
               if(Number(product['styles'][0][items]['jacket']['groupStyle'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectJacket[product['styles'][0][items]['jacket']['groupStyle'][styles]['value']] = Number(product['styles'][0][items]['jacket']['groupStyle'][styles]['workerprice'])
+                stylingPriceObjectJacket[product['styles'][0][items]['jacket']['groupStyle'][styles]['value']] = {
+                  workerprice: Number(product['styles'][0][items]['jacket']['groupStyle'][styles]['workerprice']),
+                  process: product['styles'][0][items]['jacket']['groupStyle'][styles]['process']
+                }
               }
           }
           }
@@ -780,7 +825,10 @@ router.post("/createRepeat", auth, async (req, res) => {
               pantPrice = Number(pantPrice) + Number(product['styles'][0][items]['pant']['style'][styles]['workerprice'])
               if(Number(product['styles'][0][items]['pant']['style'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectPant[product['styles'][0][items]['pant']['style'][styles]['value']] = Number(product['styles'][0][items]['pant']['style'][styles]['workerprice'])
+                stylingPriceObjectPant[product['styles'][0][items]['pant']['style'][styles]['value']] = {
+                  workerprice: Number(product['styles'][0][items]['pant']['style'][styles]['workerprice']),
+                  process: product['styles'][0][items]['pant']['style'][styles]['process']
+                }
               }
           }
               
@@ -790,7 +838,10 @@ router.post("/createRepeat", auth, async (req, res) => {
               pantPrice = Number(pantPrice) + Number(product['styles'][0][items]['pant']['groupStyle'][styles]['workerprice'])  
               if(Number(product['styles'][0][items]['pant']['groupStyle'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectPant[product['styles'][0][items]['pant']['groupStyle'][styles]['value']] = Number(product['styles'][0][items]['pant']['groupStyle'][styles]['workerprice'])
+                stylingPriceObjectPant[product['styles'][0][items]['pant']['groupStyle'][styles]['value']] = {
+                  workerprice: Number(product['styles'][0][items]['pant']['groupStyle'][styles]['workerprice']),
+                  process: product['styles'][0][items]['pant']['groupStyle'][styles]['process']
+                }
               }
           }
           }
@@ -809,7 +860,10 @@ router.post("/createRepeat", auth, async (req, res) => {
                 for(let styles of Object.keys(product['styles'][0][items]['style'])){
                 price = Number(price) + Number(product['styles'][0][items]['style'][styles]['workerprice'])
                 if(Number(product['styles'][0][items]['style'][styles]['workerprice']) > 0){
-                  styleObj[product['styles'][0][items]['style'][styles]['value']] = Number(product['styles'][0][items]['style'][styles]['workerprice'])
+                  styleObj[product['styles'][0][items]['style'][styles]['value']] = {
+                    workerprice: Number(product['styles'][0][items]['style'][styles]['workerprice']),
+                    process: product['styles'][0][items]['style'][styles]['process']
+                  }
                 }
             }
                 
@@ -818,7 +872,10 @@ router.post("/createRepeat", auth, async (req, res) => {
                   for(let styles of Object.keys(product['styles'][0][items]['groupStyle'])){
                 price = Number(price) + Number(product['styles'][0][items]['groupStyle'][styles]['workerprice'])
                 if(Number(product['styles'][0][items]['groupStyle'][styles]['workerprice']) > 0){
-                  styleObj[product['styles'][0][items]['groupStyle'][styles]['value']] = Number(product['styles'][0][items]['groupStyle'][styles]['workerprice'])
+                  styleObj[product['styles'][0][items]['groupStyle'][styles]['value']] = {
+                    workerprice: Number(product['styles'][0][items]['groupStyle'][styles]['workerprice']),
+                    process: product['styles'][0][items]['groupStyle'][styles]['process']
+                  }
                 }
             }
             }
@@ -1039,7 +1096,10 @@ router.put("/updateOrder/:id", auth, async (req, res) => {
             for(let styles of Object.keys(product['styles'][0][items]['jacket']['style'])){
                 jacketPrice = Number(jacketPrice) + Number(product['styles'][0][items]['jacket']['style'][styles]['workerprice'])              
                 if(Number(product['styles'][0][items]['jacket']['style'][styles]['workerprice']) > 0){
-                  stylingPriceObjectJacket[product['styles'][0][items]['jacket']['style'][styles]['value']] = Number(product['styles'][0][items]['jacket']['style'][styles]['workerprice'])
+                  stylingPriceObjectJacket[product['styles'][0][items]['jacket']['style'][styles]['value']] = {
+                    workerprice: Number(product['styles'][0][items]['jacket']['style'][styles]['workerprice']),
+                    process: product['styles'][0][items]['jacket']['style'][styles]['process']
+                  }
                 }
             }
            
@@ -1050,7 +1110,10 @@ router.put("/updateOrder/:id", auth, async (req, res) => {
 
               if(Number(product['styles'][0][items]['jacket']['groupStyle'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectJacket[product['styles'][0][items]['jacket']['groupStyle'][styles]['value']] = Number(product['styles'][0][items]['jacket']['groupStyle'][styles]['workerprice'])
+                stylingPriceObjectJacket[product['styles'][0][items]['jacket']['groupStyle'][styles]['value']] = {
+                  workerprice: Number(product['styles'][0][items]['jacket']['groupStyle'][styles]['workerprice']),
+                  process: product['styles'][0][items]['jacket']['groupStyle'][styles]['process']
+                }
               }
           }
           }
@@ -1060,7 +1123,10 @@ router.put("/updateOrder/:id", auth, async (req, res) => {
               pantPrice = Number(pantPrice) + Number(product['styles'][0][items]['pant']['style'][styles]['workerprice'])
               if(Number(product['styles'][0][items]['pant']['style'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectPant[product['styles'][0][items]['pant']['style'][styles]['value']] = Number(product['styles'][0][items]['pant']['style'][styles]['workerprice'])
+                stylingPriceObjectPant[product['styles'][0][items]['pant']['style'][styles]['value']] = {
+                  workerprice: Number(product['styles'][0][items]['pant']['style'][styles]['workerprice']),
+                  process: product['styles'][0][items]['pant']['style'][styles]['process']
+                }
               }
               
           }
@@ -1071,8 +1137,11 @@ router.put("/updateOrder/:id", auth, async (req, res) => {
               pantPrice = Number(pantPrice) + Number(product['styles'][0][items]['pant']['groupStyle'][styles]['workerprice'])
               if(Number(product['styles'][0][items]['pant']['groupStyle'][styles]['workerprice']) > 0){
 
-                stylingPriceObjectPant[product['styles'][0][items]['pant']['groupStyle'][styles]['value']] = Number(product['styles'][0][items]['pant']['groupStyle'][styles]['workerprice'])
-              }[0]
+                stylingPriceObjectPant[product['styles'][0][items]['pant']['groupStyle'][styles]['value']] = {
+                  workerprice: Number(product['styles'][0][items]['pant']['groupStyle'][styles]['workerprice']),
+                  process: product['styles'][0][items]['pant']['groupStyle'][styles]['process']
+                }
+              }
           }
           }
 
@@ -1091,7 +1160,10 @@ router.put("/updateOrder/:id", auth, async (req, res) => {
                 for(let styles of Object.keys(product['styles'][0][items]['style'])){
                 price = Number(price) + Number(product['styles'][0][items]['style'][styles]['workerprice'])
                 if(Number(product['styles'][0][items]['style'][styles]['workerprice']) > 0){
-                  styleObj[product['styles'][0][items]['style'][styles]['value']] = Number(product['styles'][0][items]['style'][styles]['workerprice'])
+                  styleObj[product['styles'][0][items]['style'][styles]['value']] = {
+                    workerprice: Number(product['styles'][0][items]['style'][styles]['workerprice']),
+                    process: product['styles'][0][items]['style'][styles]['process']
+                  }
                 }
             } 
                 
@@ -1100,7 +1172,10 @@ router.put("/updateOrder/:id", auth, async (req, res) => {
                   for(let styles of Object.keys(product['styles'][0][items]['groupStyle'])){
                 price = Number(price) + Number(product['styles'][0][items]['groupStyle'][styles]['workerprice'])
                 if(Number(product['styles'][0][items]['groupStyle'][styles]['workerprice']) > 0){
-                  styleObj[product['styles'][0][items]['groupStyle'][styles]['value']] = Number(product['styles'][0][items]['groupStyle'][styles]['workerprice'])
+                  styleObj[product['styles'][0][items]['groupStyle'][styles]['value']] = {
+                    workerprice: Number(product['styles'][0][items]['groupStyle'][styles]['workerprice']),
+                    process: product['styles'][0][items]['groupStyle'][styles]['process']
+                  }
                 }
             }
             }

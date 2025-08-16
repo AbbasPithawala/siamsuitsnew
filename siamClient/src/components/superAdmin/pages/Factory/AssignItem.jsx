@@ -281,7 +281,7 @@ console.log("checkboxItem", checkboxItem)
   //   }
   // }
 
-
+console.log("jobs ", jobs)
   const handleAssignItem = async (e) => {
     const qrData = qrCode.split("/")
     if(qrData.length === 2){
@@ -754,7 +754,7 @@ console.log("checkboxItem", checkboxItem)
       // Step 1: Create extra payments ONLY if:
       // - Process includes 'stitching' AND
       // - User has selected extra payments (checkboxItem.length > 0)
-      if (job['process']['name'].includes('stitching') && checkboxItem.length > 0) {
+      if (checkboxItem.length > 0) {
         let orderID = "";
         let type = "normal";
         
@@ -1188,11 +1188,11 @@ console.log("checkboxItem", checkboxItem)
                     <button 
                       onClick={() => handlePrintSlipWithCompletion(job)} 
                       className="custom-btn" 
-                      style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none", marginBottom: "8px"}}
+                      style={{backgroundColor:"#1CDF8A !important",fontSize:"14px",fontWeight:"400",color:"#fff", border:"none", marginBottom: "8px"}}
                     >
                       Print Slip & Complete Job
                     </button>
-                    {job['process']['name'].includes('stitching') && (
+                    {/* {job['process']['name'].includes('stitching') && ( */}
                       <button 
                         onClick={handleOpenExtraPaymentCategories} 
                         className="custom-btn" 
@@ -1200,7 +1200,7 @@ console.log("checkboxItem", checkboxItem)
                       >
                         Create Extra Payment
                       </button>
-                    )}
+                     {/* )} */}
                   </div>
                 </div>
               </div>
@@ -1344,6 +1344,7 @@ console.log("checkboxItem", checkboxItem)
                     {extraPaymentCategories.length > 0 && showJob
                     ?
                     extraPaymentCategories.map((epc) =>{
+                      console.log("epc ", epc)
                     const code = jobs[0]['item_code'].split("/")[1]
                     let itemName = "";
                     if(code.split("_")[0] === "suit"){
@@ -1353,7 +1354,7 @@ console.log("checkboxItem", checkboxItem)
                     }else{
                       itemName = code.split("_")[0]
                     }
-                    if(itemName == epc['product']['name']){
+                    if(itemName == epc['product']['name'] && epc['process']?.['_id'] == jobs[0]['process']['_id']){
                       return(
                         <div className="extra-payment-item" style={{padding: "20px 10px", fontSize: "16px", fontWeight: "500", backgroundColor: "#EDF1F6", marginBottom: "5px", borderRadius:"5px"}}>
                           <label className="full_label">
@@ -1369,7 +1370,7 @@ console.log("checkboxItem", checkboxItem)
                   <></>}
                   </div>
         <DialogActions>
-          <Button className="custom-btn" onClick={() => setShowExtraPaymentCategories(false)}>Cancel</Button>
+          <Button className="custom-btn" style={{backgroundColor: "red !important"}} onClick={() => setShowExtraPaymentCategories(false)}>Cancel</Button>
           <Button className="custom-btn" onClick={() => handleCreateExtraPayment()}>Create</Button>
         </DialogActions>
       </Dialog>

@@ -48,7 +48,7 @@ router.post("/fetchAll", auth, catchAsync(async (req, res, next) => {
 
     try{
 
-        const extraPaymentCategories = await ExtraPaymentCategories.find().populate("product").populate("feature").populate("style");
+        const extraPaymentCategories = await ExtraPaymentCategories.find().populate("product").populate("feature").populate("style").populate("process");
         // const tailers = await Tailor.find();
         
         if(extraPaymentCategories.length > 0){

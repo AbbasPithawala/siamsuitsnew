@@ -687,6 +687,12 @@ export default function Step4() {
           const pdfString =  exportPDF(res.data.data['_id'])
           navigate("/");
         }
+        else{
+          setShowPlaceOrderButton(false);
+          setErrorMsg(res.data.message)
+          setSuccess(false)
+          setError(true)
+        }
 
       } else {     
         setErrorMsg("Please Complete the necesaary information!")

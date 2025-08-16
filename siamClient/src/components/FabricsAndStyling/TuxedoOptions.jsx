@@ -49,6 +49,7 @@ if (event.target.dataset.for == "groupStyle") {
         styleInfoObject.thai_name = event.target.dataset.thainame || event.target.selectedOptions[0].getAttribute('data-set');
         styleInfoObject.additional = event.target.dataset.addtional;
         styleInfoObject.workerprice = event.target.dataset.workerprice;
+        styleInfoObject.process = event.target.dataset.process;
         TuxedostylesArray[itemNameID][suitPro]["groupStyle"][event.target.dataset.feature]= styleInfoObject
         setTuxedostylesArray({ ...TuxedostylesArray });
         if(!justGroupFeaturesArray.includes(event.target.dataset.feature)){
@@ -63,6 +64,7 @@ if (event.target.dataset.for == "groupStyle") {
         styleInfoObject.thai_name = event.target.dataset.thainame || event.target.selectedOptions[0].getAttribute('data-set');
         styleInfoObject.additional = event.target.dataset.addtional;
         styleInfoObject.workerprice = event.target.dataset.workerprice;
+        styleInfoObject.process = event.target.dataset.process;
         // let object = {}
         // object[event.target.dataset.style] = styleInfoObject
         TuxedostylesArray[itemNameID][suitPro]["groupStyle"][event.target.dataset.feature] = styleInfoObject
@@ -81,6 +83,7 @@ if (event.target.dataset.for == "groupStyle") {
       styleInfoObject.thai_name = event.target.dataset.thainame || event.target.selectedOptions[0].getAttribute('data-set');
       styleInfoObject.additional = event.target.dataset.addtional;
       styleInfoObject.workerprice = event.target.dataset.workerprice;
+      styleInfoObject.process = event.target.dataset.process;
       let parentObject = {}
       parentObject[event.target.dataset.feature] = styleInfoObject
       TuxedostylesArray[itemNameID][suitPro]['groupStyle'] = parentObject;
@@ -136,6 +139,7 @@ const handleStyleChangeRadio =(e) =>{
                 data-addtional={false} 
                 data-feature={feature.name} 
                 data-workerprice = {styles['worker_price'] ? styles['worker_price'] : 0}
+                data-process={feature.process}
                 data-style={styles.name} 
                 value={options['name']} 
                 type="radio" 
@@ -183,7 +187,8 @@ const handleStyleChangeRadio =(e) =>{
         data-feature={feature.name}
         data-workerprice = {styles['worker_price'] ? styles['worker_price'] : 0}
         data-image={styles['image']}
-        data-addtional={false} 
+        data-addtional={false}
+        data-process={feature.process} 
         onChange={(e) => handleSuitStyleChange(e, productIndex, product)}>
           
           <option value="" selected disabled>Select an option</option>
@@ -234,6 +239,7 @@ const handleStyleChangeRadio =(e) =>{
               data-addtional={false} 
               data-feature={feature.name} 
               data-workerprice = {styles['worker_price'] ? styles['worker_price'] : 0}
+              data-process={feature.process}
               data-style={styles.name} 
               value={options['name']} 
               type="radio" 
