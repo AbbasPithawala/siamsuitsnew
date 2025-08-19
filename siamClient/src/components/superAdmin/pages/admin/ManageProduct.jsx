@@ -76,7 +76,6 @@ export default function ManageProduct() {
     fetchProducts();
   }, []);
 
-
   
   const handleClickOpen3 = () => {
     navigate("/admin/process")
