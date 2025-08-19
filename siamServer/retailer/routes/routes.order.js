@@ -2530,7 +2530,7 @@ html = html +
         '<img src=data:image/png;base64,'+qrImageBase64+' alt="logo" class="img-fluid" style="width:80px; object-fit: contain; object-position: 100% 100%;"><br><span style="font-size:.6rem; text-align:center">'+qrData+'</span>'+
       '</div>'+
          '<div clas="info-box" style="text-align:center">'+
-          '<img src="' + PicBaseUrl + retailer["retailer_logo"] +  '" alt="logo" class="img-fluid" style="width:100px; height:80px; object-fit: contain; object-position: 100% 100%;">'+
+          '<img src="' + PicBaseUrl + retailer["retailer_logo"] +  '" alt="logo" class="img-fluid" style="width:80px;  object-fit: contain; object-position: 100% 100%;">'+
       '</div>'+
 
     '</div>'+
