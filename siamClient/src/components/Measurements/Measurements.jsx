@@ -167,17 +167,17 @@ export default function Measurements({
                     alignItems: "center",
                     width: "100%",
                     justifyContent: "space-between",
-                    padding: "10px 20px",
+                    padding: "8px 15px",
                     fontWeight: "bold",
                     background: "#f0f0f0",
                     borderRadius: "6px",
                   }}
                 >
-                  <p style={{ flex: 1 }}>Measurement Name</p>
-                  <p style={{ flex: 1, textAlign: "center" }}>Value</p>
-                  <p style={{ flex: 1, textAlign: "center" }}>Adjustment</p>
-                  <p style={{ flex: 1, textAlign: "center" }}>Total Value</p>
-                  <p style={{ flex: 0.5 }}></p>
+                  <p style={{ flex: 1, fontSize: "12px", margin: "0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Measurement Name</p>
+                  <p style={{ flex: 0.7, textAlign: "center", fontSize: "12px", margin: "0" }}>Value</p>
+                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Adjustment</p>
+                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Total Value</p>
+                  <p style={{ flex: 0.5, margin: "0" }}></p>
                 </div>
               </Grid>
             ))}
@@ -210,7 +210,10 @@ export default function Measurements({
                       border: "1px solid #ccc",
                       outline: "none",
                       textAlign: "center",
-                      margin: "5px"
+                      margin: "5px",
+                      fontSize: "14px",
+                      fontWeight: "bold"
+                    
                     }}
                     value={productMeasurements[measurement.name]?.value || 0}
                     name={measurement.name + "-value"}
@@ -233,7 +236,9 @@ export default function Measurements({
                       border: "1px solid #ccc",
                       outline: "none",
                       textAlign: "center",
-                      margin: "5px"
+                      margin: "5px",
+                      fontSize: "14px",
+                      fontWeight: "bold"
                     }}
                     value={productMeasurements[measurement.name]?.adjustment_value || 0}
                     name={measurement.name + "-adjustment_value"}
@@ -255,7 +260,10 @@ export default function Measurements({
                       border: "1px solid #eee",
                       background: "#f7f7f7",
                       textAlign: "center",
-                      margin: "5px"
+                      margin: "5px",
+                      border: "solid 1px #1C4D8F",
+                      fontSize: "14px",
+                      fontWeight: "bold"
                     }}
                     value={productMeasurements[measurement.name]?.total_value || 0}
                     name={measurement.name + "-total_value"}
@@ -286,6 +294,24 @@ export default function Measurements({
  
 
 
+      
+
+      <div className="form-group">
+        <label className="note"> Note </label>
+        <textarea
+          className="searchinput"
+          value={
+            product_name !== undefined &&
+              customerMeasurements[product_name] &&
+              customerMeasurements[product_name]["notes"]
+              ? customerMeasurements[product_name]["notes"]
+              : ""
+          }
+          onChange={handleNoteChange}
+          onFocus={handleOnFocus}
+        />
+      </div>
+
       {product_name == "vest" ? (
         <></>
       )
@@ -293,7 +319,7 @@ export default function Measurements({
           <></>
         )
           : (
-            <div className="fabric-types_NM">
+            <div className="form-group fabric-types_NM" style={{marginBottom: "20px", border: "1px solid #ccc", padding: "10px", borderRadius: "5px"}}>
               <h3 className="steper-title"> Shoulder Type </h3>
               <ul className="fabricselection_Common_NM">
                 <li>
@@ -365,23 +391,6 @@ export default function Measurements({
               </ul>
             </div>
           )}
-
-      <div className="form-group">
-        <label className="note"> Note </label>
-        <textarea
-          className="searchinput"
-          value={
-            product_name !== undefined &&
-              customerMeasurements[product_name] &&
-              customerMeasurements[product_name]["notes"]
-              ? customerMeasurements[product_name]["notes"]
-              : ""
-          }
-          onChange={handleNoteChange}
-          onFocus={handleOnFocus}
-        />
-      </div>
-
       <div>
         <Button
           className="custom-btn"

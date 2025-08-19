@@ -210,17 +210,17 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                                     alignItems: "center",
                                     width: "100%",
                                     justifyContent: "space-between",
-                                    padding: "10px 20px",
+                                    padding: "8px 15px",
                                     fontWeight: "bold",
                                     background: "#f0f0f0",
                                     borderRadius: "6px",
                                   }}
                                 >
-                                  <p style={{ flex: 1 }}>Measurement Name</p>
-                                  <p style={{ flex: 1, textAlign: "center" }}>Value</p>
-                                  <p style={{ flex: 1, textAlign: "center" }}>Adjustment</p>
-                                  <p style={{ flex: 1, textAlign: "center" }}>Total Value</p>
-                                  <p style={{ flex: 0.5 }}></p>
+                                  <p style={{ flex: 1, fontSize: "12px", margin: "0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Measurement Name</p>
+                                  <p style={{ flex: 0.7, textAlign: "center", fontSize: "12px", margin: "0" }}>Value</p>
+                                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Adjustment</p>
+                                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Total Value</p>
+                                  <p style={{ flex: 0.5, margin: "0" }}></p>
                                 </div>
                               </Grid>
                             ))}
@@ -254,7 +254,9 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                                       border: "1px solid #ccc",
                                       outline: "none",
                                       textAlign: "center",
-                                      margin: "5px"
+                                      margin: "5px",
+                                      fontSize: "14px",
+                                      fontWeight: "bold"
                                     }}
                                     name={data + "-value"}
                                     value={measurement.m[data]["value"]}
@@ -273,7 +275,9 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                                       border: "1px solid #ccc",
                                       outline: "none",
                                       textAlign: "center",
-                                      margin: "5px"
+                                      margin: "5px",
+                                      fontSize: "14px",
+                                      fontWeight: "bold"
                                     }}
                                     value={
                                       measurement.m[data][
@@ -297,7 +301,10 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                                       border: "1px solid #eee",
                                       background: "#f7f7f7",
                                       textAlign: "center",
-                                      margin: "5px"
+                                      margin: "5px",
+                                      fontSize: "14px",
+                                      fontWeight: "bold",
+                                      border: "solid 2px #1C4D8F"
                                     }}
                                     value={
                                       measurement.m[data]["total_value"]
@@ -482,8 +489,26 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
                 </div>
               </div> */}
             </div>
+            <div className="form-group">
+              <label className="note"> Note </label>
+              <textarea
+                className="searchinput"
+                value={
+                  tuxedoCustomerMeasurements[measurement.name] &&
+                  tuxedoCustomerMeasurements[measurement.name]["notes"]
+                    ? tuxedoCustomerMeasurements[measurement.name][
+                        "notes"
+                      ]
+                    : ""
+                }
+                onChange={(event) =>
+                  handleSuitNoteChange(measurement.name, event)
+                }
+                onFocus={handleOnFocus}
+              />
+            </div>
             {measurement.name == "tuxedojacket" ? (
-              <div className="fabric-types_NM">
+              <div className="form-group fabric-types_NM" style={{marginBottom: "20px", border: "1px solid #ccc", padding: "10px", borderRadius: "5px"}}>
                 <h3 className="steper-title"> Shoulder Type </h3>
                 <ul className="fabricselection_Common_NM">
                   <li>
@@ -585,24 +610,6 @@ console.log("newTuxedoMeasurement: ", newTuxedoMeasurement)
               <></>
             )}
 
-            <div className="form-group">
-              <label className="note"> Note </label>
-              <textarea
-                className="searchinput"
-                value={
-                  tuxedoCustomerMeasurements[measurement.name] &&
-                  tuxedoCustomerMeasurements[measurement.name]["notes"]
-                    ? tuxedoCustomerMeasurements[measurement.name][
-                        "notes"
-                      ]
-                    : ""
-                }
-                onChange={(event) =>
-                  handleSuitNoteChange(measurement.name, event)
-                }
-                onFocus={handleOnFocus}
-              />
-            </div>
           </div>
         </>
       );
