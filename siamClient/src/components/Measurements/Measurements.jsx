@@ -71,10 +71,12 @@ export default function Measurements({
       }
     }
   };
-
+console.log("check123")
   const handleValueChange = async (e) => {
     let value = parseFloat(e.target.value);
     const string = e.target.name.split("-");
+    console.log("e.target.value", e.target.value) 
+    console.log("string", string)
     if (string[1] == "value") {
       productMeasurements[string[0]]["total_value"] =
         productMeasurements[string[0]]["adjustment_value"] + value;

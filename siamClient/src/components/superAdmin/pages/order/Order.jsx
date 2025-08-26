@@ -1,7 +1,7 @@
 import React from "react";
 import "./order.css";
 // import "./pdfStyle.css";
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Context } from "../../../../context/Context";
 import { axiosInstance } from "../../../../config";
@@ -80,7 +80,65 @@ export default function Order() {
   const [showCustomerList, setShowCustomerList] = useState("none");
   const [allCustomers, setAllCustomers] = useState([]);
   const [customerID, setCustomerID] = useState("");
+  const [allOrdersData, setAllOrdersData] = useState([]);
 
+  // Optimized order status counts using useMemo
+  const orderStatusCounts = useMemo(() => {
+    if (!allOrdersData || allOrdersData.length === 0) {
+      return {
+        newOrder: 0,
+        modified: 0,
+        rush: 0,
+        processing: 0,
+        shipment: 0,
+        sent: 0
+      };
+    }
+
+    // Single pass through the array instead of 6 separate filter operations
+    const counts = allOrdersData.reduce((acc, order) => {
+      switch(order.order_status) {
+        case "New Order":
+          acc.newOrder++;
+          break;
+        case "Modified":
+          acc.modified++;
+          break;
+        case "Rush":
+          acc.rush++;
+          break;
+        case "Processing":
+          acc.processing++;
+          break;
+        case "Shipment":
+          acc.shipment++;
+          break;
+        case "Sent":
+          acc.sent++;
+          break;
+      }
+      return acc;
+    }, {
+      newOrder: 0,
+      modified: 0,
+      rush: 0,
+      processing: 0,
+      shipment: 0,
+      sent: 0
+    });
+
+    return counts;
+  }, [allOrdersData]); // Only recalculate when allOrdersData changes
+
+  // Update individual state variables from memoized counts
+  useEffect(() => {
+    setLength1(orderStatusCounts.newOrder);
+    setLength2(orderStatusCounts.modified);
+    setLength3(orderStatusCounts.rush);
+    setLength4(orderStatusCounts.processing);
+    setLength5(orderStatusCounts.shipment);
+    setLength6(orderStatusCounts.sent);
+  }, [orderStatusCounts]);
 
   useEffect(() => {
     const par = {
@@ -448,29 +506,13 @@ console.log("orders: ",orders)
       token: user.data.token,
       par: par
     });
-
+    console.log(res.data.data)
     if (res.data.status === true) {
-
-      setDoc(res.data.data ? res.data.data.length : 0)
-
-      let L = res.data.data.filter((x) => x.order_status == "New Order");
-      setLength1(L.length);
-
-      let L1 = res.data.data.filter((x) => x.order_status == "Modified");
-      setLength2(L1.length);
-
-      let L2 = res.data.data.filter((x) => x.order_status == "Rush");
-      setLength3(L2.length);
-
-      let L3 = res.data.data.filter((x) => x.order_status == "Processing");
-      setLength4(L3.length);
-
-      let L4 = res.data.data.filter((x) => x.order_status == "Shipment");
-      setLength5(L4.length);
-
-      let L5 = res.data.data.filter((x) => x.order_status == "Sent");
-      setLength6(L5.length);
-
+      // Store the raw data instead of immediately processing it
+      setAllOrdersData(res.data.data || []);
+    } else {
+      // Important: Also update when no orders are found
+      setAllOrdersData([]);
     }
 
   };
@@ -516,6 +558,7 @@ console.log("orders: ",orders)
     } else {
       setShowOrders(false)
       setOrders([])
+      setDoc(0) // Ensure pagination count is 0 when no orders found
     }
   }
   const fetchProducts = async () => {

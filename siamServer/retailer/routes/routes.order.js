@@ -1600,7 +1600,7 @@ router.post("/fetchAdminPaginateNew/:skip", auth, async(req, res) => {
         data: null
       })
     }
-
+    console.log(orders.length, count)
     return res.json({
       status: true,
       message: "Orders fetched successfully.!",
@@ -1847,6 +1847,7 @@ for(let i=0; i < orderItemsArrayPDF.length; i++){
               '<table class="table table-bordered" style="width:100%; border-collapse: collapse; border-spacing:0;">'+
               
                   '<tbody>';
+                  let suitIndex = 0;
                   for(let singles of orderItemsArrayPDF[i]){
 
                     let qrData = "";
@@ -1861,21 +1862,42 @@ for(let i=0; i < orderItemsArrayPDF.length; i++){
                     const qrImage = qr.imageSync(qrData, { type: 'png' });
                     const qrImageBase64 = qrImage.toString('base64');
                     if(singles.item_name == 'suit'){
-                      html =  html +        
-                      '<tr>'+
-                        '<td style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+ singles.item_name + " " + singles.item_code.split(" ")[1] +'</td>'+
-                        '<td style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">Suit '+ singles.item_code.split(" ")[0] + '</td>'+
-                        '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+  singles.styles.fabric_code +'</td>'+
-                        '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px; "><img src=data:image/png;base64,'+qrImageBase64+' style="width:80px; height:80px"><br><span style="font-size:.6rem; text-align:center">'+qrData+'</span></td>'+
-                      '</tr>';
+                      if(singles.item_code.split(" ")[0] == "jacket"){
+                        // First row of suit (jacket) - show merged cell with rowspan
+                        html =  html +        
+                        '<tr>'+
+                          '<td rowspan="2" style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 100px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px; vertical-align: middle;">'+ singles.item_name + " " + singles.item_code.split(" ")[1] +'</td>'+
+                          '<td style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+ singles.item_code.split(" ")[0] + '</td>'+
+                          '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+  singles.styles.fabric_code +'</td>'+
+                          '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px; "><img src=data:image/png;base64,'+qrImageBase64+' style="width:80px; height:80px"><br><span style="font-size:.6rem; text-align:center">'+qrData+'</span></td>'+
+                        '</tr>';
+                      } else {
+                        // Second row of suit (pant) - skip first column due to rowspan
+                        html =  html +        
+                        '<tr>'+
+                          '<td style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+ singles.item_code.split(" ")[0] + '</td>'+
+                          '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+  singles.styles.fabric_code +'</td>'+
+                          '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px; "><img src=data:image/png;base64,'+qrImageBase64+' style="width:80px; height:80px"><br><span style="font-size:.6rem; text-align:center">'+qrData+'</span></td>'+
+                        '</tr>';
+                      }
                     }else  if(singles.item_name == 'tuxedo'){
-                      html =  html +        
+                      if(singles.item_code.split(" ")[0] == "tuxedojacket"){
+                        html =  html +        
+                        '<tr>'+
+                          '<td rowspan="2" style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 100px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px; vertical-align: middle;">'+ singles.item_name + " " + singles.item_code.split(" ")[1] +'</td>'+
+                          '<td style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+ singles.item_code.split(" ")[0] + '</td>'+
+                          '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+  singles.styles.fabric_code +'</td>'+
+                          '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px; "><img src=data:image/png;base64,'+qrImageBase64+' style="width:80px; height:80px"><br><span style="font-size:.6rem; text-align:center">'+qrData+'</span></td>'+
+                        '</tr>';
+                      }else{ 
+                        html =  html +        
                       '<tr>'+
-                        '<td style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+ singles.item_name + " " + singles.item_code.split(" ")[1] +'</td>'+
-                        '<td style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">Tuxedo '+ singles.item_code.split(" ")[0] + '</td>'+
+                        '<td style="text-transform: capitalize; border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;"> '+ singles.item_code.split(" ")[0] + '</td>'+
                         '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px;">'+  singles.styles.fabric_code +'</td>'+
                         '<td style="border-right: 1px solid; width: 25%; height: 50px; text-align: center; border-bottom: 1px solid; font-size:1.3rem; padding: 5px; "><img src=data:image/png;base64,'+qrImageBase64+' style="width:80px; height:80px"><br><span style="font-size:.6rem; text-align:center">'+qrData+'</span></td>'+
                       '</tr>';
+                      }
+                      
                     }else{
                       html =  html +        
                       '<tr>'+
@@ -2132,7 +2154,7 @@ if(singleOrderArray[i]['measurementsObject']['notes']){
                   '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: left;border-right: 1px solid;border-bottom: 1px solid;"></td>'+
                   '<td style="text-align:center;  width: auto; Height: 15px !important;padding: 2px 0px !important;font-size: 15px; border-right: 1px solid;border-bottom: 1px solid;">skin<p style="margin: 0;margin-top: 5px; height: 10px !important; padding: 5px;border-top: 1px solid; ">นิ้ว</p></td>'+
                   '<td style="text-align:center;  width: auto; Height: 15px !important;padding: 2px 0px !important;font-size: 15px; border-right: 1px solid;border-bottom: 1px solid;">FIT<p style="margin: 0;margin-top: 5px; height: 10px !important; padding: 5px;border-top: 1px solid; ">(+)</p></td>'+
-                  '<td style="text-align:center;  width: auto; Height: 15px !important;padding: 2px 0px !important;font-size: 15px; border-right: 1px solid;border-bottom: 1px solid;">TTL<p style="margin: 0;margin-top: 5px; height: 10px !important; padding: 5px;border-top: 1px solid; ">นิ้ว</p></td>'+
+                  '<td style="text-align:center;  width: auto; Height: 15px !important;padding: 2px 0px !important;font-size: 15px; border-right: 1px solid;border-bottom: 1px solid red;">TTL<p style="margin: 0;margin-top: 5px; height: 10px !important; padding: 5px;border-top: 1px solid;">นิ้ว</p></td>'+
                   '<td style="text-align:center;  width: auto; Height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: left;border-right: 1px solid;border-bottom: 1px solid;"><p style="margin: 0;margin-top: 5px; height: 10px !important; padding: 5px; "></p></td>'+
                 '</tr>';
 
@@ -2169,8 +2191,8 @@ if(singleOrderArray[i]['measurementsObject']['notes']){
                   '<tr>'+
                     '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: left;border-right: 1px solid;border-bottom: 1px solid;">' + measurement + "[" + singleOrderArray[i].measurementsObject.measurements[measurement]['thai_name'] + ']</td>'+
                     '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;border-bottom: 1px solid;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['value'] + '</td>'+
-                    '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;border-bottom: 1px solid;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['adjustment_value'] + '</td>'+
-                    '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;border-bottom: 1px solid;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['total_value'] + '</td>'+
+                    '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid red;border-bottom: 1px solid;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['adjustment_value'] + '</td>'+
+                    '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;border-bottom: 1px solid; color:red;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['total_value'] + '</td>'+
                     '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: left;border-right: 1px solid;border-bottom: 1px solid;">' + string + '</td>'+
                   '</tr>';
                 }
@@ -2682,6 +2704,10 @@ html = html +
           '<td style="width: 150px;height: 15px !important;padding: 8px 5px !important;font-size: 15px;text-align: left;border-right: 1px solid; border-left: 0px; border-bottom: 1px solid; border-top: 1px solid;">Monogram Name :</td>'+
           '<td style="width: auto;height: 15px !important; padding: 8px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;  border-left: 1px solid;border-bottom: 1px solid;">'+monogramTag +'</td>'+
          '</tr>'+
+
+         '<tr>'+
+          '<td colspan="2" style="width: auto;height: 30px !important; padding: 8px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;border-bottom: 1px solid;"></td>'+
+        '</tr>'+
         
         '</tbody>'+
 
