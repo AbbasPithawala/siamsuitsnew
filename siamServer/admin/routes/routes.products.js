@@ -496,6 +496,7 @@ router.post("/fetchByJacketName/:name", auth, async(req, res)=>{
           model: 'Style'
       }
   });
+
     if(!product.length > 0){
       return res.json({
         status: false,

@@ -808,6 +808,9 @@ export default function MissingFabric(props) {
           }
         );
 
+        console.log("res.data.data", res.data)
+        console.log("res1.data.data", res1.data.data)
+
         setTuxedoJacket(res.data.data[0]);
         setTuxedoPant(res1.data.data[0]);
 
@@ -957,6 +960,17 @@ export default function MissingFabric(props) {
     const itemNameID = product.name + "_" + i;
 
     if (event.target.dataset.for == "monogram") {
+      if (stylesArray[itemNameID]["monogram"]) {
+        stylesArray[itemNameID]["monogram"][event.target.name] =
+          event.target.value;
+        setStylesArray({ ...stylesArray });
+      } else {
+        const object = {};
+        object[event.target.name] = event.target.value;
+        stylesArray[itemNameID]["monogram"] = object;
+        setStylesArray({ ...stylesArray });
+      }
+    }else if (event.target.dataset.for == "monogramOptional") {
       if (stylesArray[itemNameID]["monogram"]) {
         stylesArray[itemNameID]["monogram"][event.target.name] =
           event.target.value;
@@ -1271,18 +1285,29 @@ export default function MissingFabric(props) {
 
     const itemNameID = "suit" + "_" + i;
 
-    if (event.target.dataset.for == "monogram") {
-      if (SuitstylesArray[itemNameID]["jacket"]["monogram"]) {
-        SuitstylesArray[itemNameID]["jacket"]["monogram"][event.target.name] =
-          event.target.value;
-        setSuitstylesArray({ ...SuitstylesArray });
+      if (event.target.dataset.for == "monogram") {
+        if (SuitstylesArray[itemNameID]["jacket"]["monogram"]) {
+          SuitstylesArray[itemNameID]["jacket"]["monogram"][event.target.name] =
+            event.target.value;
+          setSuitstylesArray({ ...SuitstylesArray });
+        } else {
+          const object = {};
+          object[event.target.name] = event.target.value;
+          SuitstylesArray[itemNameID]["jacket"]["monogram"] = object;
+          setSuitstylesArray({ ...SuitstylesArray });
+        }
+      }else if (event.target.dataset.for == "monogramOptional") {
+        if (SuitstylesArray[itemNameID]["jacket"]["monogram"]) {
+          SuitstylesArray[itemNameID]["jacket"]["monogram"][event.target.name] =
+            event.target.value;
+          setSuitstylesArray({ ...SuitstylesArray });
+        } else {
+          const object = {};
+          object[event.target.name] = event.target.value;
+          SuitstylesArray[itemNameID]["jacket"]["monogram"] = object;
+          setSuitstylesArray({ ...SuitstylesArray });
+        }
       } else {
-        const object = {};
-        object[event.target.name] = event.target.value;
-        SuitstylesArray[itemNameID]["jacket"]["monogram"] = object;
-        setSuitstylesArray({ ...SuitstylesArray });
-      }
-    } else {
       SuitstylesArray[itemNameID]["jacket"][event.target.name] = event.target.value;
       setSuitstylesArray({ ...SuitstylesArray });
     }
@@ -1402,6 +1427,17 @@ export default function MissingFabric(props) {
     const itemNameID = "tuxedo" + "_" + i;
 
     if (event.target.dataset.for == "monogram") {
+      if (TuxedostylesArray[itemNameID]["tuxedojacket"]["monogram"]) {
+        TuxedostylesArray[itemNameID]["tuxedojacket"]["monogram"][event.target.name] =
+          event.target.value;
+        setTuxedostylesArray({ ...TuxedostylesArray });
+      } else {
+        const object = {};
+        object[event.target.name] = event.target.value;
+        TuxedostylesArray[itemNameID]["tuxedojacket"]["monogram"] = object;
+        setTuxedostylesArray({ ...TuxedostylesArray });
+      }
+    }else if (event.target.dataset.for == "monogramOptional") {
       if (TuxedostylesArray[itemNameID]["tuxedojacket"]["monogram"]) {
         TuxedostylesArray[itemNameID]["tuxedojacket"]["monogram"][event.target.name] =
           event.target.value;
@@ -1729,6 +1765,29 @@ export default function MissingFabric(props) {
                                     }
                                   ></input>
                                 </div>
+                                <div className="title-fabrics">
+                              {" "}
+                              <h3> Monogram Optional </h3>{" "}
+                            </div>
+                            <div className="form-group monogram-info">
+                              {/* <p> Monogram </p> */}
+                              <input
+                                type="text"
+                                className="searchinput"
+                                placeholder="Tag Optional"
+                                name="tagOptional"
+                                value={
+                                  stylesArray[product.name + "_" + i].monogram
+                                    ? stylesArray[product.name + "_" + i]
+                                      .monogram.tagOptional
+                                    : ""
+                                }
+                                data-for="monogramOptional"
+                                onChange={(event) =>
+                                  handleChangeInput(event, i)
+                                }
+                              ></input>
+                            </div>
                                 <div className="form-group monogram-info">
                                   <p> Monogram Position </p>
                                   <ul>
@@ -2006,6 +2065,29 @@ export default function MissingFabric(props) {
                                 }
                               ></input>
                             </div>
+                            <div className="title-fabrics">
+                              {" "}
+                              <h3> Monogram Optional </h3>{" "}
+                            </div>
+                            <div className="form-group monogram-info">
+                              {/* <p> Monogram </p> */}
+                              <input
+                                type="text"
+                                className="searchinput"
+                                placeholder="Tag Optional"
+                                name="tagOptional"
+                                value={
+                                  stylesArray[product.name + "_" + i].monogram
+                                    ? stylesArray[product.name + "_" + i]
+                                      .monogram.tagOptional
+                                    : ""
+                                }
+                                data-for="monogramOptional"
+                                onChange={(event) =>
+                                  handleChangeInput(event, i)
+                                }
+                              ></input>
+                            </div>
                             <div className="form-group monogram-foont-style">
                               <p> Monogram Font Style </p>
                               <ul>
@@ -2229,6 +2311,29 @@ export default function MissingFabric(props) {
                                     }
                                   ></input>
                                 </div>
+                                <div className="title-fabrics">
+                              {" "}
+                              <h3> Monogram Optional </h3>{" "}
+                            </div>
+                            <div className="form-group monogram-info">
+                              {/* <p> Monogram </p> */}
+                              <input
+                                type="text"
+                                className="searchinput"
+                                placeholder="Tag Optional"
+                                name="tagOptional"
+                                value={
+                                  stylesArray[product.name + "_" + i].monogram
+                                    ? stylesArray[product.name + "_" + i]
+                                      .monogram.tagOptional
+                                    : ""
+                                }
+                                data-for="monogramOptional"
+                                onChange={(event) =>
+                                  handleChangeInput(event, i)
+                                }
+                              ></input>
+                            </div>
                                 <div className="form-group monogram-info">
                                   <p> Monogram Position </p>
                                   <ul>
@@ -2986,6 +3091,33 @@ export default function MissingFabric(props) {
                                     : ""
                                 }
                                 data-for="monogram"
+                                onChange={(event) =>
+                                  handleSuitChangeInput(event, i)
+                                }
+                              ></input>
+                            </div>
+                            <div className="title-fabrics">
+                              {" "}
+                              <h3> Monogram Optional </h3>{" "}
+                            </div>
+                            <div className="form-group monogram-info">
+                              <input
+                                type="text"
+                                className="searchinput"
+                                placeholder="Tag Optional"
+                                name="tagOptional"
+                                value={
+                                  SuitstylesArray["suit" + "_" + i] &&
+                                    SuitstylesArray["suit" + "_" + i]["jacket"] &&
+                                    SuitstylesArray["suit" + "_" + i]["jacket"][
+                                    "monogram"
+                                    ]
+                                    ? SuitstylesArray["suit" + "_" + i][
+                                      "jacket"
+                                    ].monogram.tagOptional
+                                    : ""
+                                }
+                                data-for="monogramOptional"
                                 onChange={(event) =>
                                   handleSuitChangeInput(event, i)
                                 }
@@ -3864,6 +3996,33 @@ export default function MissingFabric(props) {
                                     : ""
                                 }
                                 data-for="monogram"
+                                onChange={(event) =>
+                                  handleTuxedoChangeInput(event, i)
+                                }
+                              ></input>
+                            </div>
+                            <div className="title-fabrics">
+                              {" "}
+                              <h3> Monogram Optional </h3>{" "}
+                            </div>
+                            <div className="form-group monogram-info">
+                              <input
+                                type="text"
+                                className="searchinput"
+                                placeholder="Tag Optional"
+                                name="tagOptional"
+                                value={
+                                  TuxedostylesArray["tuxedo" + "_" + i] &&
+                                    TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"] &&
+                                    TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"][
+                                    "monogram"
+                                    ]
+                                    ? TuxedostylesArray["tuxedo" + "_" + i][
+                                      "tuxedojacket"
+                                    ].monogram.tagOptional
+                                    : ""
+                                }
+                                data-for="monogramOptional"
                                 onChange={(event) =>
                                   handleTuxedoChangeInput(event, i)
                                 }

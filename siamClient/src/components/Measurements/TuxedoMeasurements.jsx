@@ -66,12 +66,25 @@ export default function TuxedoMeasurements({
     const suithandleValueChange = async (e) => {
       let value = parseFloat(e.target.value);
       let string = e.target.name.split("-");
+      
+      // Ensure the measurement object exists
+      for (let x of newTuxedoMeasurement) {
+        if (!x.m[string[0]]) {
+          x.m[string[0]] = {
+            value: 0,
+            adjustment_value: 0,
+            total_value: 0,
+            repeat: false
+          };
+        }
+      }
+      
       if (string[1] === "value") {
         for (let x of newTuxedoMeasurement) {
           for (let y of Object.keys(x.m)) {
             if (y === string[0]) {
-              x.m[string[0]]["total_value"] =
-                x.m[string[0]]["adjustment_value"] + value;
+              const adjustmentValue = x.m[string[0]]["adjustment_value"] || 0;
+              x.m[string[0]]["total_value"] = adjustmentValue + value;
             }
           }
         }
@@ -79,7 +92,8 @@ export default function TuxedoMeasurements({
         for (let x of newTuxedoMeasurement) {
           for (let y of Object.keys(x.m)) {
             if (y === string[0]) {
-              x.m[string[0]]["total_value"] = x.m[string[0]]["value"] + value;
+              const currentValue = x.m[string[0]]["value"] || 0;
+              x.m[string[0]]["total_value"] = currentValue + value;
             }
           }
         }
@@ -99,7 +113,12 @@ export default function TuxedoMeasurements({
       setNewTuxedoMeasurement([...newTuxedoMeasurement]);
     };
     const handleOnFocus = (e) => {
-      e.target.select();
+      // If the value is 0, clear it on focus so user can type directly
+      if (e.target.value === '0' || e.target.value === 0) {
+        e.target.value = '';
+      } else {
+        e.target.select();
+      }
     };
     const handleSuitTypeChangeType = async (name, e) => {
       if (name === "pant") {

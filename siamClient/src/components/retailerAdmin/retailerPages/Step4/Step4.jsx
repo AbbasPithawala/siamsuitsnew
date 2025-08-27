@@ -338,7 +338,7 @@ export default function Step4() {
           measurementsFinished['pant'] = true
           setMeasurementsFinished({...measurementsFinished});
           setSuitCustomerMeasurements({ ...customer["suit"]});
-        } else if (!suitFilledMeasurements.includes(res1.data.data[0]["name"])) {
+        } else if (res1.data && res1.data.data && res1.data.data[0] && !suitFilledMeasurements.includes(res1.data.data[0]["name"])) {
           for (let x of res1.data.data[0].measurements) {
             obj[x.name] = {
               value: 0,
@@ -397,7 +397,7 @@ export default function Step4() {
           measurementsFinished['pant'] = true
           setMeasurementsFinished({...measurementsFinished});
           setTuxedoCustomerMeasurements({ ...customer["tuxedo"]});
-        } else if (!tuxedoFilledMeasurements.includes(res1.data.data[0]["name"])) {
+        } else if (res1.data && res1.data.data && res1.data.data[0] && !tuxedoFilledMeasurements.includes(res1.data.data[0]["name"])) {
           for (let x of res1.data.data[0].measurements) {
             obj[x.name] = {
               value: 0,

@@ -1993,37 +1993,44 @@ for(let i=0; i < singleOrderArray.length; i++){
   let monogramColor= "";
   let monogramFont= "";
   let monogramTag = "";
+  let monogramTagOptional = "";
   if(singleOrderArray[i]['item_name'] == 'suit' && singleOrderArray[i].item_code.split(" ")[0] == "jacket" && singleOrderArray[i]["styles"]["jacket"]["monogram"] !== undefined){
     monogramColor = singleOrderArray[i]['styles']['jacket']['monogram']['color'] || "N/A"
     monogramFont = singleOrderArray[i]['styles']['jacket']['monogram']['font'] || "N/A"
     monogramPosition = singleOrderArray[i]['styles']['jacket']['monogram']['side'] || "Right Side"
     monogramTag = singleOrderArray[i]['styles']['jacket']['monogram']['tag'] || "N/A"
+    monogramTagOptional = singleOrderArray[i]['styles']['jacket']['monogram']['tag_optional'] || "N/A"
   } else if(singleOrderArray[i]['item_name'] == 'suit' && singleOrderArray[i].item_code.split(" ")[0] == "jacket" && singleOrderArray[i]["styles"]["jacket"]["monogram"] == undefined){
     monogramColor = "N/A"
     monogramFont = "N/A"
     monogramPosition = "Right Side" 
     monogramTag ="N/A"
+    monogramTagOptional = "N/A"
   } else if(singleOrderArray[i]['item_name'] == 'tuxedo' && singleOrderArray[i].item_code.split(" ")[0] == "tuxedojacket" && singleOrderArray[i]["styles"]["tuxedojacket"]["monogram"] !== undefined){
     monogramColor = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['color'] || "N/A"
     monogramFont = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['font'] || "N/A"
     monogramPosition = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['side'] || "Right Side"
     monogramTag = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['tag'] || "N/A"
+    monogramTagOptional = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['tag_optional'] || "N/A"
   } else if(singleOrderArray[i]['item_name'] == 'tuxedo' && singleOrderArray[i].item_code.split(" ")[0] == "tuxedojacket" && singleOrderArray[i]["styles"]["tuxedojacket"]["monogram"] == undefined){
     monogramColor = "N/A"
     monogramFont = "N/A"
     monogramPosition = "Right Side" 
     monogramTag ="N/A"
+    monogramTagOptional = "N/A"
   }else if((singleOrderArray[i]['item_name'] !== 'suit' || singleOrderArray[i]['item_name'] !== 'tuxedo') && singleOrderArray[i]["styles"]["monogram"] !== undefined){
     if(singleOrderArray[i]['item_name'] == 'jacket'){
       monogramColor = singleOrderArray[i]['styles']['monogram']['color'] || "N/A"
       monogramFont = singleOrderArray[i]['styles']['monogram']['font'] || "N/A"
       monogramPosition = singleOrderArray[i]['styles']['monogram']['side'] || "Right Side" 
       monogramTag = singleOrderArray[i]['styles']['monogram']['tag'] || "N/A"
+      monogramTagOptional = singleOrderArray[i]['styles']['monogram']['tag_optional'] || "N/A"
     }else{
       monogramColor = singleOrderArray[i]['styles']['monogram']['color'] || "N/A"
       monogramFont = singleOrderArray[i]['styles']['monogram']['font'] || "N/A"
       monogramPosition = singleOrderArray[i]['styles']['monogram']['side'] || "N/A"
       monogramTag = singleOrderArray[i]['styles']['monogram']['tag'] || "N/A"
+      monogramTagOptional = singleOrderArray[i]['styles']['monogram']['tag_optional'] || "N/A"
     }
   }else if((singleOrderArray[i]['item_name'] !== 'suit' || singleOrderArray[i]['item_name'] !== 'tuxedo') && singleOrderArray[i]["styles"]["monogram"] == undefined){
     if(singleOrderArray[i]['item_name'] == 'jacket'){
@@ -2031,11 +2038,13 @@ for(let i=0; i < singleOrderArray.length; i++){
       monogramFont = "N/A"
       monogramPosition = "Right Side" 
       monogramTag ="N/A"
+      monogramTagOptional = "N/A"
     }else{
       monogramColor = "N/A"
       monogramFont = "N/A"
       monogramPosition = "N/A"
-      monogramTag ="N/A"
+      monogramTag ="N/A"  
+      monogramTagOptional = "N/A"
     }
   }
   
@@ -2192,7 +2201,7 @@ if(singleOrderArray[i]['measurementsObject']['notes']){
                     '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: left;border-right: 1px solid;border-bottom: 1px solid;">' + measurement + "[" + singleOrderArray[i].measurementsObject.measurements[measurement]['thai_name'] + ']</td>'+
                     '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;border-bottom: 1px solid;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['value'] + '</td>'+
                     '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid red;border-bottom: 1px solid;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['adjustment_value'] + '</td>'+
-                    '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;border-bottom: 1px solid; color:red;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['total_value'] + '</td>'+
+                    '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px; font-weight: bold;text-align: center;border-right: 1px solid;border-bottom: 1px solid; color:red;">' + singleOrderArray[i].measurementsObject.measurements[measurement]['total_value'] + '</td>'+
                     '<td style="width: auto;height: 15px !important;padding: 2px 5px !important;font-size: 15px;text-align: left;border-right: 1px solid;border-bottom: 1px solid;">' + string + '</td>'+
                   '</tr>';
                 }
@@ -2706,7 +2715,8 @@ html = html +
          '</tr>'+
 
          '<tr>'+
-          '<td colspan="2" style="width: auto;height: 30px !important; padding: 8px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;border-bottom: 1px solid;"></td>'+
+         '<td style="width: 150px;height: 15px !important;padding: 8px 5px !important;font-size: 15px;text-align: left;border-right: 1px solid; border-left: 0px; border-bottom: 1px solid; border-top: 1px solid;">Monogram Line 2 :</td>'+
+         '<td style="width: auto;height: 15px !important; padding: 8px 5px !important;font-size: 15px;text-align: center;border-right: 1px solid;  border-left: 1px solid;border-bottom: 1px solid;">'+ monogramTagOptional +'</td>'+
         '</tr>'+
         
         '</tbody>'+

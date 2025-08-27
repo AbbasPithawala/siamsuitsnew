@@ -71,19 +71,27 @@ export default function Measurements({
       }
     }
   };
-console.log("check123")
   const handleValueChange = async (e) => {
     let value = parseFloat(e.target.value);
     const string = e.target.name.split("-");
-    console.log("e.target.value", e.target.value) 
-    console.log("string", string)
+    
+    // Ensure the measurement object exists
+    if (!productMeasurements[string[0]]) {
+      productMeasurements[string[0]] = {
+        value: 0,
+        adjustment_value: 0,
+        total_value: 0,
+        repeat: false
+      };
+    }
+    
     if (string[1] == "value") {
-      productMeasurements[string[0]]["total_value"] =
-        productMeasurements[string[0]]["adjustment_value"] + value;
+      const adjustmentValue = productMeasurements[string[0]]["adjustment_value"] || 0;
+      productMeasurements[string[0]]["total_value"] = adjustmentValue + value;
       productMeasurements[string[0]]["repeat"] = false;
     } else if (string[1] == "adjustment_value") {
-      productMeasurements[string[0]]["total_value"] =
-        productMeasurements[string[0]]["value"] + value;
+      const currentValue = productMeasurements[string[0]]["value"] || 0;
+      productMeasurements[string[0]]["total_value"] = currentValue + value;
       productMeasurements[string[0]]["repeat"] = false;
     }
 
@@ -105,7 +113,12 @@ console.log("check123")
   };
 
   const handleOnFocus = (e) => {
-    e.target.select();
+    // If the value is 0, clear it on focus so user can type directly
+    if (e.target.value === '0' || e.target.value === 0) {
+      e.target.value = '';
+    } else {
+      e.target.select();
+    }
   };
 
   const handleChangeType = async (e) => {
