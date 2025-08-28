@@ -35,6 +35,7 @@ const workerExtraPaymentsRoutes = require("./admin/routes/factoryRoutes/routes.e
 const PaymentsRoutes = require("./admin/routes/factoryRoutes/routes.payments")
 const shippingRoutes = require("./admin/routes/shipping/routes.shipping")
 const jobRoutes = require("./admin/routes/factoryRoutes/routes.jobs")
+const retailerOrderManagementRoutes = require("./retailer/routes/routes.retailerOrderManagement")
 
 
 // call GLOBAL MIDDLEWARES
@@ -112,6 +113,7 @@ app.use("/api/payments", PaymentsRoutes)
 app.use("/api/tailor", tailorRoutesApp)
 app.use("/api/job", jobRoutes)
 app.use("/api/shipping", shippingRoutes)
+app.use("/api/retailerOrderManagement", retailerOrderManagementRoutes)
 
 
 // Catch-all handler for React Router (must be after API routes)

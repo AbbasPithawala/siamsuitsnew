@@ -72,36 +72,53 @@ export default function Measurements({
     }
   };
   const handleValueChange = async (e) => {
-    let value = parseFloat(e.target.value);
+    let value = e.target.value;
     const string = e.target.name.split("-");
-    
+
+    // Allow only numbers and a single decimal point.
+    value = value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
+
+    const parts = value.split('.');
+    if (parts[0].length > 2) {
+        parts[0] = parts[0].slice(0, 2);
+    }
+    if (parts.length > 1) {
+        parts[1] = parts[1].slice(0, 2);
+        value = `${parts[0]}.${parts[1]}`;
+    } else {
+        value = parts[0];
+    }
+
     // Ensure the measurement object exists
     if (!productMeasurements[string[0]]) {
       productMeasurements[string[0]] = {
-        value: 0,
-        adjustment_value: 0,
+        value: "0",
+        adjustment_value: "0",
         total_value: 0,
         repeat: false
       };
     }
     
+    productMeasurements[string[0]][string[1]] = value;
+    
+    const numericValue = parseFloat(value) || 0;
+
     if (string[1] == "value") {
-      const adjustmentValue = productMeasurements[string[0]]["adjustment_value"] || 0;
-      productMeasurements[string[0]]["total_value"] = adjustmentValue + value;
-      productMeasurements[string[0]]["repeat"] = false;
+      const adjustmentValue = parseFloat(productMeasurements[string[0]]["adjustment_value"]) || 0;
+      productMeasurements[string[0]]["total_value"] = adjustmentValue + numericValue;
     } else if (string[1] == "adjustment_value") {
-      const currentValue = productMeasurements[string[0]]["value"] || 0;
-      productMeasurements[string[0]]["total_value"] = currentValue + value;
-      productMeasurements[string[0]]["repeat"] = false;
+      const currentValue = parseFloat(productMeasurements[string[0]]["value"]) || 0;
+      productMeasurements[string[0]]["total_value"] = currentValue + numericValue;
     }
 
-    productMeasurements[string[0]][string[1]] = value;
+    productMeasurements[string[0]]["repeat"] = false;
+
     setProductMeasurements({ ...productMeasurements });
     customerMeasurements[product_name]["measurements"] = productMeasurements;
     setCustomerMeasurements({ ...customerMeasurements });
     let check = "true";
     Object.keys(productMeasurements).map((measurements) => {
-      if (!productMeasurements[measurements]["total_value"] > 0) {
+      if (!(productMeasurements[measurements]["total_value"] > 0)) {
         check = "false";
       }
     });
@@ -118,6 +135,13 @@ export default function Measurements({
       e.target.value = '';
     } else {
       e.target.select();
+    }
+  };
+
+  const handleBlur = (e) => {
+    if (e.target.value === '') {
+        const { name } = e.target;
+        handleValueChange({ target: { name, value: '0' } });
     }
   };
 
@@ -189,9 +213,9 @@ export default function Measurements({
                   }}
                 >
                   <p style={{ flex: 1, fontSize: "12px", margin: "0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Measurement Name</p>
-                  <p style={{ flex: 0.7, textAlign: "center", fontSize: "12px", margin: "0" }}>Value</p>
-                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Adjustment</p>
-                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Total Value</p>
+                  <p style={{ flex: 0.7, textAlign: "center", fontSize: "12px", margin: "0" }}>Body Size</p>
+                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Allowance</p>
+                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Production Size</p>
                   <p style={{ flex: 0.5, margin: "0" }}></p>
                 </div>
               </Grid>
@@ -217,7 +241,8 @@ export default function Measurements({
                   </p>
 
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     className="searchinput-measurement"
                     style={{
                       padding: "6px",
@@ -230,20 +255,17 @@ export default function Measurements({
                       fontWeight: "bold"
                     
                     }}
-                    value={productMeasurements[measurement.name]?.value || 0}
+                    value={productMeasurements[measurement.name]?.value || ''}
                     name={measurement.name + "-value"}
-                    min="0" // Ensures the user cannot manually enter a value below 0
-                    onChange={(e) => {
-                      const newValue = Math.max(0, Number(e.target.value)); // Prevents negative values
-                      handleValueChange({ target: { name: e.target.name, value: newValue } });
-                    }}
-                    // onChange={handleValueChange}
+                    onChange={handleValueChange}
                     onFocus={handleOnFocus}
-
+                    onBlur={handleBlur}
+                    onWheel={(e) => e.target.blur()}
                   />
 
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     className="searchinput-measurement"
                     style={{
                       padding: "6px",
@@ -255,14 +277,12 @@ export default function Measurements({
                       fontSize: "14px",
                       fontWeight: "bold"
                     }}
-                    value={productMeasurements[measurement.name]?.adjustment_value || 0}
+                    value={productMeasurements[measurement.name]?.adjustment_value || ''}
                     name={measurement.name + "-adjustment_value"}
-                    min="0" // Ensures the user cannot manually enter a value below 0
-                    onChange={(e) => {
-                      const newValue = Math.max(0, Number(e.target.value)); // Prevents negative values
-                      handleValueChange({ target: { name: e.target.name, value: newValue } });
-                    }}
+                    onChange={handleValueChange}
                     onFocus={handleOnFocus}
+                    onBlur={handleBlur}
+                    onWheel={(e) => e.target.blur()}
                   />
 
                   <input

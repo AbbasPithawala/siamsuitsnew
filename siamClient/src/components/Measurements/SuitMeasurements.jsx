@@ -64,44 +64,44 @@ export default function SuitMeasurements({
       }
     };
     const suithandleValueChange = async (e) => {
-      let value = parseFloat(e.target.value);
+      let value = e.target.value;
       let string = e.target.name.split("-");
-      
-      // Ensure the measurement object exists
-      for (let x of newMeasurement) {
-        if (!x.m[string[0]]) {
-          x.m[string[0]] = {
-            value: 0,
-            adjustment_value: 0,
-            total_value: 0,
-            repeat: false
-          };
-        }
+  
+      // Allow only numbers and a single decimal point.
+      value = value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
+  
+      const parts = value.split('.');
+      if (parts[0].length > 2) {
+          parts[0] = parts[0].slice(0, 2);
+      }
+      if (parts.length > 1) {
+          parts[1] = parts[1].slice(0, 2);
+          value = `${parts[0]}.${parts[1]}`;
+      } else {
+          value = parts[0];
       }
       
+      const numericValue = parseFloat(value) || 0;
+  
       if (string[1] === "value") {
         for (let x of newMeasurement) {
-          for (let y of Object.keys(x.m)) {
-            if (y === string[0]) {
-              const adjustmentValue = x.m[string[0]]["adjustment_value"] || 0;
-              x.m[string[0]]["total_value"] = adjustmentValue + value;
-            }
+          if (x.m[string[0]]) {
+            const adjustmentValue = parseFloat(x.m[string[0]]["adjustment_value"]) || 0;
+            x.m[string[0]]["total_value"] = adjustmentValue + numericValue;
           }
         }
       } else if (string[1] === "adjustment_value") {
         for (let x of newMeasurement) {
-          for (let y of Object.keys(x.m)) {
-            if (y === string[0]) {
-              const currentValue = x.m[string[0]]["value"] || 0;
-              x.m[string[0]]["total_value"] = currentValue + value;
-            }
+          if (x.m[string[0]]) {
+            const currentValue = parseFloat(x.m[string[0]]["value"]) || 0;
+            x.m[string[0]]["total_value"] = currentValue + numericValue;
           }
         }
       }
   
       for (let z of newMeasurement) {
-        for (let u of Object.keys(z.m)) {
-          if (u === string[0]) z.m[string[0]][string[1]] = value;
+        if (z.m[string[0]]) {
+          z.m[string[0]][string[1]] = value;
         }
       }
   
@@ -118,6 +118,12 @@ export default function SuitMeasurements({
         e.target.value = '';
       } else {
         e.target.select();
+      }
+    };
+    const handleBlur = (e) => {
+      if (e.target.value === '') {
+          const { name } = e.target;
+          suithandleValueChange({ target: { name, value: '0' } });
       }
     };
     const handleSuitTypeChangeType = async (name, e) => {
@@ -237,9 +243,9 @@ export default function SuitMeasurements({
                                   }}
                                 >
                                   <p style={{ flex: 1, fontSize: "12px", margin: "0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Measurement Name</p>
-                                  <p style={{ flex: 0.7, textAlign: "center", fontSize: "12px", margin: "0" }}>Value</p>
-                                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Adjustment</p>
-                                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Total Value</p>
+                                  <p style={{ flex: 0.7, textAlign: "center", fontSize: "12px", margin: "0" }}>Body Size</p>
+                                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Allowance</p>
+                                  <p style={{ flex: 0.8, textAlign: "center", fontSize: "12px", margin: "0" }}>Production Size</p>
                                   <p style={{ flex: 0.5, margin: "0" }}></p>
                                 </div>
                               </Grid>
@@ -266,7 +272,8 @@ export default function SuitMeasurements({
                                   </p>
                 
                                   <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     className="searchinput-measurement"
                                     style={{
                                       padding: "6px",
@@ -279,15 +286,16 @@ export default function SuitMeasurements({
                                       fontWeight: "bold"
                                     }}
                                     name={data + "-value"}
-                                    value={measurement.m[data]["value"]}
-                                    // value={productMeasurements1[data]['value']}
+                                    value={measurement.m[data]["value"] || ''}
                                     onChange={suithandleValueChange}
                                     onFocus={handleOnFocus}
-                
+                                    onBlur={handleBlur}
+                                    onWheel={(e) => e.target.blur()}
                                   />
                 
                                   <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     className="searchinput-measurement"
                                     style={{
                                       padding: "6px",
@@ -302,13 +310,13 @@ export default function SuitMeasurements({
                                     value={
                                       measurement.m[data][
                                         "adjustment_value"
-                                      ]
+                                      ] || ''
                                     }
-                                    // value={productMeasurements1[data]['adjustment_value']}
-                                    // disabled={adjustmentValueImmutable}
                                     name={data + "-adjustment_value"}
                                     onChange={suithandleValueChange}
                                     onFocus={handleOnFocus}
+                                    onBlur={handleBlur}
+                                    onWheel={(e) => e.target.blur()}
                                   />
                 
                                   <input
