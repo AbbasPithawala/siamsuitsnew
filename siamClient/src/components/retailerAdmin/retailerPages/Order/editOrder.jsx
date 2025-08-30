@@ -133,8 +133,6 @@ export default function Step4() {
         setDate(res1.data.data[0]['rushOrderDate']);
         setIsRushOrder(true);
       }
-      const drafts = JSON.parse(JSON.stringify(res1.data.data[0]['measurements']))
-      setDraftMeasurementsObject(drafts)
       
       let num = 0
 
