@@ -5,6 +5,7 @@ const Measurement = require("../model/model.measurement")
 const auth = require("../../middleware/auth")
 const { resolve } = require("path")
 const { find } = require("../model/model.products")
+const { generateUniqueSlug } = require("../../utills/common")
 
 
 // ============create a Measurement==================
@@ -24,6 +25,14 @@ router.post("/create", auth, async (req, res) => {
     }
 
     req.body.measurement.name = measurementName
+    
+    // Generate unique slug
+    const checkSlugExists = async (slug) => {
+      const existingMeasurement = await Measurement.findOne({ slug: slug })
+      return !!existingMeasurement
+    }
+    
+    req.body.measurement.slug = await generateUniqueSlug(measurementName, checkSlugExists)
 
     const measurement = new Measurement(req.body.measurement)
 
@@ -154,6 +163,17 @@ router.put("/update/:id", auth, async (req, res) => {
     }
 
     req.body.measurement.name = req.body.measurement.name.toLowerCase()
+    
+    // Generate unique slug when name is updated
+    const checkSlugExists = async (slug) => {
+      const existingMeasurement = await Measurement.findOne({ 
+        slug: slug, 
+        _id: { $ne: req.params.id } // Exclude current measurement from check
+      })
+      return !!existingMeasurement
+    }
+    
+    req.body.measurement.slug = await generateUniqueSlug(req.body.measurement.name, checkSlugExists)
 
     const updatedMeasurement = await Measurement.findOneAndUpdate({ _id: req.params.id }, req.body.measurement)
     console.log(measurementToBeUpdated)

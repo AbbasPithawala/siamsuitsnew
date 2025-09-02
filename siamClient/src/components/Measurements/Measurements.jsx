@@ -25,7 +25,7 @@ export default function Measurements({
     "Total Value",
     ""
   ];
-
+console.log("measurements: ", measurements)
   const handleCustomFitValue = async (e) => {
     const fitMeasure = customFittings.filter((x) => {
       return x.fitting_name == e.target.value;
