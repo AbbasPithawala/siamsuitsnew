@@ -1999,7 +1999,7 @@ for(let i=0; i < singleOrderArray.length; i++){
     monogramFont = singleOrderArray[i]['styles']['jacket']['monogram']['font'] || "N/A"
     monogramPosition = singleOrderArray[i]['styles']['jacket']['monogram']['side'] || "Right Side"
     monogramTag = singleOrderArray[i]['styles']['jacket']['monogram']['tag'] || "N/A"
-    monogramTagOptional = singleOrderArray[i]['styles']['jacket']['monogram']['tagOptional'] || "N/A"
+    monogramTagOptional = singleOrderArray[i]['styles']['jacket']['monogram']['tagOptional'] || ""
   } else if(singleOrderArray[i]['item_name'] == 'suit' && singleOrderArray[i].item_code.split(" ")[0] == "jacket" && singleOrderArray[i]["styles"]["jacket"]["monogram"] == undefined){
     monogramColor = "N/A"
     monogramFont = "N/A"
@@ -2011,7 +2011,7 @@ for(let i=0; i < singleOrderArray.length; i++){
     monogramFont = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['font'] || "N/A"
     monogramPosition = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['side'] || "Right Side"
     monogramTag = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['tag'] || "N/A"
-    monogramTagOptional = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['tagOptional'] || "N/A"
+    monogramTagOptional = singleOrderArray[i]['styles']['tuxedojacket']['monogram']['tagOptional'] || ""
   } else if(singleOrderArray[i]['item_name'] == 'tuxedo' && singleOrderArray[i].item_code.split(" ")[0] == "tuxedojacket" && singleOrderArray[i]["styles"]["tuxedojacket"]["monogram"] == undefined){
     monogramColor = "N/A"
     monogramFont = "N/A"
@@ -2024,13 +2024,13 @@ for(let i=0; i < singleOrderArray.length; i++){
       monogramFont = singleOrderArray[i]['styles']['monogram']['font'] || "N/A"
       monogramPosition = singleOrderArray[i]['styles']['monogram']['side'] || "Right Side" 
       monogramTag = singleOrderArray[i]['styles']['monogram']['tag'] || "N/A"
-      monogramTagOptional = singleOrderArray[i]['styles']['monogram']['tagOptional'] || "N/A"
+      monogramTagOptional = singleOrderArray[i]['styles']['monogram']['tagOptional'] || ""
     }else{
       monogramColor = singleOrderArray[i]['styles']['monogram']['color'] || "N/A"
       monogramFont = singleOrderArray[i]['styles']['monogram']['font'] || "N/A"
       monogramPosition = singleOrderArray[i]['styles']['monogram']['side'] || "N/A"
       monogramTag = singleOrderArray[i]['styles']['monogram']['tag'] || "N/A"
-      monogramTagOptional = singleOrderArray[i]['styles']['monogram']['tagOptional'] || "N/A"
+      monogramTagOptional = singleOrderArray[i]['styles']['monogram']['tagOptional'] || ""
     }
   }else if((singleOrderArray[i]['item_name'] !== 'suit' || singleOrderArray[i]['item_name'] !== 'tuxedo') && singleOrderArray[i]["styles"]["monogram"] == undefined){
     if(singleOrderArray[i]['item_name'] == 'jacket'){
@@ -2038,13 +2038,13 @@ for(let i=0; i < singleOrderArray.length; i++){
       monogramFont = "N/A"
       monogramPosition = "Right Side" 
       monogramTag ="N/A"
-      monogramTagOptional = "N/A"
+      monogramTagOptional = ""
     }else{
       monogramColor = "N/A"
       monogramFont = "N/A"
       monogramPosition = "N/A"
       monogramTag ="N/A"  
-      monogramTagOptional = "N/A"
+      monogramTagOptional = ""
     }
   }
   

@@ -81,7 +81,6 @@ export default function Dashboard() {
       return {
         total: 0,
         newOrder: 0,
-        rush: 0,
         modified: 0,
         processing: 0,
         shipment: 0,
@@ -89,15 +88,14 @@ export default function Dashboard() {
       };
     }
 
-    // Single pass through the array instead of 6 separate filter operations
+    // Single pass through the array instead of separate filter operations
+    // Merge Rush orders with New Orders
     const counts = allOrdersData.reduce((acc, order) => {
       acc.total++;
       switch(order.order_status) {
         case "New Order":
-          acc.newOrder++;
-          break;
         case "Rush":
-          acc.rush++;
+          acc.newOrder++;
           break;
         case "Modified":
           acc.modified++;
@@ -116,7 +114,6 @@ export default function Dashboard() {
     }, {
       total: 0,
       newOrder: 0,
-      rush: 0,
       modified: 0,
       processing: 0,
       shipment: 0,
@@ -210,7 +207,6 @@ export default function Dashboard() {
   useEffect(() => {
     setLength0(orderStatusCounts.total);
     setLength1(orderStatusCounts.newOrder);
-    setLength2(orderStatusCounts.rush);
     setLength3(orderStatusCounts.modified);
     setLength4(orderStatusCounts.processing);
     setLength5(orderStatusCounts.shipment);
@@ -706,7 +702,6 @@ const fetchAllOrders = async (par) => {
             <ul>
               <li className={statusName == "" ? "active" : ""} data-name="" onClick={handleStatusChange}> All Orders          ({l0})</li>
               <li className={statusName == "New Order" ? "active" : ""} data-name="New Order" onClick={handleStatusChange}> New Order          ({l1})</li>
-              <li className={statusName == "Rush" ? "active" : ""} id="rush"  data-name="Rush" onClick={handleStatusChange}> Rush Order         ({l2})</li>
               <li className={statusName == "Modified" ? "active" : ""}            data-name="Modified" onClick={handleStatusChange}> Modified           ({l3})</li>
               <li className={statusName == "Processing" ? "active" : ""}            data-name="Processing" onClick={handleStatusChange}> Processing         ({l4})</li>
               <li className={statusName == "Shipment" ? "active" : ""}            data-name="Shipment" onClick={handleStatusChange}> Ready For Shipping ({l5})</li>
@@ -767,14 +762,28 @@ const fetchAllOrders = async (par) => {
                       <td> {order.orderId} </td>
                       <td> {order.total_quantity} </td>
                       <td> {order.customerName} </td>
-                      <td> {order.type  == "group"?     
-                            <span className="ModifiedBg" style={{textTransform: "capitalize"}}>
-                              {order.type}
-                            </span> : 
-                            <span className="newOrderBg" style={{textTransform: "capitalize"}}>
-                              Normal
-                            </span> 
-                            } </td>
+                      <td> 
+                        {order.order_status === "Rush" ? (
+                          <span style={{ 
+                            backgroundColor: "#ff4444", 
+                            color: "white", 
+                            padding: "4px 8px", 
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            fontWeight: "bold"
+                          }}>
+                            Rush Order
+                          </span>
+                        ) : order.type == "group" ? (     
+                          <span className="ModifiedBg" style={{textTransform: "capitalize"}}>
+                            {order.type}
+                          </span>
+                        ) : (
+                          <span className="newOrderBg" style={{textTransform: "capitalize"}}>
+                            Normal
+                          </span>
+                        )}
+                      </td>
                       <td> 
                             <strong>
                               <button

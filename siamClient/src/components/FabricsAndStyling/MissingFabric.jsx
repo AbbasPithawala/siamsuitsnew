@@ -1765,12 +1765,11 @@ export default function MissingFabric(props) {
                                     }
                                   ></input>
                                 </div>
-                                <div className="title-fabrics">
+                                {/* <div className="title-fabrics">
                               {" "}
                               <h3> Monogram Optional </h3>{" "}
                             </div>
                             <div className="form-group monogram-info">
-                              {/* <p> Monogram </p> */}
                               <input
                                 type="text"
                                 className="searchinput"
@@ -1787,7 +1786,7 @@ export default function MissingFabric(props) {
                                   handleChangeInput(event, i)
                                 }
                               ></input>
-                            </div>
+                            </div> */}
                                 <div className="form-group monogram-info">
                                   <p> Monogram Position </p>
                                   <ul>

@@ -88,24 +88,22 @@ export default function Order() {
       return {
         newOrder: 0,
         modified: 0,
-        rush: 0,
         processing: 0,
         shipment: 0,
         sent: 0
       };
     }
 
-    // Single pass through the array instead of 6 separate filter operations
+    // Single pass through the array instead of separate filter operations
+    // Merge Rush orders with New Orders
     const counts = allOrdersData.reduce((acc, order) => {
       switch(order.order_status) {
         case "New Order":
+        case "Rush":
           acc.newOrder++;
           break;
         case "Modified":
           acc.modified++;
-          break;
-        case "Rush":
-          acc.rush++;
           break;
         case "Processing":
           acc.processing++;
@@ -121,7 +119,6 @@ export default function Order() {
     }, {
       newOrder: 0,
       modified: 0,
-      rush: 0,
       processing: 0,
       shipment: 0,
       sent: 0
@@ -134,7 +131,6 @@ export default function Order() {
   useEffect(() => {
     setLength1(orderStatusCounts.newOrder);
     setLength2(orderStatusCounts.modified);
-    setLength3(orderStatusCounts.rush);
     setLength4(orderStatusCounts.processing);
     setLength5(orderStatusCounts.shipment);
     setLength6(orderStatusCounts.sent);
@@ -166,11 +162,54 @@ export default function Order() {
 
   }, [statusName, page]);
 
+  // Separate useEffect to handle initial page load with saved retailer
+  useEffect(() => {
+    const savedRetailer = sessionStorage.getItem('selectedRetailer');
+    if (savedRetailer && name1 === savedRetailer) {
+      // Trigger search with the restored retailer
+      const par = {
+        order_status: statusName,
+        retailerName: savedRetailer
+      }
+      
+      const count = {
+        order_status: statusName,
+        retailerName: savedRetailer
+      }
+      
+      fetchPageOrders(par, count, 0);
+    }
+  }, [name1, statusName]); // Run when name1 or statusName changes
+
   useEffect(() => {
     const par = {}
     fetchRetailers();
-    fetchAllOrders(par);
     fetchProducts();
+    
+    // Restore retailer selection from sessionStorage when coming back from edit
+    const savedRetailer = sessionStorage.getItem('selectedRetailer');
+    if (savedRetailer) {
+      setRetailer(savedRetailer);
+      setName1(savedRetailer);
+      // Fetch orders with the saved retailer filter
+      par['retailerName'] = savedRetailer;
+    }
+    
+    fetchAllOrders(par);
+    
+    // Clear sessionStorage on page reload (detect if it's a fresh page load)
+    const handleBeforeUnload = () => {
+      // Check if this is a page reload or navigation away from the app
+      sessionStorage.removeItem('selectedRetailer');
+    };
+    
+    // Add event listener for page unload
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Cleanup function
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
 console.log("orders: ",orders)
 
@@ -188,6 +227,13 @@ console.log("orders: ",orders)
     setRetailer(value);
     name1 = value;
     setName1(value);
+    
+    // Save retailer selection to sessionStorage
+    if (value && value.trim() !== '') {
+      sessionStorage.setItem('selectedRetailer', value);
+    } else {
+      sessionStorage.removeItem('selectedRetailer');
+    }
     // fetchData(1, limit, statusName, name, value.trim(), d);
   };
 
@@ -289,8 +335,9 @@ console.log("orders: ",orders)
         count['OrderDate'] = d
         parForTabs['OrderDate'] = d
       }
-      // fetchPageOrders(par, (page - 1) * 5)
-      // fetchData(page, limit, statusName, name, name1, d);
+      // Refresh the current page orders
+      fetchPageOrders(par, count, (page - 1) * 20);
+      // Update tab counts
       fetchAllOrders(parForTabs);
     }
     setOpen(true);
@@ -707,14 +754,6 @@ console.log("orders: ",orders)
                   New Orders ({l1})
                 </li>
                 <li
-                  className={statusName == "Rush" ? "active" : ""}
-                  id="rushorder"
-                  data-name="Rush"
-                  onClick={handleStatusChange}
-                >
-                  Rush Orders ({l3})
-                </li>
-                <li
                   className={statusName == "Modified" ? "active" : ""}
                   data-name="Modified"
                   onClick={handleStatusChange}
@@ -822,14 +861,28 @@ console.log("orders: ",orders)
                         {/* <td>{order.retailerName ? order.retailerName.charAt(0).toUpperCase() + order.retailerName.slice(1) : ""}</td> */}
                         <td>{order.orderId}</td>
                         <td>{order.customerName ? order.customerName.charAt(0).toUpperCase() + order.customerName.slice(1) : ""}</td>
-                        <td> {order.type == "group" ?
-                          <span className="ModifiedBg" style={{ textTransform: "capitalize" }}>
-                            {order.type}
-                          </span> :
-                          <span className="newOrderBg" style={{ textTransform: "capitalize" }}>
-                            Normal
-                          </span>
-                        } </td>
+                        <td> 
+                          {order.order_status === "Rush" ? (
+                            <span style={{ 
+                              backgroundColor: "#ff4444", 
+                              color: "white", 
+                              padding: "4px 8px", 
+                              borderRadius: "4px",
+                              fontSize: "12px",
+                              fontWeight: "bold"
+                            }}>
+                              Rush Order
+                            </span>
+                          ) : order.type == "group" ? (
+                            <span className="ModifiedBg" style={{ textTransform: "capitalize" }}>
+                              {order.type}
+                            </span>
+                          ) : (
+                            <span className="newOrderBg" style={{ textTransform: "capitalize" }}>
+                              Normal
+                            </span>
+                          )}
+                        </td>
                         <td>{order.OrderDate}</td>
                         <td className="orderQuantity">
                           <span
