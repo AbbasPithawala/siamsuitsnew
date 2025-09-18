@@ -118,6 +118,17 @@ export default function ManageJobs() {
   const searchSelectChange = (e) => {
     const tailorObject = tailors.filter((data) => data._id == e.target.value);
     setTailor(tailorObject[0]);
+    
+    // Reset all payment-related states when tailor changes
+    setJobIDArray([]);
+    setCostChk([]);
+    setSubTotal(0);
+    setDeductedAdvance(0);
+    setManualBill(0);
+    setRent(0);
+    setTotalPay(0);
+    setShowJobs(false);
+    setJobs([]);
   };
 
   const handleSearch = () => {

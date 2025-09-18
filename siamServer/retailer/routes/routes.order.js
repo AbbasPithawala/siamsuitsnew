@@ -62,9 +62,18 @@ function toJSONLocal(date) {
 router.post("/fetchAll", auth, async (req, res) => {
   try {
     if (!req.body.par) req.body.par = {}; // Ensure par exists
-    req.body.par.type = "normal"; // Add type condition
-    console.log(req.body.par)
-    const orders = await Order.find(req.body.par)
+    
+    let obj = {...req.body.par}
+    obj.type = "normal"; // Add type condition
+    
+    // Include Rush orders when New Order is requested for tab counts
+    if(req.body.par.order_status === "New Order") {
+      obj['$or'] = [{ order_status: "New Order" }, { order_status: "Rush" }]
+      delete obj['order_status']
+    }
+    
+    console.log(obj)
+    const orders = await Order.find(obj)
       .sort({ date: -1 }) // Correct sorting syntax
       .populate("customer_id")
       .populate("retailer_id");
@@ -1540,16 +1549,26 @@ router.post("/fetchRetailerPaginateNew/:skip", auth, async(req, res) => {
 
   try{
     let obj  = {}
-    if(req.body.par.order_status.length > 0){
-      obj = req.body.par
+    if(req.body.par.order_status && req.body.par.order_status.length > 0){
+      obj = {...req.body.par}
+      // Include Rush orders when New Order is requested
+      if(req.body.par.order_status === "New Order") {
+        obj['$or'] = [{ order_status: "New Order" }, { order_status: "Rush" }]
+        delete obj['order_status']
+      }
     }else{
       obj = req.body.par
       delete obj['order_status']
     }
 
     let obj2  = {}
-    if(req.body.count.order_status.length > 0){
-      obj2 = req.body.count
+    if(req.body.count.order_status && req.body.count.order_status.length > 0){
+      obj2 = {...req.body.count}
+      // Include Rush orders when New Order is requested for count
+      if(req.body.count.order_status === "New Order") {
+        obj2['$or'] = [{ order_status: "New Order" }, { order_status: "Rush" }]
+        delete obj2['order_status']
+      }
     }else{
       obj2 = req.body.count
       delete obj2['order_status']
@@ -1587,11 +1606,26 @@ router.post("/fetchRetailerPaginateNew/:skip", auth, async(req, res) => {
 router.post("/fetchAdminPaginateNew/:skip", auth, async(req, res) => {
 
   try{
-    req.body.par.type = "normal"
-    const orders = await Order.find(req.body.par).sort({date: -1}).limit(20).skip(req.params.skip)
-    req.body.count.type = "normal"
-    // const ordersCount = await Order.find({order_status: req.body.par.order_status})
-    const ordersCount = await Order.find(req.body.count)
+    let obj = {...req.body.par}
+    obj.type = "normal"
+    
+    // Include Rush orders when New Order is requested
+    if(req.body.par.order_status === "New Order") {
+      obj['$or'] = [{ order_status: "New Order" }, { order_status: "Rush" }]
+      delete obj['order_status']
+    }
+    
+    let obj2 = {...req.body.count}
+    obj2.type = "normal"
+    
+    // Include Rush orders when New Order is requested for count
+    if(req.body.count.order_status === "New Order") {
+      obj2['$or'] = [{ order_status: "New Order" }, { order_status: "Rush" }]
+      delete obj2['order_status']
+    }
+    
+    const orders = await Order.find(obj).sort({date: -1}).limit(20).skip(req.params.skip)
+    const ordersCount = await Order.find(obj2)
     const count = ordersCount.length
     if(orders.length < 1){
       return res.json({
