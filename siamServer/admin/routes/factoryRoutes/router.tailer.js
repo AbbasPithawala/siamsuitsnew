@@ -311,7 +311,7 @@ router.post("/assignItem", auth, async(req, res) => {
       //   job['cost'] = Number(job['cost'])
       //   job['stylingprice'] = order[0]['stylingprice']?.[item] || {}
       // }
-      if(order[0]['stylingprice'][item]){
+      if(order[0]['stylingprice'] && order[0]['stylingprice'][item]){
         for(let x of Object.keys(order[0]['stylingprice'][item])){
           if(order[0]['stylingprice'][item][x]['process'] === currentProcess['_id']){
             job['cost'] = Number(job['cost'])
