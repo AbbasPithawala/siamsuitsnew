@@ -750,6 +750,7 @@ export default function ManageJobs() {
                     <th>Tailor</th>
                     <th>Item</th>
                     <th>Order</th>
+                    <th>Date</th>
                     <th>Description</th>
                     <th>Type</th>
                     <th>Cost</th>
@@ -789,9 +790,9 @@ export default function ManageJobs() {
                             {
                               job.item_code.split("/")[1].split("_")[0] == 'suit'
                                 ?
-                                Number(job.item_code.split("/")[1].split("_")[2]) +
-                                1 +
-                                " " +
+                                // Number(job.item_code.split("/")[1].split("_")[2]) +
+                                // 1 +
+                                // " " +
                                 job.item_code.split("/")[1].split("_")[1]
                                 +
                                 " ("
@@ -802,9 +803,9 @@ export default function ManageJobs() {
                                 :
                                 job.item_code.split("/")[1].split("_")[0] == 'tuxedo'
                                 ?
-                                Number(job.item_code.split("/")[1].split("_")[2]) +
-                                1 +
-                                " " +
+                                // Number(job.item_code.split("/")[1].split("_")[2]) +
+                                // 1 +
+                                // " " +
                                 job.item_code.split("/")[1].split("_")[1]
                                 +
                                 " ("
@@ -813,13 +814,14 @@ export default function ManageJobs() {
                                 +
                                 ")"
                                 :
-                                Number(job.item_code.split("/")[1].split("_")[1]) +
-                                1 +
-                                " " +
+                                // Number(job.item_code.split("/")[1].split("_")[1]) +
+                                // 1 +
+                                // " " +
                                 job.item_code.split("/")[1].split("_")[0]
                             }
                           </td>
                           <td>{job.order_id ? job.order_id.orderId : job.group_order_id.orderId}</td>
+                          <td>{new Date(job.date).toLocaleDateString('en-GB')}</td>
                           <td style={{ textTransform: "capitalize" }}>
                             {job.process["name"]}
                           </td>
