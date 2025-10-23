@@ -747,6 +747,7 @@ export default function ManageJobs() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th>ID</th>
                     <th>Tailor</th>
                     <th>Item</th>
                     <th>Order</th>
@@ -779,9 +780,10 @@ export default function ManageJobs() {
                           stylingNum = stylingNum + Number(x)
                         }
                         costTotal = costTotal + stylingNum
-                      }
+                      } 
                       return (
                         <tr key={job['_id']}>
+                          <td>{index + 1}</td>
                           <td>
                             <span >{job.tailor.firstname + " " + job.tailor.lastname}</span>
 

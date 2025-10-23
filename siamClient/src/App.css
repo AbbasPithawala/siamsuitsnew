@@ -43,6 +43,19 @@ a:hover{
 	cursor: pointer;
 }
 
+.custom-btn-white {
+    background: #fff;
+    border: 0;
+    padding: 12px 24px;
+    color: #1c4d8f;
+    font-family: 'Montserrat', sans-serif;
+    border-radius: 7px;
+    font-weight: 600;
+	transition:0.4s ease;
+	cursor: pointer;
+    border: 1px solid #1c4d8f;
+}
+
 .custom-btn-red {
     background: red;
     border: 0;
@@ -114,6 +127,12 @@ a:hover{
 .custom-btn:hover{
 	transition:0.4s ease;
 	background:#025;
+}
+
+.custom-btn-white:hover{
+	transition:0.4s ease;
+	background:#1c4d8f;
+	color:#fff;
 }
 
 .b-btn:hover{

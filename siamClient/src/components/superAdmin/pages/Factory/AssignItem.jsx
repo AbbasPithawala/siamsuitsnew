@@ -827,7 +827,6 @@ console.log("jobs ", jobs)
         setExtraPaymentCategoriesSelectedCost(0);
         setJobs([]);
         setCheckboxItem([]);
-        setTailor({});
         fetchUnfinishedJobs(tailor['_id']);
       }
       
@@ -866,10 +865,11 @@ console.log("jobs ", jobs)
               <select
                 name="workername"
                 id="retailer"
+                value={tailor && tailor._id ? tailor._id : ""}
                 onChange={searchSelectChange}
                 className="searchinput"
               >
-                <option value=" ">Select Tailor</option>
+                <option value="">Select Tailor</option>
                 {tailors.length > 0 && tailors !== null ? (
                   tailors.map((data, i) => (
                     <option
@@ -1195,8 +1195,7 @@ console.log("jobs ", jobs)
                     {/* {job['process']['name'].includes('stitching') && ( */}
                       <button 
                         onClick={handleOpenExtraPaymentCategories} 
-                        className="custom-btn" 
-                        style={{fontSize:"14px",fontWeight:"400",color:"#1c4d8f", border:"none"}}
+                        className="custom-btn-white" 
                       >
                         Create Extra Payment
                       </button>
@@ -1370,8 +1369,8 @@ console.log("jobs ", jobs)
                   <></>}
                   </div>
         <DialogActions>
-          <Button className="custom-btn" style={{backgroundColor: "red !important"}} onClick={() => setShowExtraPaymentCategories(false)}>Cancel</Button>
-          <Button className="custom-btn" onClick={() => handleCreateExtraPayment()}>Create</Button>
+          <button className="custom-btn-white" onClick={() => setShowExtraPaymentCategories(false)}>Cancel</button>
+          <button className="custom-btn" onClick={() => handleCreateExtraPayment()}>Create</button>
         </DialogActions>
       </Dialog>
 

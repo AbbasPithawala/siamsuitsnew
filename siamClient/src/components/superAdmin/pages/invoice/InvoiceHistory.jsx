@@ -209,7 +209,7 @@ export default function InvoiceHistory() {
                   <font style={{ fontSize: '12px', color: '#333' }}><span style={{ paddingLeft: "10px" }}>{retailer['address'] ? retailer['address'] : "N/A"}</span></font>
                   </div>
                   <div style={{display: "flex", flexDirection:"row", marginBottom:"10px"}}><font style={{ fontSize: '12px', color: '#333', fontWeight: 700 }}>Retailer Email :</font>
-                  <font style={{ fontSize: '12px', color: '#333' }}><span style={{ paddingLeft: "10px" }}>{retailer['email'] ? retailer['email'] : "N/A"}</span></font>
+                  <font style={{ fontSize: '12px', color: '#333' }}><span style={{ paddingLeft: "10px" }}>{retailer['email'] ? retailer['email'].split(" ").join(", ") : "N/A"}</span></font>
                   </div>
                   </div>
                 </td>
@@ -846,7 +846,13 @@ export default function InvoiceHistory() {
                               {invoice['invoice_number']}
                             </span>
                           </td>
-                          <td>{invoice.total_price}</td>
+                          <td>{
+                            invoice.total_amount ?? (
+                              Number(invoice.total_price || 0) +
+                              Number(invoice.shipping_charge || 0) -
+                              Number(invoice.discount || 0)
+                            )
+                          }</td>
                           <td>{invoice.dueDate}</td>
                           <td><Button onClick={() => handleViewInvoiceModal(invoice['_id'])} className="Eyebtn"><RemoveRedEyeIcon /></Button></td>
                           {/* exportPDF(invoice._id) */}
