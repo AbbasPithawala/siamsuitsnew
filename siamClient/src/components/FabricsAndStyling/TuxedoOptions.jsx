@@ -106,7 +106,7 @@ const handleStyleChangeRadio =(e) =>{
     <>
     <div className='Styles'>
     <div className='styleHeading' style={{textTransform: "capitalize"}}>
-      <input id={styles['_id']} type="radio" name={feature['_id']} data-name={styles['_id']} onChange={handleStyleChangeRadio}/>
+      <input id={styles['_id']} type="radio" name={feature['_id']} data-name={styles['_id']} checked={styles['_id'] === styleID} onChange={handleStyleChangeRadio}/>
       <label for={styles['_id']}>{styles['name']}</label>
     </div>
     <div className='styleOptions' style={styleOptions}>

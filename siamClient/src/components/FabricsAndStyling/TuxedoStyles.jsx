@@ -95,6 +95,22 @@ useEffect(() => {
   setCheck(true)
 }, [TuxedostylesArray])
 
+// Auto-open the first style that has style_options for the active feature tab
+useEffect(() => {
+  const nf = featuresStyle?.filter(f => f.additional == false) || [];
+  const currentFeature = nf[value] || nf[0];
+  if (!currentFeature || !currentFeature.styles) {
+    setStyleID("");
+    return;
+  }
+  const firstWithOptions = currentFeature.styles.find(s => (s.style_options && s.style_options.length > 0));
+  if (firstWithOptions) {
+    setStyleID(firstWithOptions._id);
+  } else {
+    setStyleID("");
+  }
+}, [value, featuresStyle])
+
 const handleTabChange = (event, newValue) => {
   setValue(newValue);
 };
