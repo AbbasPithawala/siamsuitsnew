@@ -135,7 +135,6 @@ export default function AssignItem(){
   //   // fetchJobs(obj);
   //   setTailorAdvance(tailor['advancePayment'])
   // }
-console.log("checkboxItem", checkboxItem)
   const handleCheckboxChange = async(e, cst) =>{
     
     if(e.target.checked){
@@ -281,7 +280,6 @@ console.log("checkboxItem", checkboxItem)
   //   }
   // }
 
-console.log("jobs ", jobs)
   const handleAssignItem = async (e) => {
     const qrData = qrCode.split("/")
     if(qrData.length === 2){
@@ -296,6 +294,8 @@ console.log("jobs ", jobs)
         order: order,
         type: type
       })
+
+      console.log("res: ", res.data)
 
       if(res.data.status === true){
         setShowUnfinishedJobs(false)
@@ -1343,7 +1343,6 @@ console.log("jobs ", jobs)
                     {extraPaymentCategories.length > 0 && showJob
                     ?
                     extraPaymentCategories.map((epc) =>{
-                      console.log("epc ", epc)
                     const code = jobs[0]['item_code'].split("/")[1]
                     let itemName = "";
                     if(code.split("_")[0] === "suit"){

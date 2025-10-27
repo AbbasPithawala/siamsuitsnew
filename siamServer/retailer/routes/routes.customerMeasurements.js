@@ -407,6 +407,9 @@ router.put("/updateCustomerMeasurementsSingle/:id", async (req, res) => {
 
     measurementsObject[req.body.product] = req.body.measurements[req.body.product]
     
+    if (req.body.product === 'jacket') {
+      measurementsObject.tuxedojacket = req.body.measurements.jacket;
+    }
     
     // if(req.body.product == 'jacket' && )
     if((req.body.product == 'jacket' || req.body.product == 'pant') && ( measurementsObject['jacket'] && measurementsObject['pant'])){    
@@ -433,7 +436,26 @@ router.put("/updateCustomerMeasurementsSingle/:id", async (req, res) => {
       
       data.measurementsObject = measurementsObject
 
-      await Customer.findByIdAndUpdate( req.params.id, {measurementsObject: measurementsObject, suit: data.suit})
+      let tuxedoObject = {}
+      if (data.tuxedo) {
+        tuxedoObject = data.tuxedo
+      }
+
+      if (req.body.product == 'pant') {
+        tuxedoObject['pant'] = req.body.measurements['pant']
+        tuxedoObject['tuxedojacket'] = measurementsObject['jacket']
+      }
+      if (req.body.product == 'jacket') {
+        tuxedoObject['tuxedojacket'] = req.body.measurements['jacket']
+        tuxedoObject['pant'] = measurementsObject['pant']
+      }
+      
+      const justNewTuxedoObject = {}
+      justNewTuxedoObject['tuxedojacket'] = tuxedoObject['tuxedojacket']
+      justNewTuxedoObject['pant'] = tuxedoObject['pant']
+      data.tuxedo = justNewTuxedoObject
+
+      await Customer.findByIdAndUpdate( req.params.id, {measurementsObject: measurementsObject, suit: data.suit, tuxedo: data.tuxedo})
     }else{
       console.log("this one")
       console.log("measurements: ", measurementsObject['jacket'])
@@ -493,29 +515,37 @@ router.put("/updateCustomerMeasurementsMeanualSize/:id", async (req, res) => {
 
 router.put("/updatesuitCustomerMeasurements/:id", async (req, res) => {
   try {
+    const customer = await Customer.findById(req.params.id);
 
-    console.log("req: ", req.body.measurements.suit)
+    // Prepare suit object
+    const suitObject = {
+      jacket: req.body.measurements.jacket,
+      pant: req.body.measurements.pant
+    };
 
-    const data = await Customer.findById(
-      req.params.id
+    // Prepare tuxedo object
+    const tuxedoObject = {
+      tuxedojacket: req.body.measurements.jacket,
+      pant: req.body.measurements.pant
+    };
+
+    // Prepare measurements object
+    const measurementsObject = {
+      ...customer.measurementsObject,
+      jacket: req.body.measurements.jacket,
+      tuxedojacket: req.body.measurements.jacket,
+      pant: req.body.measurements.pant
+    };
+
+    const data = await Customer.findByIdAndUpdate(
+      req.params.id,
+      {
+        measurementsObject: measurementsObject,
+        suit: suitObject,
+        tuxedo: tuxedoObject
+      },
+      { new: true }
     );
-    
-    let suitObject = {...data.suit}
-    suitObject = req.body.measurements
-
-    const justAnObject = {}
-    justAnObject['jacket'] = req.body.measurements['jacket']
-    justAnObject['pant'] = req.body.measurements['pant']
-    data.suit = justAnObject
-
-
-    let measurementsObject = {...data.measurementsObject}
-    measurementsObject['jacket'] = req.body.measurements['jacket']
-    measurementsObject['pant'] = req.body.measurements['pant'] 
-
-
-
-    await Customer.findByIdAndUpdate( req.params.id, {measurementsObject: measurementsObject, suit: data.suit})
     
     return res.json({
       status: true,
@@ -535,27 +565,37 @@ router.put("/updatesuitCustomerMeasurements/:id", async (req, res) => {
 router.put("/updateTuxedoCustomerMeasurements/:id", async (req, res) => {
   try {
 
+    const customer = await Customer.findById(req.params.id);
 
-    let data = await Customer.findById(
-      req.params.id
+    // Prepare tuxedo object
+    const tuxedoObject = {
+      tuxedojacket: req.body.measurements.tuxedojacket,
+      pant: req.body.measurements.pant
+    };
+
+    // Prepare suit object
+    const suitObject = {
+      jacket: req.body.measurements.tuxedojacket, // from tuxedojacket
+      pant: req.body.measurements.pant
+    };
+
+    // Prepare measurements object
+    const measurementsObject = {
+      ...customer.measurementsObject,
+      tuxedojacket: req.body.measurements.tuxedojacket,
+      jacket: req.body.measurements.tuxedojacket, // from tuxedojacket
+      pant: req.body.measurements.pant
+    };
+
+    const data = await Customer.findByIdAndUpdate(
+      req.params.id,
+      {
+        measurementsObject: measurementsObject,
+        suit: suitObject,
+        tuxedo: tuxedoObject
+      },
+      { new: true }
     );
-    console.log("daslkdnsal")
-    
-    let tuxedoObject = {...data.tuxedo}
-    tuxedoObject = req.body.measurements
-
-    const justAnObject = {}
-    justAnObject['tuxedojacket'] = req.body.measurements['tuxedojacket']
-    justAnObject['pant'] = req.body.measurements['pant']
-    data.tuxedo = justAnObject
-
-
-    let measurementsObject = {...data.measurementsObject}
-    measurementsObject['tuxedojacket'] = req.body.measurements['tuxedojacket']
-    measurementsObject['pant'] = req.body.measurements['pant'] 
-
-
-    data = await Customer.findByIdAndUpdate( req.params.id, {measurementsObject: measurementsObject, tuxedo: data.tuxedo}, {new: true})
     
     return res.json({
       status: true,

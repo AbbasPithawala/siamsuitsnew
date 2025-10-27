@@ -278,9 +278,11 @@ router.post("/assignItem", auth, async(req, res) => {
       // const index = Object.keys(processes).indexOf(tailor['process_id'][i]['name'])
   
       if(processFound === false){
+
+
         return res.json({
           status: false,
-          message: "You are not authorized for this process..!",
+          message: "This process has already been assigned to another tailor...!",
           data: null
         })
       }
