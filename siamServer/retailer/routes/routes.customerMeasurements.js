@@ -489,30 +489,6 @@ router.put("/updateCustomerMeasurementsSingle/:id", async (req, res) => {
   }
 });
 
-router.put("/updateCustomerMeasurementsMeanualSize/:id", async (req, res) => {
-  try {
-
-    const data = await Customer.findByIdAndUpdate(
-      req.params.id,
-      { manualSize: req.body.manualSize },
-      { new: true }
-    );
-
-    return res.json({
-      status: true,
-      message: "Measurements Manual Size updated successfully",
-      data: data,
-    })
-  }
-  catch (err) {
-    return res.json({
-      status: true,
-      message: err.message,
-      data: []
-    })
-  }
-});
-
 router.put("/updatesuitCustomerMeasurements/:id", async (req, res) => {
   try {
     const customer = await Customer.findById(req.params.id);
@@ -601,6 +577,30 @@ router.put("/updateTuxedoCustomerMeasurements/:id", async (req, res) => {
       status: true,
       message: "Measurements updated successfully",
       data: data
+    })
+  }
+  catch (err) {
+    return res.json({
+      status: true,
+      message: err.message,
+      data: []
+    })
+  }
+});
+
+router.put("/updateCustomerMeasurementsMeanualSize/:id", async (req, res) => {
+  try {
+
+    const data = await Customer.findByIdAndUpdate(
+      req.params.id,
+      { manualSize: req.body.manualSize },
+      { new: true }
+    );
+
+    return res.json({
+      status: true,
+      message: "Measurements Manual Size updated successfully",
+      data: data,
     })
   }
   catch (err) {

@@ -627,31 +627,28 @@ export default function Step4() {
     const res = await axiosInstance.put(
       "/userMeasurement/updateCustomerMeasurementsSingle/" + path,
       {
-        measurements: { ...customerMeasurements },
+        measurements: {...customerMeasurements},
         product: product_name
       }
     );
 
-    if (res.data && res.data.data) {
-      const updatedCustomer = res.data.data;
-      setCustomer(updatedCustomer);
-
-      if (updatedCustomer.measurementsObject) {
-        setCustomerMeasurements(updatedCustomer.measurementsObject);
-      }
-      if (updatedCustomer.suit) {
-        setSuitCustomerMeasurements(updatedCustomer.suit);
-      }
-      if (updatedCustomer.tuxedo) {
-        setTuxedoCustomerMeasurements(updatedCustomer.tuxedo);
-      }
-    }
+    customer["measurementsObject"] = customerMeasurements;
+    setCustomer({ ...customer });
 
     filledMeasurements.push(product_name)
     setFilledMeasurements([...filledMeasurements]);
+    if(res.data.data["measurementsObject"] && Object.keys(res.data.data["measurementsObject"]).includes('jacket') && Object.keys(res.data.data["measurementsObject"]).includes('pant')){
+      // measurementsFinished['suit'] = true
+      // setMeasurementsFinished({...measurementsFinished})
+    }
     measurementsFinished[product_name] = true
-    setMeasurementsFinished({ ...measurementsFinished })
+    setMeasurementsFinished({...measurementsFinished})
 
+    if ( res.data.data["measurementsObject"] && 
+      orders.length == Object.keys(res.data.data["measurementsObject"]).length
+    ) {
+      setCanPlaceOrder(true);
+    }
     setCanPlaceOrder(true);
     setMeasurements([]);
     setProductMeasurements({});
@@ -1194,25 +1191,21 @@ const action = (
       }
     );
 
-    if (res.data && res.data.data) {
-      const updatedCustomer = res.data.data;
-      setCustomer(updatedCustomer);
+    customer["suit"] = { ...suitcustomerMeasurements } ;
+    setCustomer({ ...customer });
 
-      if (updatedCustomer.measurementsObject) {
-        setCustomerMeasurements(updatedCustomer.measurementsObject);
-      }
-      if (updatedCustomer.suit) {
-        setSuitCustomerMeasurements(updatedCustomer.suit);
-      }
-      if (updatedCustomer.tuxedo) {
-        setTuxedoCustomerMeasurements(updatedCustomer.tuxedo);
-      }
+    if (res.data.data["suit"] &&
+      orders.length == Object.keys(res.data.data["suit"]).length
+    ) {
+      setCanPlaceOrder(true);
     }
-
     setCanPlaceOrder(true);
+
     setSuitFilledMeasurement('suit');
+
     measurementsFinished['suit'] = true
-    setMeasurementsFinished({ ...measurementsFinished })
+    setMeasurementsFinished({...measurementsFinished})
+
     setSuitOpen(false);
     setNew([]);
   };
@@ -1322,25 +1315,21 @@ const action = (
       }
     );
 
-    if (res.data && res.data.data) {
-      const updatedCustomer = res.data.data;
-      setCustomer(updatedCustomer);
+    customer["tuxedo"] = { ...tuxedoCustomerMeasurements } ;
+    setCustomer({ ...customer });
 
-      if (updatedCustomer.measurementsObject) {
-        setCustomerMeasurements(updatedCustomer.measurementsObject);
-      }
-      if (updatedCustomer.suit) {
-        setSuitCustomerMeasurements(updatedCustomer.suit);
-      }
-      if (updatedCustomer.tuxedo) {
-        setTuxedoCustomerMeasurements(updatedCustomer.tuxedo);
-      }
+    if (res.data.data["tuxedo"] &&
+      orders.length == Object.keys(res.data.data["tuxedo"]).length
+    ) {
+      setCanPlaceOrder(true);
     }
-
     setCanPlaceOrder(true);
+
     setTuxedoFilledMeasurement('tuxedo');
+
     measurementsFinished['tuxedo'] = true
-    setMeasurementsFinished({ ...measurementsFinished })
+    setMeasurementsFinished({...measurementsFinished})
+
     setTuxedoOpen(false);
     setNewTuxedoMeasurement([]);
   };
