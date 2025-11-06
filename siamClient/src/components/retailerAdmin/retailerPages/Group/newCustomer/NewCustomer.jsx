@@ -531,11 +531,11 @@ const NewCustomer = (
               </div>
               <div className={validationError.firstname ? "form-group error-handle" : "form-group"}>
                 <label> First Name <span className="red-required">*</span></label>
-                <input type="text" className="searchinput" value={customer.firstname} placeholder="James" onChange={(e) => setCustomer({ ...customer, firstname: e.target.value })} required />
+                <input type="text" className="searchinput" value={customer.firstname} onChange={(e) => setCustomer({ ...customer, firstname: e.target.value })} required />
               </div>
               <div className={validationError.lastname ? "form-group error-handle" : "form-group"}>
                 <label> Last Name <span className="red-required">*</span></label>
-                <input type="text" value={customer.lastname} className="searchinput" placeholder="Doe" onChange={(e) => setCustomer({ ...customer, lastname: e.target.value })} required />
+                <input type="text" value={customer.lastname} className="searchinput" onChange={(e) => setCustomer({ ...customer, lastname: e.target.value })} required />
               </div>
               <div className={validationError.gender ? "form-group error-handle" : "form-group"}>
                 <label> Gender <span className="red-required">*</span></label>
@@ -548,16 +548,16 @@ const NewCustomer = (
               </div>
               <div className="form-group">
                 <label> Email </label>
-                <input type="email" className="searchinput" value={customer.email} placeholder="james@example.com" onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
+                <input type="email" className="searchinput" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
               </div>
               <div className="form-group">
                 <label> Contact </label>
-                <input type="text" className="searchinput" value={customer.phone} placeholder="12345" onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
+                <input type="text" className="searchinput" value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
 
               </div>
               <div className="form-group">
                 <label> Customer Monogram Tag </label>
-                <input type="text" className="searchinput" value={customer.tag} placeholder="Monogram Tag" onChange={(e) => setCustomer({ ...customer, tag: e.target.value })} />
+                <input type="text" className="searchinput" value={customer.tag}  onChange={(e) => setCustomer({ ...customer, tag: e.target.value })} />
 
               </div>
               <div className="image-note">

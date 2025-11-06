@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import { Context } from "../../../../context/Context";
 import { axiosInstance } from "./../../../../config";
-import { Navigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import Snackbar from "@mui/material/Snackbar";
@@ -25,6 +25,7 @@ export default function ManageMeasurementsFormEdit(){
   const [error, setError] = useState(false)
   const [open, setOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
   const id = location.pathname.split("/")[3]
 
 
@@ -75,11 +76,14 @@ export default function ManageMeasurementsFormEdit(){
       setError(true)
       setErrorMsg("Please fill this input!")
     }else{
+      console.log("id:", id)
       const res = await axiosInstance.put("/measurement/update/" +id, newMeasurement)
+
+      console.log(res.data)
       if(res.data.status==true){
         setOpen(true)
         setSuccess(true)
-        Navigate(`/admin/measurements`);
+        navigate(`/admin/measurements`);
       }else{
         setOpen(true)
         setError(true)
@@ -119,7 +123,7 @@ export default function ManageMeasurementsFormEdit(){
         <div className="content-wrapper">
           <div className="order-table manage-page">
             <div className="top-heading-title">
-              <strong> Edit Measurements </strong>
+              <strong> Edit Measurements abbsakj </strong>
               </div>
                 <div className="factory-user-from-NM pd-15">       
                  <form onSubmit = {handleSubmit}>
@@ -140,7 +144,7 @@ export default function ManageMeasurementsFormEdit(){
                     <div className="role_block">
                         <h4>Product Name</h4>
                         {productsName.map((productName) => (
-                        <label className="full_label">
+                        <label className="full_label" key={productName._id}>
                         <input type="checkbox" id={`chk${productName.name}`} value={productName._id} checked={productNamechk.includes(productName._id)} onChange={handleCheckboxChange}/>
                         <label htmlFor={`chk${productName.name}`}>{productName.name}</label>
                         </label>

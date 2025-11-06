@@ -200,7 +200,6 @@ export default function EditCustomer() {
                 type="text"
                 className="searchinput"
                 value={customer.firstname}
-                placeholder="James"
                 onChange={(e) =>
                   setCustomer({ ...customer, firstname: e.target.value })
                 }
@@ -222,7 +221,6 @@ export default function EditCustomer() {
                 type="text"
                 value={customer.lastname}
                 className="searchinput"
-                placeholder="Doe"
                 onChange={(e) =>
                   setCustomer({ ...customer, lastname: e.target.value })
                 }
@@ -260,7 +258,6 @@ export default function EditCustomer() {
                 type="email"
                 className="searchinput"
                 value={customer.email}
-                placeholder="james@example.com"
                 onChange={(e) =>
                   setCustomer({ ...customer, email: e.target.value })
                 }
@@ -272,7 +269,6 @@ export default function EditCustomer() {
                 type="text"
                 className="searchinput"
                 value={customer.phone}
-                placeholder="12345"
                 onChange={(e) =>
                   setCustomer({ ...customer, phone: e.target.value })
                 }

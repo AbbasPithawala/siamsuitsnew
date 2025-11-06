@@ -139,7 +139,6 @@ router.post("/fetch/:id", auth, async (req, res) => {
 router.put("/update/:id", auth, async (req, res) => {
 
   try {
-
     const measurementToBeUpdated = await Measurement.find({ _id: req.params.id })
 
     if (!measurementToBeUpdated.length > 0) {
@@ -176,10 +175,8 @@ router.put("/update/:id", auth, async (req, res) => {
     req.body.measurement.slug = await generateUniqueSlug(req.body.measurement.name, checkSlugExists)
 
     const updatedMeasurement = await Measurement.findOneAndUpdate({ _id: req.params.id }, req.body.measurement)
-    console.log(measurementToBeUpdated)
 
     if (req.body.measurement.product_id.length > 0) {
-
       for (let x of req.body.measurement.product_id) {
 
         const product = await Product.findOne({ _id: x })
@@ -201,7 +198,7 @@ router.put("/update/:id", auth, async (req, res) => {
     })
 
   } catch (err) {
-
+console.log("err:", err)
     return res.json({
       status: false,
       message: err.message,

@@ -291,7 +291,6 @@ export default function Step4() {
     
     setStylesFinished(styleF)
   };
-
   const handleProduct = async (e) => {
     setCanPlaceOrder(false);
     
@@ -518,6 +517,7 @@ export default function Step4() {
             setCustomerMeasurements({ ...customerMeasurements });
           }
         }else {
+          // customerMeasurements[e.target.dataset.name] && 
           setProductMeasurements(
             customerMeasurements[e.target.dataset.name]["measurements"]
           );
@@ -562,7 +562,7 @@ export default function Step4() {
 
     let check = "true";
 
-    Object.keys(
+    customerMeasurements[e.target.dataset.name] && Object.keys(
       customerMeasurements[e.target.dataset.name]["measurements"]
     ).map((measurements) => {
       if (
@@ -621,7 +621,6 @@ export default function Step4() {
   const handleOnClick = async (e) => {
     e.target.value = "";
   };
-  console.log(customer)
   const handleSaveMeasurements = async (e) => {
     setIsActive(false);
     const res = await axiosInstance.put(
@@ -637,13 +636,13 @@ export default function Step4() {
       setCustomer(updatedCustomer);
 
       if (updatedCustomer.measurementsObject) {
-        setCustomerMeasurements(updatedCustomer.measurementsObject);
+        setCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.measurementsObject }));
       }
       if (updatedCustomer.suit) {
-        setSuitCustomerMeasurements(updatedCustomer.suit);
+        setSuitCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.suit }));
       }
       if (updatedCustomer.tuxedo) {
-        setTuxedoCustomerMeasurements(updatedCustomer.tuxedo);
+        setTuxedoCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.tuxedo }));
       }
     }
 
@@ -1049,7 +1048,6 @@ export default function Step4() {
 
   // ===========================================
   // ===========================================
-  console.log("show ", stylesFinished)
   const handleStyleDataSave = async (e) => {
     let styleF = true
     for(let x of orders){
@@ -1199,13 +1197,13 @@ const action = (
       setCustomer(updatedCustomer);
 
       if (updatedCustomer.measurementsObject) {
-        setCustomerMeasurements(updatedCustomer.measurementsObject);
+        setCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.measurementsObject }));
       }
       if (updatedCustomer.suit) {
-        setSuitCustomerMeasurements(updatedCustomer.suit);
+        setSuitCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.suit }));
       }
       if (updatedCustomer.tuxedo) {
-        setTuxedoCustomerMeasurements(updatedCustomer.tuxedo);
+        setTuxedoCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.tuxedo }));
       }
     }
 
@@ -1327,13 +1325,13 @@ const action = (
       setCustomer(updatedCustomer);
 
       if (updatedCustomer.measurementsObject) {
-        setCustomerMeasurements(updatedCustomer.measurementsObject);
+        setCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.measurementsObject }));
       }
       if (updatedCustomer.suit) {
-        setSuitCustomerMeasurements(updatedCustomer.suit);
+        setSuitCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.suit }));
       }
       if (updatedCustomer.tuxedo) {
-        setTuxedoCustomerMeasurements(updatedCustomer.tuxedo);
+        setTuxedoCustomerMeasurements(prev => ({ ...prev, ...updatedCustomer.tuxedo }));
       }
     }
 
