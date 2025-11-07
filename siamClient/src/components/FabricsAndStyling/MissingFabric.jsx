@@ -25,6 +25,7 @@ import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
 import ImageUpload from "./../../images/ImageUpload.png";
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import Styles from './Styles';
 import AdditionalStyles from './AdditionalStyles';
 import SuitStyles from "./SuitStyles";
@@ -1708,24 +1709,47 @@ export default function MissingFabric(props) {
                             <></>
                           )}
                         </div>
-                        <div className="form-group ">
-                          {/* <label> Fabric form Retailer </label> */}
-                          <input
-                            type="text"
-                            className="searchinput"
-                            name="fabric_code"
-                            // value={styleObject.fabric_code}
-                            value={
-                              stylesArray[product.name + "_" + i]["fabric_code"]
-                                ? stylesArray[product.name + "_" + i][
-                                "fabric_code"
-                                ]
-                                : ""
-                            }
-                            // value="fabricName"
-                            placeholder="Enter Your Fabric"
-                            onChange={(event) => handleChangeInput(event, i)}
-                          ></input>
+                        <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                          <div className="form-group " style={{ flex: 1 }}>
+                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Fabric</label>
+                            <input
+                              type="text"
+                              className="searchinput"
+                              name="fabric_code"
+                              value={
+                                stylesArray[product.name + "_" + i]["fabric_code"]
+                                  ? stylesArray[product.name + "_" + i][
+                                  "fabric_code"
+                                  ]
+                                  : ""
+                              }
+                              placeholder="Enter Your Fabric"
+                              onChange={(event) => handleChangeInput(event, i)}
+                            ></input>
+                          </div>
+                          {product["name"] !== "pant" && product["name"] !== "shirt" ? (
+                            <div className="form-group" style={{ flex: 1 }}>
+                              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Lining</label>
+                              <input
+                                type="text"
+                                className="searchinput"
+                                name="lining_code"
+                                value={
+                                  stylesArray[product.name + "_" + i][
+                                    "lining_code"
+                                  ]
+                                    ? stylesArray[product.name + "_" + i][
+                                    "lining_code"
+                                    ]
+                                    : ""
+                                }
+                                placeholder="Enter Your Lining"
+                                onChange={(event) =>
+                                  handleChangeInput(event, i)
+                                }
+                              ></input>
+                            </div>
+                          ) : null}
                         </div>
                         <hr></hr>
                         {product["name"] == "pant" ? (
@@ -1954,33 +1978,6 @@ export default function MissingFabric(props) {
                         ) : product["name"] == "jacket" ? (
                           <>
                             <div className="title-fabrics">
-                              <h3> Lining </h3>
-                            </div>
-                            <div className="form-group">
-                              {/* <p> Fabric form Retailer </p> */}
-                              <input
-                                type="text"
-                                className="searchinput"
-                                name="lining_code"
-                                value={
-                                  stylesArray[product.name + "_" + i][
-                                    "lining_code"
-                                  ]
-                                    ? stylesArray[product.name + "_" + i][
-                                    "lining_code"
-                                    ]
-                                    : ""
-                                }
-                                // value={styleObject.lining_code}
-                                // value="lining"
-                                placeholder="Enter Your Lining"
-                                onChange={(event) =>
-                                  handleChangeInput(event, i)
-                                }
-                              ></input>
-                            </div>
-                            <hr></hr>
-                            <div className="title-fabrics">
                               <h3> Piping </h3>
                             </div>
                             <div className="form-group colored-style-boX">
@@ -2042,50 +2039,47 @@ export default function MissingFabric(props) {
                             </div>
                             <hr></hr>
                             <div className="title-fabrics">
-                              {" "}
-                              <h3> Monogram </h3>{" "}
+                              <h3> Monogram </h3>
                             </div>
-                            <div className="form-group monogram-info">
-                              {/* <p> Monogram </p> */}
-                              <input
-                                type="text"
-                                className="searchinput"
-                                placeholder="Tag"
-                                name="tag"
-                                value={
-                                  stylesArray[product.name + "_" + i].monogram
-                                    ? stylesArray[product.name + "_" + i]
-                                      .monogram.tag
-                                    : ""
-                                }
-                                data-for="monogram"
-                                onChange={(event) =>
-                                  handleChangeInput(event, i)
-                                }
-                              ></input>
-                            </div>
-                            <div className="title-fabrics">
-                              {" "}
-                              <h3> Monogram Optional </h3>{" "}
-                            </div>
-                            <div className="form-group monogram-info">
-                              {/* <p> Monogram </p> */}
-                              <input
-                                type="text"
-                                className="searchinput"
-                                placeholder="Tag Optional"
-                                name="tagOptional"
-                                value={
-                                  stylesArray[product.name + "_" + i].monogram
-                                    ? stylesArray[product.name + "_" + i]
-                                      .monogram.tagOptional
-                                    : ""
-                                }
-                                data-for="monogramOptional"
-                                onChange={(event) =>
-                                  handleChangeInput(event, i)
-                                }
-                              ></input>
+                            <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                              <div className="form-group monogram-info" style={{ flex: 1 }}>
+                                {/* <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Tag</label> */}
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  placeholder="Tag"
+                                  name="tag"
+                                  value={
+                                    stylesArray[product.name + "_" + i].monogram
+                                      ? stylesArray[product.name + "_" + i]
+                                        .monogram.tag
+                                      : ""
+                                  }
+                                  data-for="monogram"
+                                  onChange={(event) =>
+                                    handleChangeInput(event, i)
+                                  }
+                                ></input>
+                              </div>
+                              <div className="form-group monogram-info" style={{ flex: 1 }}>
+                                {/* <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Tag Optional</label> */}
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  placeholder="Tag Optional"
+                                  name="tagOptional"
+                                  value={
+                                    stylesArray[product.name + "_" + i].monogram
+                                      ? stylesArray[product.name + "_" + i]
+                                        .monogram.tagOptional
+                                      : ""
+                                  }
+                                  data-for="monogramOptional"
+                                  onChange={(event) =>
+                                    handleChangeInput(event, i)
+                                  }
+                                ></input>
+                              </div>
                             </div>
                             <div className="form-group monogram-foont-style">
                               <p> Monogram Font Style </p>
@@ -2196,32 +2190,6 @@ export default function MissingFabric(props) {
                           </>
                         ) : (
                           <>
-                            <div className="title-fabrics">
-                              <h3> Lining </h3>
-                            </div>
-                            <div className="form-group">
-                              {/* <p> Fabric form Retailer </p> */}
-                              <input
-                                type="text"
-                                className="searchinput"
-                                name="lining_code"
-                                value={
-                                  stylesArray[product.name + "_" + i][
-                                    "lining_code"
-                                  ]
-                                    ? stylesArray[product.name + "_" + i][
-                                    "lining_code"
-                                    ]
-                                    : ""
-                                }
-                                // value={styleObject.lining_code}
-                                // value="lining"
-                                placeholder="Enter Your Lining"
-                                onChange={(event) =>
-                                  handleChangeInput(event, i)
-                                }
-                              ></input>
-                            </div>
                             <hr></hr>
                             <div className="title-fabrics">
                               <h3> Piping </h3>
@@ -2288,51 +2256,46 @@ export default function MissingFabric(props) {
                               ?
                               <>
                                 <div className="title-fabrics">
-                                  {" "}
-                                  <h3> Monogram </h3>{" "}
+                                  <h3> Monogram </h3>
                                 </div>
-                                <div className="form-group monogram-info">
-                                  {/* <p> Monogram </p> */}
-                                  <input
-                                    type="text"
-                                    className="searchinput"
-                                    placeholder="Tag"
-                                    name="tag"
-                                    value={
-                                      stylesArray[product.name + "_" + i].monogram
-                                        ? stylesArray[product.name + "_" + i]
-                                          .monogram.tag
-                                        : ""
-                                    }
-                                    data-for="monogram"
-                                    onChange={(event) =>
-                                      handleChangeInput(event, i)
-                                    }
-                                  ></input>
+                                <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                                  <div className="form-group monogram-info" style={{ flex: 1 }}>
+                                    <input
+                                      type="text"
+                                      className="searchinput"
+                                      placeholder="Tag"
+                                      name="tag"
+                                      value={
+                                        stylesArray[product.name + "_" + i].monogram
+                                          ? stylesArray[product.name + "_" + i]
+                                            .monogram.tag
+                                          : ""
+                                      }
+                                      data-for="monogram"
+                                      onChange={(event) =>
+                                        handleChangeInput(event, i)
+                                      }
+                                    ></input>
+                                  </div>
+                                  <div className="form-group monogram-info" style={{ flex: 1 }}>
+                                    <input
+                                      type="text"
+                                      className="searchinput"
+                                      placeholder="Tag Optional"
+                                      name="tagOptional"
+                                      value={
+                                        stylesArray[product.name + "_" + i].monogram
+                                          ? stylesArray[product.name + "_" + i]
+                                            .monogram.tagOptional
+                                          : ""
+                                      }
+                                      data-for="monogramOptional"
+                                      onChange={(event) =>
+                                        handleChangeInput(event, i)
+                                      }
+                                    ></input>
+                                  </div>
                                 </div>
-                                <div className="title-fabrics">
-                              {" "}
-                              <h3> Monogram Optional </h3>{" "}
-                            </div>
-                            <div className="form-group monogram-info">
-                              {/* <p> Monogram </p> */}
-                              <input
-                                type="text"
-                                className="searchinput"
-                                placeholder="Tag Optional"
-                                name="tagOptional"
-                                value={
-                                  stylesArray[product.name + "_" + i].monogram
-                                    ? stylesArray[product.name + "_" + i]
-                                      .monogram.tagOptional
-                                    : ""
-                                }
-                                data-for="monogramOptional"
-                                onChange={(event) =>
-                                  handleChangeInput(event, i)
-                                }
-                              ></input>
-                            </div>
                                 <div className="form-group monogram-info">
                                   <p> Monogram Position </p>
                                   <ul>
@@ -2568,24 +2531,56 @@ export default function MissingFabric(props) {
                           <div className="title-fabrics">
                             <h3> Reference Image </h3>
                           </div>
-                          <label htmlFor="fileInput">
+                          <label htmlFor="fileInput" style={{ cursor: 'pointer', display: 'inline-block' }}>
 
                             {
                               imageData
                                 ?
                                 <img
-                                  style={{ width: "200px", height: "200px", borderRadius: "50%" }}
-                                  src={URL.createObjectURL(imageData)} alt="" className='uploaded-image' />
+                                  style={{ width: "200px", height: "200px", borderRadius: "50%", objectFit: "cover" }}
+                                   src={URL.createObjectURL(imageData)} alt="" className='uploaded-image' 
+                                  />
                                 :
                                 stylesArray[product['name'] + "_" + i]['referance_image'] && stylesArray[product['name'] + "_" + i]['referance_image'].length > 0
                                   ?
                                   <img
-                                    style={{ width: "200px", height: "200px", borderRadius: "50%" }}
+                                    style={{ width: "200px", height: "200px", borderRadius: "50%", objectFit: "cover" }}
                                     src={PicBaseUrl + stylesArray[product['name'] + "_" + i]['referance_image']} alt="" className='uploaded-image' />
                                   :
-                                  <img
-                                    style={{ width: "200px", height: "200px", borderRadius: "50%" }}
-                                    src={ImageUpload} alt="" className='uploaded-image' />
+                                  <div
+                                    style={{
+                                      width: "200px",
+                                      height: "200px",
+                                      border: "2px dashed #ccc",
+                                      borderRadius: "8px",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      backgroundColor: "#f9f9f9",
+                                      transition: "all 0.3s ease",
+                                      cursor: "pointer"
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.borderColor = "#1976d2";
+                                      e.currentTarget.style.backgroundColor = "#f0f7ff";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.borderColor = "#ccc";
+                                      e.currentTarget.style.backgroundColor = "#f9f9f9";
+                                    }}
+                                  >
+                                    <CloudUploadIcon
+                                      style={{
+                                        fontSize: "48px",
+                                        color: "#999",
+                                        marginBottom: "8px"
+                                      }}
+                                    />
+                                    <p style={{ margin: 0, color: "#666", fontSize: "14px", textAlign: "center", padding: "0 10px" }}>
+                                      Click to upload image
+                                    </p>
+                                  </div>
 
                             }
 
@@ -2960,53 +2955,52 @@ export default function MissingFabric(props) {
                                 <></>
                               )}
                             </div>
-                            <div className="form-group ">
-                              <input
-                                type="text"
-                                className="searchinput"
-                                name="fabric_code"
-                                value={
-                                  SuitstylesArray["suit" + "_" + i][
-                                    "fabric_code"
-                                  ]
-                                    ? SuitstylesArray["suit" + "_" + i][
-                                    "fabric_code"
+                            <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                              <div className="form-group" style={{ flex: 1 }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Fabric</label>
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  name="fabric_code"
+                                  value={
+                                    SuitstylesArray["suit" + "_" + i][
+                                      "fabric_code"
                                     ]
-                                    : ""
-                                }
-                                placeholder="Enter Your Fabric"
-                                onChange={(event) =>
-                                  handleSuitFabricInput(event, i)
-                                }
-                              ></input>
-                            </div>
-                            <hr></hr>
-                            <div className="title-fabrics">
-                              <h3> Lining </h3>
-                            </div>
-                            <div className="form-group">
-                              {/* <p> Fabric form Retailer </p> */}
-                              <input
-                                type="text"
-                                className="searchinput"
-                                name="lining_code"
-                                value={
-                                  SuitstylesArray["suit" + "_" + i] &&
-                                    SuitstylesArray["suit" + "_" + i]["jacket"] &&
-                                    SuitstylesArray["suit" + "_" + i]["jacket"][
-                                    "lining_code"
-                                    ]
-                                    ? SuitstylesArray["suit" + "_" + i][
-                                    "jacket"
-                                    ]["lining_code"]
-                                    : ""
-                                }
-                                data-for="jacket"
-                                placeholder="Enter Your Lining"
-                                onChange={(event) =>
-                                  handleSuitChangeInput(event, i)
-                                }
-                              ></input>
+                                      ? SuitstylesArray["suit" + "_" + i][
+                                      "fabric_code"
+                                      ]
+                                      : ""
+                                  }
+                                  placeholder="Enter Your Fabric"
+                                  onChange={(event) =>
+                                    handleSuitFabricInput(event, i)
+                                  }
+                                ></input>
+                              </div>
+                              <div className="form-group" style={{ flex: 1 }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Lining</label>
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  name="lining_code"
+                                  value={
+                                    SuitstylesArray["suit" + "_" + i] &&
+                                      SuitstylesArray["suit" + "_" + i]["jacket"] &&
+                                      SuitstylesArray["suit" + "_" + i]["jacket"][
+                                      "lining_code"
+                                      ]
+                                      ? SuitstylesArray["suit" + "_" + i][
+                                      "jacket"
+                                      ]["lining_code"]
+                                      : ""
+                                  }
+                                  data-for="jacket"
+                                  placeholder="Enter Your Lining"
+                                  onChange={(event) =>
+                                    handleSuitChangeInput(event, i)
+                                  }
+                                ></input>
+                              </div>
                             </div>
                             <hr></hr>
                             <div className="title-fabrics">
@@ -3069,58 +3063,55 @@ export default function MissingFabric(props) {
                             </div>
                             <hr></hr>
                             <div className="title-fabrics">
-                              {" "}
-                              <h3> Monogram </h3>{" "}
+                              <h3> Monogram </h3>
                             </div>
-                            <div className="form-group monogram-info">
-                              <input
-                                type="text"
-                                className="searchinput"
-                                placeholder="Tag"
-                                name="tag"
-                                value={
-                                  SuitstylesArray["suit" + "_" + i] &&
-                                    SuitstylesArray["suit" + "_" + i]["jacket"] &&
-                                    SuitstylesArray["suit" + "_" + i]["jacket"][
-                                    "monogram"
-                                    ]
-                                    ? SuitstylesArray["suit" + "_" + i][
-                                      "jacket"
-                                    ].monogram.tag
-                                    : ""
-                                }
-                                data-for="monogram"
-                                onChange={(event) =>
-                                  handleSuitChangeInput(event, i)
-                                }
-                              ></input>
-                            </div>
-                            <div className="title-fabrics">
-                              {" "}
-                              <h3> Monogram Optional </h3>{" "}
-                            </div>
-                            <div className="form-group monogram-info">
-                              <input
-                                type="text"
-                                className="searchinput"
-                                placeholder="Tag Optional"
-                                name="tagOptional"
-                                value={
-                                  SuitstylesArray["suit" + "_" + i] &&
-                                    SuitstylesArray["suit" + "_" + i]["jacket"] &&
-                                    SuitstylesArray["suit" + "_" + i]["jacket"][
-                                    "monogram"
-                                    ]
-                                    ? SuitstylesArray["suit" + "_" + i][
-                                      "jacket"
-                                    ].monogram.tagOptional
-                                    : ""
-                                }
-                                data-for="monogramOptional"
-                                onChange={(event) =>
-                                  handleSuitChangeInput(event, i)
-                                }
-                              ></input>
+                            <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                              <div className="form-group monogram-info" style={{ flex: 1 }}>
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  placeholder="Tag"
+                                  name="tag"
+                                  value={
+                                    SuitstylesArray["suit" + "_" + i] &&
+                                      SuitstylesArray["suit" + "_" + i]["jacket"] &&
+                                      SuitstylesArray["suit" + "_" + i]["jacket"][
+                                      "monogram"
+                                      ]
+                                      ? SuitstylesArray["suit" + "_" + i][
+                                        "jacket"
+                                      ].monogram.tag
+                                      : ""
+                                  }
+                                  data-for="monogram"
+                                  onChange={(event) =>
+                                    handleSuitChangeInput(event, i)
+                                  }
+                                ></input>
+                              </div>
+                              <div className="form-group monogram-info" style={{ flex: 1 }}>
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  placeholder="Tag Optional"
+                                  name="tagOptional"
+                                  value={
+                                    SuitstylesArray["suit" + "_" + i] &&
+                                      SuitstylesArray["suit" + "_" + i]["jacket"] &&
+                                      SuitstylesArray["suit" + "_" + i]["jacket"][
+                                      "monogram"
+                                      ]
+                                      ? SuitstylesArray["suit" + "_" + i][
+                                        "jacket"
+                                      ].monogram.tagOptional
+                                      : ""
+                                  }
+                                  data-for="monogramOptional"
+                                  onChange={(event) =>
+                                    handleSuitChangeInput(event, i)
+                                  }
+                                ></input>
+                              </div>
                             </div>
                             {/* <div className="form-group monogram-info">
                               <p> Monogram Position </p>
@@ -3429,24 +3420,55 @@ export default function MissingFabric(props) {
                               <div className="title-fabrics">
                                 <h3> Reference Image </h3>
                               </div>
-                              <label htmlFor="fileInput">
+                              <label htmlFor="fileInput" style={{ cursor: 'pointer', display: 'inline-block' }}>
 
                                 {
                                   imageDataSuit
                                     ?
                                     <img
-                                      style={{ width: "200px", height: "200px", borderRadius: "50%" }}
+                                      style={{ width: "200px", height: "200px", borderRadius: "50%", objectFit: "cover" }}
                                       src={URL.createObjectURL(imageDataSuit)} alt="" className='uploaded-image' />
                                     :
                                     SuitstylesArray["suit_" + i] && SuitstylesArray["suit_" + i]['referance_image'] && SuitstylesArray["suit_" + i]['referance_image'].length > 0
                                       ?
                                       <img
-                                        style={{ width: "200px", height: "200px", borderRadius: "50%" }}
+                                        style={{ width: "200px", height: "200px", borderRadius: "50%", objectFit: "cover" }}
                                         src={PicBaseUrl + SuitstylesArray["suit_" + i]['referance_image']} alt="" className='uploaded-image' />
                                       :
-                                      <img
-                                        style={{ width: "200px", height: "200px", borderRadius: "50%" }}
-                                        src={ImageUpload} alt="" className='uploaded-image' />
+                                      <div
+                                        style={{
+                                          width: "200px",
+                                          height: "200px",
+                                          border: "2px dashed #ccc",
+                                          borderRadius: "8px",
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          backgroundColor: "#f9f9f9",
+                                          transition: "all 0.3s ease",
+                                          cursor: "pointer"
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.borderColor = "#1976d2";
+                                          e.currentTarget.style.backgroundColor = "#f0f7ff";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.borderColor = "#ccc";
+                                          e.currentTarget.style.backgroundColor = "#f9f9f9";
+                                        }}
+                                      >
+                                        <CloudUploadIcon
+                                          style={{
+                                            fontSize: "48px",
+                                            color: "#999",
+                                            marginBottom: "8px"
+                                          }}
+                                        />
+                                        <p style={{ margin: 0, color: "#666", fontSize: "14px", textAlign: "center", padding: "0 10px" }}>
+                                          Click to upload image
+                                        </p>
+                                      </div>
 
                                 }
 
@@ -3865,53 +3887,52 @@ export default function MissingFabric(props) {
                                 <></>
                               )}
                             </div>
-                            <div className="form-group ">
-                              <input
-                                type="text"
-                                className="searchinput"
-                                name="fabric_code"
-                                value={
-                                  TuxedostylesArray["tuxedo" + "_" + i][
-                                    "fabric_code"
-                                  ]
-                                    ? TuxedostylesArray["tuxedo" + "_" + i][
-                                    "fabric_code"
+                            <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                              <div className="form-group" style={{ flex: 1 }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Fabric</label>
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  name="fabric_code"
+                                  value={
+                                    TuxedostylesArray["tuxedo" + "_" + i][
+                                      "fabric_code"
                                     ]
-                                    : ""
-                                }
-                                placeholder="Enter Your Fabric"
-                                onChange={(event) =>
-                                  handleTuxedoFabricInput(event, i)
-                                }
-                              ></input>
-                            </div>
-                            <hr></hr>
-                            <div className="title-fabrics">
-                              <h3> Lining </h3>
-                            </div>
-                            <div className="form-group">
-                              {/* <p> Fabric form Retailer </p> */}
-                              <input
-                                type="text"
-                                className="searchinput"
-                                name="lining_code"
-                                value={
-                                  TuxedostylesArray["tuxedo" + "_" + i] &&
-                                    TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"] &&
-                                    TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"][
-                                    "lining_code"
-                                    ]
-                                    ? TuxedostylesArray["tuxedo" + "_" + i][
-                                    "tuxedojacket"
-                                    ]["lining_code"]
-                                    : ""
-                                }
-                                data-for="tuxedojacket"
-                                placeholder="Enter Your Lining"
-                                onChange={(event) =>
-                                  handleTuxedoChangeInput(event, i)
-                                }
-                              ></input>
+                                      ? TuxedostylesArray["tuxedo" + "_" + i][
+                                      "fabric_code"
+                                      ]
+                                      : ""
+                                  }
+                                  placeholder="Enter Your Fabric"
+                                  onChange={(event) =>
+                                    handleTuxedoFabricInput(event, i)
+                                  }
+                                ></input>
+                              </div>
+                              <div className="form-group" style={{ flex: 1 }}>
+                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Lining</label>
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  name="lining_code"
+                                  value={
+                                    TuxedostylesArray["tuxedo" + "_" + i] &&
+                                      TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"] &&
+                                      TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"][
+                                      "lining_code"
+                                      ]
+                                      ? TuxedostylesArray["tuxedo" + "_" + i][
+                                      "tuxedojacket"
+                                      ]["lining_code"]
+                                      : ""
+                                  }
+                                  data-for="tuxedojacket"
+                                  placeholder="Enter Your Lining"
+                                  onChange={(event) =>
+                                    handleTuxedoChangeInput(event, i)
+                                  }
+                                ></input>
+                              </div>
                             </div>
                             <hr></hr>
                             <div className="title-fabrics">
@@ -3974,58 +3995,55 @@ export default function MissingFabric(props) {
                             </div>
                             <hr></hr>
                             <div className="title-fabrics">
-                              {" "}
-                              <h3> Monogram </h3>{" "}
+                              <h3> Monogram </h3>
                             </div>
-                            <div className="form-group monogram-info">
-                              <input
-                                type="text"
-                                className="searchinput"
-                                placeholder="Tag"
-                                name="tag"
-                                value={
-                                  TuxedostylesArray["tuxedo" + "_" + i] &&
-                                    TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"] &&
-                                    TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"][
-                                    "monogram"
-                                    ]
-                                    ? TuxedostylesArray["tuxedo" + "_" + i][
-                                      "tuxedojacket"
-                                    ].monogram.tag
-                                    : ""
-                                }
-                                data-for="monogram"
-                                onChange={(event) =>
-                                  handleTuxedoChangeInput(event, i)
-                                }
-                              ></input>
-                            </div>
-                            <div className="title-fabrics">
-                              {" "}
-                              <h3> Monogram Optional </h3>{" "}
-                            </div>
-                            <div className="form-group monogram-info">
-                              <input
-                                type="text"
-                                className="searchinput"
-                                placeholder="Tag Optional"
-                                name="tagOptional"
-                                value={
-                                  TuxedostylesArray["tuxedo" + "_" + i] &&
-                                    TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"] &&
-                                    TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"][
-                                    "monogram"
-                                    ]
-                                    ? TuxedostylesArray["tuxedo" + "_" + i][
-                                      "tuxedojacket"
-                                    ].monogram.tagOptional
-                                    : ""
-                                }
-                                data-for="monogramOptional"
-                                onChange={(event) =>
-                                  handleTuxedoChangeInput(event, i)
-                                }
-                              ></input>
+                            <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                              <div className="form-group monogram-info" style={{ flex: 1 }}>
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  placeholder="Tag"
+                                  name="tag"
+                                  value={
+                                    TuxedostylesArray["tuxedo" + "_" + i] &&
+                                      TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"] &&
+                                      TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"][
+                                      "monogram"
+                                      ]
+                                      ? TuxedostylesArray["tuxedo" + "_" + i][
+                                        "tuxedojacket"
+                                      ].monogram.tag
+                                      : ""
+                                  }
+                                  data-for="monogram"
+                                  onChange={(event) =>
+                                    handleTuxedoChangeInput(event, i)
+                                  }
+                                ></input>
+                              </div>
+                              <div className="form-group monogram-info" style={{ flex: 1 }}>
+                                <input
+                                  type="text"
+                                  className="searchinput"
+                                  placeholder="Tag Optional"
+                                  name="tagOptional"
+                                  value={
+                                    TuxedostylesArray["tuxedo" + "_" + i] &&
+                                      TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"] &&
+                                      TuxedostylesArray["tuxedo" + "_" + i]["tuxedojacket"][
+                                      "monogram"
+                                      ]
+                                      ? TuxedostylesArray["tuxedo" + "_" + i][
+                                        "tuxedojacket"
+                                      ].monogram.tagOptional
+                                      : ""
+                                  }
+                                  data-for="monogramOptional"
+                                  onChange={(event) =>
+                                    handleTuxedoChangeInput(event, i)
+                                  }
+                                ></input>
+                              </div>
                             </div>
                             {/* <div className="form-group monogram-info">
                               <p> Monogram Position </p>
@@ -4334,24 +4352,55 @@ export default function MissingFabric(props) {
                               <div className="title-fabrics">
                                 <h3> Reference Image </h3>
                               </div>
-                              <label htmlFor="fileInput">
+                              <label htmlFor="fileInput" style={{ cursor: 'pointer', display: 'inline-block' }}>
 
                                 {
                                   imageDataTuxedo
                                     ?
                                     <img
-                                      style={{ width: "200px", height: "200px", borderRadius: "50%" }}
+                                      style={{ width: "200px", height: "200px", borderRadius: "50%", objectFit: "cover" }}
                                       src={URL.createObjectURL(imageDataTuxedo)} alt="" className='uploaded-image' />
                                     :
                                     TuxedostylesArray["tuxedo_" + i] && TuxedostylesArray["tuxedo_" + i]['referance_image'] && TuxedostylesArray["tuxedo_" + i]['referance_image'].length > 0
                                       ?
                                       <img
-                                        style={{ width: "200px", height: "200px", borderRadius: "50%" }}
+                                        style={{ width: "200px", height: "200px", borderRadius: "50%", objectFit: "cover" }}
                                         src={PicBaseUrl + TuxedostylesArray["tuxedo_" + i]['referance_image']} alt="" className='uploaded-image' />
                                       :
-                                      <img
-                                        style={{ width: "200px", height: "200px", borderRadius: "50%" }}
-                                        src={ImageUpload} alt="" className='uploaded-image' />
+                                      <div
+                                        style={{
+                                          width: "200px",
+                                          height: "200px",
+                                          border: "2px dashed #ccc",
+                                          borderRadius: "8px",
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          backgroundColor: "#f9f9f9",
+                                          transition: "all 0.3s ease",
+                                          cursor: "pointer"
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.borderColor = "#1976d2";
+                                          e.currentTarget.style.backgroundColor = "#f0f7ff";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.borderColor = "#ccc";
+                                          e.currentTarget.style.backgroundColor = "#f9f9f9";
+                                        }}
+                                      >
+                                        <CloudUploadIcon
+                                          style={{
+                                            fontSize: "48px",
+                                            color: "#999",
+                                            marginBottom: "8px"
+                                          }}
+                                        />
+                                        <p style={{ margin: 0, color: "#666", fontSize: "14px", textAlign: "center", padding: "0 10px" }}>
+                                          Click to upload image
+                                        </p>
+                                      </div>
 
                                 }
 

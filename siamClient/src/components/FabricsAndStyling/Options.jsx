@@ -24,7 +24,8 @@ export default function Options({
   setStylesArray,
   product,
   justGroupFeaturesArray,
-  setJustGroupFeaturesArray
+  setJustGroupFeaturesArray,
+  advanceToNextTab
 }
   ){
     useEffect(()=>{ 
@@ -55,6 +56,10 @@ const handleStyleChange = (event, i) => {
           justGroupFeaturesArray.push(event.target.dataset.feature)
           setJustGroupFeaturesArray([...justGroupFeaturesArray])
         }
+        // Auto-advance to next tab after option selection
+        if (advanceToNextTab) {
+          advanceToNextTab();
+        }
       }else{
         let styleInfoObject = {};
         styleInfoObject.value = event.target.value;
@@ -70,6 +75,10 @@ const handleStyleChange = (event, i) => {
         if(!justGroupFeaturesArray.includes(event.target.dataset.feature)){
           justGroupFeaturesArray.push(event.target.dataset.feature)
           setJustGroupFeaturesArray([...justGroupFeaturesArray])
+        }
+        // Auto-advance to next tab after option selection
+        if (advanceToNextTab) {
+          advanceToNextTab();
         }
       }
     } else {
@@ -91,6 +100,10 @@ const handleStyleChange = (event, i) => {
         setJustGroupFeaturesArray([...justGroupFeaturesArray])
       }
       setStylesArray({ ...stylesArray });
+      // Auto-advance to next tab after option selection
+      if (advanceToNextTab) {
+        advanceToNextTab();
+      }
     }
   }
 

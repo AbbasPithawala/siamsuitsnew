@@ -115,6 +115,26 @@ useEffect(() => {
 
 console.log("stylesArray", stylesArray)
 
+// Function to advance to the next tab - can be used by both handleStyleChange and Options component
+const advanceToNextTab = () => {
+  // Find the next non-additional feature's index in the original array
+  const nonAdditionalIndices = [];
+  featuresStyle.forEach((feature, idx) => {
+    if (feature.additional === false) {
+      nonAdditionalIndices.push(idx);
+    }
+  });
+  
+  // Find current value's position in non-additional indices
+  const currentPosition = nonAdditionalIndices.indexOf(value);
+  
+  // Move to next tab if available
+  if (currentPosition >= 0 && currentPosition < nonAdditionalIndices.length - 1) {
+    const nextIndex = nonAdditionalIndices[currentPosition + 1];
+    setValue(nextIndex);
+  }
+};
+
 const handleStyleChange = (event, i) => {
 
   const itemNameID = product.name + "_" + i;
@@ -157,8 +177,12 @@ const handleStyleChange = (event, i) => {
       }
       setStylesArray({ ...stylesArray });
     }
+    
+    // Auto-advance to next tab after style selection
+    advanceToNextTab();
   }
 };
+console.log("value", value)
 console.log("featuresStyle", featuresStyle)
 const handleTabChange = (event, newValue) => {
   setValue(newValue);
@@ -263,7 +287,8 @@ const handleTabChange = (event, newValue) => {
                     setStylesArray = {setStylesArray}
                     product={product}
                     justGroupFeaturesArray = {justGroupFeaturesArray}
-                    setJustGroupFeaturesArray = {setJustGroupFeaturesArray}  
+                    setJustGroupFeaturesArray = {setJustGroupFeaturesArray}
+                    advanceToNextTab = {advanceToNextTab}
                     style={{minHeight: '500px'}}
                     ></Options>
                   ) 

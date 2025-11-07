@@ -113,6 +113,27 @@ useEffect(() => {
 const handleTabChange = (event, newValue) => {
   setValue(newValue);
 };
+
+// Function to advance to the next tab - can be used by both handleSuitStyleChange and SuitOptions component
+const advanceToNextTab = () => {
+  // Find the next non-additional feature's index in the original array
+  const nonAdditionalIndices = [];
+  featuresStyle.forEach((feature, idx) => {
+    if (feature.additional === false) {
+      nonAdditionalIndices.push(idx);
+    }
+  });
+  
+  // Find current value's position in non-additional indices
+  const currentPosition = nonAdditionalIndices.indexOf(value);
+  
+  // Move to next tab if available
+  if (currentPosition >= 0 && currentPosition < nonAdditionalIndices.length - 1) {
+    const nextIndex = nonAdditionalIndices[currentPosition + 1];
+    setValue(nextIndex);
+  }
+};
+
 const handleSuitStyleChange = (event, i, suitPro) => {
   let itemNameID = "suit" + "_" + i;
   if (event.target.dataset.for == "style") {
@@ -151,6 +172,9 @@ const handleSuitStyleChange = (event, i, suitPro) => {
       }
       setSuitstylesArray({ ...SuitstylesArray });
     }
+    
+    // Auto-advance to next tab after style selection
+    advanceToNextTab();
   }
 };
 
@@ -258,7 +282,8 @@ const handleSuitStyleChange = (event, i, suitPro) => {
                     setSuitstylesArray = {setSuitstylesArray}
                     product={product}                    
                     justGroupFeaturesArray = {justGroupFeaturesArray}
-                    setJustGroupFeaturesArray = {setJustGroupFeaturesArray} 
+                    setJustGroupFeaturesArray = {setJustGroupFeaturesArray}
+                    advanceToNextTab = {advanceToNextTab}
                     ></SuitOptions>
                   ) 
                 }

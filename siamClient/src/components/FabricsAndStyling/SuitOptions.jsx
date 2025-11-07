@@ -25,7 +25,8 @@ export default function SuitOptions({
   setSuitstylesArray,
   product,
   justGroupFeaturesArray,
-  setJustGroupFeaturesArray
+  setJustGroupFeaturesArray,
+  advanceToNextTab
 }
   ){
 
@@ -56,6 +57,10 @@ if (event.target.dataset.for == "groupStyle") {
           justGroupFeaturesArray.push(event.target.dataset.feature)
           setJustGroupFeaturesArray([...justGroupFeaturesArray])
         }
+        // Auto-advance to next tab after option selection
+        if (advanceToNextTab) {
+          advanceToNextTab();
+        }
       }
       else{
         let styleInfoObject = {};
@@ -72,6 +77,10 @@ if (event.target.dataset.for == "groupStyle") {
         if(!justGroupFeaturesArray.includes(event.target.dataset.feature)){
           justGroupFeaturesArray.push(event.target.dataset.feature)
           setJustGroupFeaturesArray([...justGroupFeaturesArray])
+        }
+        // Auto-advance to next tab after option selection
+        if (advanceToNextTab) {
+          advanceToNextTab();
         }
       }
   
@@ -92,6 +101,10 @@ if (event.target.dataset.for == "groupStyle") {
         setJustGroupFeaturesArray([...justGroupFeaturesArray])
       }
       setSuitstylesArray({ ...SuitstylesArray });
+      // Auto-advance to next tab after option selection
+      if (advanceToNextTab) {
+        advanceToNextTab();
+      }
     }
   }
 };
@@ -146,7 +159,7 @@ const handleStyleChangeRadio =(e) =>{
                 name={styles['_id']} 
                 id={options['_id']} 
                 style={{ display: "none" }}
-                onChange={(e) => handleSuitStyleChange(e, productIndex)}
+                onChange={(e) => handleSuitStyleChange(e, productIndex, product)}
                 checked={
                   SuitstylesArray[
                     "suit_" + productIndex
