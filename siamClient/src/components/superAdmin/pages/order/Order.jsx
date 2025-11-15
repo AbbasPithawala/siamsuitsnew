@@ -234,6 +234,22 @@ console.log("orders: ",orders)
     } else {
       sessionStorage.removeItem('selectedRetailer');
     }
+    
+    // Update tab counts immediately when retailer is selected
+    const parForTabs = {};
+    if (value && value.trim() !== '') {
+      parForTabs['retailerName'] = value.trim();
+    }
+    if (customerID.length > 0) {
+      parForTabs['customer_id'] = customerID;
+    }
+    if (d.length > 0) {
+      parForTabs['OrderDate'] = d;
+    }
+    
+    // Fetch all orders with the new filter to update tab counts
+    fetchAllOrders(parForTabs);
+    
     // fetchData(1, limit, statusName, name, value.trim(), d);
   };
 
@@ -252,6 +268,21 @@ console.log("orders: ",orders)
       setD(result);
     }
 
+    // Update tab counts immediately when date is selected
+    const parForTabs = {};
+    if (name1.length > 0) {
+      parForTabs['retailerName'] = name1;
+    }
+    if (customerID.length > 0) {
+      parForTabs['customer_id'] = customerID;
+    }
+    if (result.length > 0) {
+      parForTabs['OrderDate'] = result;
+    }
+    
+    // Fetch all orders with the new filter to update tab counts
+    fetchAllOrders(parForTabs);
+    
     // fetchData(1, limit, statusName, name, name1, result);
   };
 
@@ -520,9 +551,25 @@ console.log("orders: ",orders)
   }
 
   const handleSelectCustomer = (e) => {
-    setCustomerID(e.target.dataset.val)
-    setShowCustomerList("none")
-    setAllCustomers([])
+    const customerId = e.target.dataset.val;
+    setCustomerID(customerId);
+    setShowCustomerList("none");
+    setAllCustomers([]);
+    
+    // Update tab counts immediately when customer is selected
+    const parForTabs = {};
+    if (name1.length > 0) {
+      parForTabs['retailerName'] = name1;
+    }
+    if (customerId && customerId.length > 0) {
+      parForTabs['customer_id'] = customerId;
+    }
+    if (d.length > 0) {
+      parForTabs['OrderDate'] = d;
+    }
+    
+    // Fetch all orders with the new filter to update tab counts
+    fetchAllOrders(parForTabs);
   }
 
   const handleFetchCustomers = async (e) => {
@@ -705,7 +752,7 @@ console.log("orders: ",orders)
                 onChange={searchSelectChange}
                 className="searchinput"
               >
-                <option value=" ">Select Retailer name</option>
+                <option value="" disabled>Select Retailer name</option>
                 {
                   showRetailers
                     // retailers.length > 0 && retailers !== null 
