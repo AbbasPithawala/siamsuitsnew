@@ -734,6 +734,8 @@ console.log("orders: ",orders)
                 })}
               </ol>
             </div>
+
+            {/* normal */}
             {/* <div className="searchinput-inner">
               <p>Customer Name</p>
               <input
