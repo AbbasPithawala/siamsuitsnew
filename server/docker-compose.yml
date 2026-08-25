@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: siam_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: siam
+      POSTGRES_PASSWORD: siam_dev_password
+      POSTGRES_DB: siam_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - siam_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  siam_postgres_data:

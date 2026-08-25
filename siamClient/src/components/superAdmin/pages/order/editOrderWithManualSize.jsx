@@ -889,7 +889,7 @@ console.log("sdasd:", suitcustomerMeasurements)
       draftMeasurementsObj = previousOrder.data.data[0]['measurements']
     }else{
       const existingOrders = await axiosInstance.post("/customerOrders/fetchCustomerOrders/" + res.data.data[0]['customer_id']['_id'], {token: user.data.token})
-      
+
   if(existingOrders.data.status == true && existingOrders.data.data.length > 1){
         let ind = 0;
         let ourIndex ;
@@ -1155,7 +1155,8 @@ console.log("sdasd:", suitcustomerMeasurements)
         }
       }
     }
-    console.log("sing: ", singleOrderArray)
+    // console.log("sing: ", singleOrderArray)
+    console.log("draftMeasurementsObj: ", draftMeasurementsObj)
     const orderItemsArrayPDFString = JSON.stringify(orderItemsArrayPDF)
     const singleOrderArrayString = JSON.stringify(singleOrderArray)
 

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run lint)",
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(npx tsc -b)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(tasklist *)"
+    ]
+  }
+}

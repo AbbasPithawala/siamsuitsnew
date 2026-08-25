@@ -1,0 +1,2 @@
+ALTER TABLE "feature_products" ADD COLUMN "sequence_order" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "product_measurements" ADD COLUMN "sequence_order" integer DEFAULT 0 NOT NULL;

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "retailer_users_user_id_unique" ON "retailer_users" USING btree ("user_id");

@@ -1,0 +1,38 @@
+/*
+ * Ported verbatim from `siamClient/src/components/retailerAdmin/retailerPages/Step4/Step4.css`
+ * (the qty-stepper/`.minusIc`/`.plusIc`/`.undrLine`/`.styleFabricsTD` rules,
+ * unscoped from `.content-wrapper` since this rewrite's order-builder page
+ * has no such ambient wrapper class) plus `.searchinput-inner`'s base rule,
+ * which in legacy lives in several page-level CSS files
+ * (`components/superAdmin/pages/order/order.css`,
+ * `.../groupOrder/groupOrder.css`) rather than `Step4.css` itself — same
+ * "verbatim rule, different real source file" situation Group 3's
+ * `Measurements.css` comment already documents for this codebase.
+ * PHASE_9_TASKS.md Group 7 — the Super Product step's real multi-line-item
+ * cart table.
+ */
+.minusIc,
+.content-wrapper button.minusIc {
+    background: #e4efff !important;
+    border-radius: 50px;
+    min-width: 40px;
+}
+.plusIc,
+.content-wrapper button.plusIc {
+    background: #e4efff !important;
+    border-radius: 50px;
+    min-width: 40px;
+}
+.undrLine {
+    border-bottom: 1px solid #c2c2c3;
+    border-top: 1px solid #c2c2c3;
+}
+.styleFabricsTD {
+    min-width: 221px !important;
+}
+.searchinput-inner {
+    margin-top: 1rem;
+}
+.text-center {
+    text-align: center;
+}

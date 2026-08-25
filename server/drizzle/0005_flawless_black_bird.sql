@@ -1,0 +1,1 @@
+ALTER TABLE "extra_payment_categories" ADD COLUMN "deleted_at" timestamp with time zone;

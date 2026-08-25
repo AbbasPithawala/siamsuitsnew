@@ -1,0 +1,2 @@
+ALTER TABLE "extra_payments" ALTER COLUMN "approved" SET DEFAULT false;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "extra_payments_job_category_unique" ON "extra_payments" USING btree ("job_id","category_id");

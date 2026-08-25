@@ -1,0 +1,19 @@
+ALTER TABLE "retailers" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "roles" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "tailors" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "tenants" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "users" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "features" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "measurement_definitions" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "processes" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "products" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "styles" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "customers" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "order_groups" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "orders" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "extra_payment_categories" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "extra_payments" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "jobs" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "worker_advance_payments" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "retailer_invoices" DROP COLUMN IF EXISTS "legacy_mongo_id";--> statement-breakpoint
+ALTER TABLE "shipping_boxes" DROP COLUMN IF EXISTS "legacy_mongo_id";

@@ -1,0 +1,355 @@
+import type { Server } from "node:http";
+import { promises as fsp } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { eq, sql } from "drizzle-orm";
+import { PNG } from "pngjs";
+import jsQR from "jsqr";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { app } from "../src/app";
+import { db } from "../src/db/index";
+import { retailers, roles, rolePermissions, userRoles, users } from "../src/db/schema/index";
+import { hashPassword, issueToken } from "../src/services/auth.service";
+import { buildOrderPdfHtml, closePdfBrowser } from "../src/services/orderPdf.service";
+import { createTenantWithUser } from "./helpers/catalog-test-auth";
+
+interface Ctx {
+  token: string;
+}
+
+async function createRetailer(tenantId: string) {
+  const suffix = randomUUID();
+  const [retailer] = await db
+    .insert(retailers)
+    .values({ tenantId, name: `PDF Test Retailer ${suffix}`, code: `PT${suffix.slice(0, 6).toUpperCase()}` })
+    .returning();
+  if (!retailer) throw new Error("Failed to create test retailer");
+  return retailer;
+}
+
+async function createUserInTenant(tenantId: string, permissionKeys: string[]) {
+  const suffix = randomUUID();
+  const [role] = await db.insert(roles).values({ tenantId, name: `Pdf-${suffix}` }).returning();
+  if (!role) throw new Error("Failed to create role");
+
+  if (permissionKeys.length > 0) {
+    const permissionRows = await db.query.permissions.findMany({ where: (p, { inArray }) => inArray(p.key, permissionKeys) });
+    if (permissionRows.length !== permissionKeys.length) throw new Error(`Missing seeded permissions among [${permissionKeys.join(", ")}]`);
+    for (const permission of permissionRows) {
+      await db.insert(rolePermissions).values({ roleId: role.id, permissionId: permission.id });
+    }
+  }
+
+  const passwordHash = await hashPassword("irrelevant-for-this-test");
+  const [user] = await db
+    .insert(users)
+    .values({ tenantId, name: "PDF Test User", username: `pdf-${suffix}`, passwordHash })
+    .returning();
+  if (!user) throw new Error("Failed to create user");
+  await db.insert(userRoles).values({ userId: user.id, roleId: role.id });
+
+  const token = issueToken({ sub: user.id, tenantId, actorType: "user" });
+  return {
+    token,
+    async cleanup() {
+      await db.delete(userRoles).where(eq(userRoles.userId, user.id));
+      await db.delete(users).where(eq(users.id, user.id));
+      await db.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
+      await db.delete(roles).where(eq(roles.id, role.id));
+    },
+  };
+}
+
+async function deleteOrderTreeForRetailer(retailerId: string) {
+  const orderRows = await db.query.orders.findMany({ where: (o, { eq: eqOp }) => eqOp(o.retailerId, retailerId) });
+  for (const order of orderRows) {
+    const itemRows = await db.query.orderItems.findMany({ where: (i, { eq: eqOp }) => eqOp(i.orderId, order.id) });
+    for (const item of itemRows) {
+      const componentRows = await db.query.orderItemComponents.findMany({ where: (c, { eq: eqOp }) => eqOp(c.orderItemId, item.id) });
+      for (const component of componentRows) {
+        await db.execute(sql`delete from manufacturing_steps where order_item_component_id = ${component.id}`);
+        await db.execute(sql`delete from order_item_component_measurements where order_item_component_id = ${component.id}`);
+        await db.execute(sql`delete from order_item_component_features where order_item_component_id = ${component.id}`);
+      }
+      await db.execute(sql`delete from order_item_components where order_item_id = ${item.id}`);
+    }
+    await db.execute(sql`delete from order_items where order_id = ${order.id}`);
+  }
+  await db.execute(sql`delete from orders where retailer_id = ${retailerId}`);
+}
+
+async function postJson(baseUrl: string, path: string, token: string, body: unknown) {
+  return fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+}
+
+async function createProduct(baseUrl: string, ctx: Ctx, name: string): Promise<string> {
+  const res = await postJson(baseUrl, "/api/products", ctx.token, { name: `${name} ${randomUUID()}` });
+  const body = (await res.json()) as { data: { id: string } };
+  return body.data.id;
+}
+
+async function createProcess(baseUrl: string, ctx: Ctx, name: string): Promise<string> {
+  const res = await postJson(baseUrl, "/api/processes", ctx.token, { name: `${name} ${randomUUID()}` });
+  const body = (await res.json()) as { data: { id: string } };
+  return body.data.id;
+}
+
+async function setProductProcesses(baseUrl: string, ctx: Ctx, productId: string, processIds: string[]) {
+  const res = await fetch(`${baseUrl}/api/products/${productId}/processes`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.token}` },
+    body: JSON.stringify({ processIds }),
+  });
+  if (res.status !== 200) throw new Error(`Failed to set product processes: ${res.status}`);
+}
+
+async function createSuperProduct(
+  baseUrl: string,
+  ctx: Ctx,
+  name: string,
+  components: Array<{ productId: string; slotLabel: string }>
+): Promise<{ id: string; components: Array<{ id: string; productId: string; slotLabel: string; sequence: number }> }> {
+  const res = await postJson(baseUrl, "/api/super-products", ctx.token, {
+    name: `${name} ${randomUUID()}`,
+    components: components.map((c, i) => ({ ...c, sequence: i + 1 })),
+  });
+  const body = (await res.json()) as { data: { id: string; components: Array<{ id: string; productId: string; slotLabel: string; sequence: number }> } };
+  return body.data;
+}
+
+async function createCustomer(baseUrl: string, ctx: Ctx, retailerId: string): Promise<string> {
+  const res = await postJson(baseUrl, "/api/customers", ctx.token, { retailerId, firstName: `Customer ${randomUUID()}`, lastName: "Tester" });
+  const body = (await res.json()) as { data: { id: string } };
+  return body.data.id;
+}
+
+async function createMeasurementDefinition(baseUrl: string, ctx: Ctx, name: string): Promise<string> {
+  const suffix = randomUUID();
+  const res = await postJson(baseUrl, "/api/measurement-definitions", ctx.token, { name: `${name} ${suffix}`, slug: `${name.toLowerCase()}-${suffix}` });
+  const body = (await res.json()) as { data: { id: string } };
+  return body.data.id;
+}
+
+async function createChoiceFeatureWithStyle(baseUrl: string, ctx: Ctx, productId: string) {
+  const featureRes = await postJson(baseUrl, "/api/features", ctx.token, { name: `Lapel ${randomUUID()}`, type: "choice", productIds: [productId] });
+  const feature = (await featureRes.json()) as { data: { id: string } };
+
+  const createStyleRes = await fetch(`${baseUrl}/api/features/${feature.data.id}/styles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ctx.token}` },
+    body: JSON.stringify({ name: "Notch" }),
+  });
+  const style = (await createStyleRes.json()) as { data: { id: string } };
+
+  return { featureId: feature.data.id, styleId: style.data.id };
+}
+
+/** Decodes the QR PNG actually embedded in the generated HTML (the same bytes Puppeteer renders into the PDF), confirming it encodes the real `order_item_component.id` — not a regenerated/re-trusted copy. */
+function decodeQrDataUrl(dataUrl: string): string {
+  const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
+  const buffer = Buffer.from(base64, "base64");
+  const png = PNG.sync.read(buffer);
+  const result = jsQR(new Uint8ClampedArray(png.data.buffer, png.data.byteOffset, png.data.byteLength), png.width, png.height);
+  if (!result) throw new Error("Failed to decode QR code from generated PDF HTML");
+  return result.data;
+}
+
+function extractQrDataUrls(html: string): string[] {
+  const matches = html.matchAll(/data:image\/png;base64,[A-Za-z0-9+/=]+/g);
+  return [...matches].map((m) => m[0]);
+}
+
+describe("/api/orders/:id/pdf", () => {
+  let server: Server;
+  let baseUrl: string;
+
+  let owner: Awaited<ReturnType<typeof createTenantWithUser>>;
+  let noView: Awaited<ReturnType<typeof createUserInTenant>>;
+
+  let retailer: Awaited<ReturnType<typeof createRetailer>>;
+  let customerId: string;
+
+  let jacketId: string;
+  let pantId: string;
+  let waistcoatId: string;
+  let cuttingId: string;
+  let stitchingId: string;
+  let pressingId: string;
+
+  let threePiece: { id: string; components: Array<{ id: string; productId: string; slotLabel: string; sequence: number }> };
+  let onePiece: { id: string; components: Array<{ id: string; productId: string; slotLabel: string; sequence: number }> };
+
+  let chestDefId: string;
+  let lapel: { featureId: string; styleId: string };
+
+  const generatedPdfPaths: string[] = [];
+
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, () => {
+        const address = server.address();
+        const port = typeof address === "object" && address !== null ? address.port : 0;
+        baseUrl = `http://127.0.0.1:${port}`;
+        resolve();
+      });
+    });
+
+    owner = await createTenantWithUser([
+      "orders.create",
+      "orders.view",
+      "catalog.products.manage",
+      "catalog.super_products.manage",
+      "catalog.processes.manage",
+      "catalog.measurements.manage",
+      "catalog.features.manage",
+      "customers.manage",
+    ]);
+
+    noView = await createUserInTenant(owner.tenantId, ["orders.create"]);
+
+    retailer = await createRetailer(owner.tenantId);
+    customerId = await createCustomer(baseUrl, owner, retailer.id);
+
+    [jacketId, pantId, waistcoatId] = await Promise.all([
+      createProduct(baseUrl, owner, "Jacket"),
+      createProduct(baseUrl, owner, "Pant"),
+      createProduct(baseUrl, owner, "Waistcoat"),
+    ]);
+    [cuttingId, stitchingId, pressingId] = await Promise.all([
+      createProcess(baseUrl, owner, "Cutting"),
+      createProcess(baseUrl, owner, "Stitching"),
+      createProcess(baseUrl, owner, "Pressing"),
+    ]);
+
+    await Promise.all([
+      setProductProcesses(baseUrl, owner, jacketId, [cuttingId, stitchingId, pressingId]),
+      setProductProcesses(baseUrl, owner, pantId, [cuttingId, pressingId]),
+      setProductProcesses(baseUrl, owner, waistcoatId, [stitchingId]),
+    ]);
+
+    threePiece = await createSuperProduct(baseUrl, owner, "PDF Three Piece Suit", [
+      { productId: jacketId, slotLabel: "Jacket" },
+      { productId: pantId, slotLabel: "Pant" },
+      { productId: waistcoatId, slotLabel: "Waistcoat" },
+    ]);
+    onePiece = await createSuperProduct(baseUrl, owner, "PDF Jacket Only", [{ productId: jacketId, slotLabel: "Jacket" }]);
+
+    chestDefId = await createMeasurementDefinition(baseUrl, owner, "Chest");
+    lapel = await createChoiceFeatureWithStyle(baseUrl, owner, jacketId);
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closePdfBrowser();
+
+    for (const p of generatedPdfPaths) {
+      await fsp.rm(p, { force: true });
+    }
+
+    await deleteOrderTreeForRetailer(retailer.id);
+    await db.execute(
+      sql`delete from customer_measurement_profile_values where profile_id in (select id from customer_measurement_profiles where customer_id in (select id from customers where retailer_id = ${retailer.id}))`
+    );
+    await db.execute(sql`delete from customer_measurement_profiles where customer_id in (select id from customers where retailer_id = ${retailer.id})`);
+    await db.execute(sql`delete from customers where retailer_id = ${retailer.id}`);
+    await db.execute(sql`delete from retailers where id = ${retailer.id}`);
+
+    await noView.cleanup();
+    await owner.cleanup();
+  }, 30000);
+
+  it("generates a real PDF for a 3-component super product, covering all 3 components with QR codes that decode to their real component ids", async () => {
+    const orderRes = await postJson(baseUrl, "/api/orders", owner.token, {
+      retailerId: retailer.id,
+      customerId,
+      items: [
+        {
+          superProductId: threePiece.id,
+          components: threePiece.components.map((c) => {
+            if (c.productId === jacketId) {
+              return {
+                superProductComponentId: c.id,
+                measurements: [{ measurementDefinitionId: chestDefId, value: "40.00", adjustmentValue: "0.50" }],
+                features: [{ featureId: lapel.featureId, styleId: lapel.styleId }],
+              };
+            }
+            return { superProductComponentId: c.id };
+          }),
+        },
+      ],
+    });
+    expect(orderRes.status).toBe(201);
+    const order = (await orderRes.json()) as {
+      data: { id: string; items: Array<{ components: Array<{ id: string }> }> };
+    };
+    const componentIds = order.data.items[0]!.components.map((c) => c.id);
+    expect(componentIds).toHaveLength(3);
+
+    const pdfRes = await postJson(baseUrl, `/api/orders/${order.data.id}/pdf`, owner.token, {});
+    expect(pdfRes.status).toBe(201);
+    const pdfBody = (await pdfRes.json()) as { data: { path: string; order: { pdfPath: string } } };
+    expect(pdfBody.data.path).toBeTruthy();
+    expect(pdfBody.data.order.pdfPath).toBe(pdfBody.data.path);
+    generatedPdfPaths.push(pdfBody.data.path);
+
+    const stat = await fsp.stat(pdfBody.data.path);
+    expect(stat.size).toBeGreaterThan(0);
+    const fileHandle = await fsp.open(pdfBody.data.path, "r");
+    const magicBuffer = Buffer.alloc(4);
+    await fileHandle.read(magicBuffer, 0, 4, 0);
+    await fileHandle.close();
+    expect(magicBuffer.toString("ascii")).toBe("%PDF");
+
+    // Decode the actual QR PNGs embedded in the HTML fed to Puppeteer for this same order.
+    // PHASE_10_TASKS.md Workstream B Group 2's two-tier layout renders each component's QR
+    // twice — once on the summary-page row, once on its own detail page — so 3 real
+    // components now yield 6 QR codes total, 2 decoding to each real component id.
+    const { html, detail } = await buildOrderPdfHtml(owner.tenantId, order.data.id);
+    const realComponentIds = detail.items.flatMap((item) => item.components.map((c) => c.id));
+    expect(realComponentIds.sort()).toEqual(componentIds.sort());
+
+    const qrDataUrls = extractQrDataUrls(html);
+    expect(qrDataUrls).toHaveLength(6);
+    const decoded = qrDataUrls.map(decodeQrDataUrl).sort();
+    expect(decoded).toEqual([...componentIds, ...componentIds].sort());
+  }, 30000);
+
+  it("generates a PDF for a 1-component super product identically, with exactly two QR codes (summary + detail page) for that one component (no special-casing)", async () => {
+    const orderRes = await postJson(baseUrl, "/api/orders", owner.token, {
+      retailerId: retailer.id,
+      customerId,
+      items: [{ superProductId: onePiece.id, components: [{ superProductComponentId: onePiece.components[0]!.id }] }],
+    });
+    expect(orderRes.status).toBe(201);
+    const order = (await orderRes.json()) as { data: { id: string; items: Array<{ components: Array<{ id: string }> }> } };
+    const componentId = order.data.items[0]!.components[0]!.id;
+
+    const pdfRes = await postJson(baseUrl, `/api/orders/${order.data.id}/pdf`, owner.token, {});
+    expect(pdfRes.status).toBe(201);
+    const pdfBody = (await pdfRes.json()) as { data: { path: string } };
+    generatedPdfPaths.push(pdfBody.data.path);
+
+    const stat = await fsp.stat(pdfBody.data.path);
+    expect(stat.size).toBeGreaterThan(0);
+
+    const { html } = await buildOrderPdfHtml(owner.tenantId, order.data.id);
+    const qrDataUrls = extractQrDataUrls(html);
+    expect(qrDataUrls).toHaveLength(2);
+    expect(qrDataUrls.map(decodeQrDataUrl)).toEqual([componentId, componentId]);
+  }, 30000);
+
+  it("403s a PDF-generation request from a user lacking orders.view", async () => {
+    const orderRes = await postJson(baseUrl, "/api/orders", owner.token, {
+      retailerId: retailer.id,
+      customerId,
+      items: [{ superProductId: onePiece.id, components: [{ superProductComponentId: onePiece.components[0]!.id }] }],
+    });
+    const order = (await orderRes.json()) as { data: { id: string } };
+
+    const res = await postJson(baseUrl, `/api/orders/${order.data.id}/pdf`, noView.token, {});
+    expect(res.status).toBe(403);
+  });
+});

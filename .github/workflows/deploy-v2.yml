@@ -1,0 +1,286 @@
+# ==============================================================================
+# Deploy pipeline for the NEW stack: siam/server + siam/client (Phase 7 Group 2).
+#
+# Manual (workflow_dispatch) only, deliberately NOT wired to `on: push`. The
+# real deploy target for this stack is not yet decided as of authoring this
+# (could end up being the same Hostinger VPS as the legacy siamServer/
+# siamClient stack alongside it during a transition period, or somewhere else
+# entirely) — see PHASE_7_TASKS.md Group 2. Every host/path/service-manager
+# detail below is a named secret, not a hardcoded value, so this workflow is
+# ready to point at wherever that target ends up being. Do not add a `push`
+# trigger until the target + secrets genuinely exist.
+#
+# Does NOT touch `.github/workflows/deploy.yml` (legacy siamClient/siamServer,
+# still auto-deploying to live production on every push to master — unrelated
+# stack, out of scope here on purpose).
+#
+# ------------------------------------------------------------------------
+# Required GitHub repo secrets (names only — provision real values once the
+# deploy target is decided; see PHASE_7_TASKS.md Group 2 for the checklist):
+#
+#   DATABASE_URL                Target Postgres connection string that
+#                                `db:migrate` (drizzle-kit) runs against.
+#   JWT_SECRET                  Required by server/src/config/env.ts's schema
+#                                (parsed unconditionally, so even the migrate
+#                                script needs it set, not just the running server).
+#   VITE_API_BASE_URL           Baked into the client bundle at build time
+#                                (Vite env var) — must point at wherever the
+#                                deployed server will actually be reachable.
+#   DEPLOY_HOST                 SSH host/IP of the deploy target.
+#   DEPLOY_USER                 SSH user on the deploy target.
+#   DEPLOY_PATH                 Remote base directory artifacts are rsynced
+#                                into (this workflow uses `<path>/server` and
+#                                `<path>/client` subfolders under it).
+#   SSH_PRIVATE_KEY             SSH key for DEPLOY_HOST (name matches the
+#                                legacy deploy.yml's secret for consistency).
+#   DEPLOY_SERVICE_RESTART_CMD  Remote command(s) to restart the server
+#                                process after artifacts land (e.g. a PM2
+#                                command, `systemctl restart ...`, docker
+#                                compose, etc.) — deliberately not hardcoded
+#                                since the new stack's process manager is not
+#                                yet decided.
+#   HEALTH_CHECK_URL            Full URL the post-deploy check hits — expects
+#                                the new server's `GET /health` (server/src/app.ts),
+#                                e.g. https://<deploy-host>/health.
+#
+# NOT referenced by this workflow (intentionally): AWS_ACCESS_KEY_ID /
+# AWS_SECRET_ACCESS_KEY / AWS_REGION / AWS_S3_BUCKET / PORT / NODE_ENV. Same
+# convention as the legacy pipeline (`--exclude '.env'` in deploy.yml): the
+# deploy target keeps its own persistent `.env` provisioned out-of-band,
+# never overwritten or assembled by CI. Those are optional() in env.ts's
+# schema anyway (server boots without them), so nothing in this pipeline
+# needs them.
+# ==============================================================================
+
+name: Deploy v2 (new stack — server + client)
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-v2
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  verify-server:
+    name: Verify server (typecheck + test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: siam
+          POSTGRES_PASSWORD: siam_dev_password
+          POSTGRES_DB: siam_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U siam -d siam_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Ephemeral CI-only database — never the real DATABASE_URL secret. Tests
+      # write real rows (tenants, users, orders, ...) so they must never run
+      # against the actual deploy target's database.
+      DATABASE_URL: postgres://siam:siam_dev_password@localhost:5432/siam_dev
+      # Not a real secret — tests only need JWT_SECRET to be a non-empty
+      # string to satisfy env.ts's schema; no token from this run is ever
+      # verified against production.
+      JWT_SECRET: ci-test-jwt-secret-not-used-in-production
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Typecheck server
+        working-directory: server
+        run: npx tsc -b
+
+      - name: Apply migrations to ephemeral test database
+        working-directory: server
+        run: npm run db:migrate
+
+      - name: Seed permission catalog + default tenant (idempotent, required by tests)
+        working-directory: server
+        run: npm run db:seed
+
+      - name: Run server test suite
+        working-directory: server
+        run: npm test
+
+  verify-client:
+    name: Verify client (typecheck + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Typecheck client
+        working-directory: client
+        run: npx tsc -b
+
+      - name: Run client test suite
+        working-directory: client
+        run: npm test
+
+  build-client:
+    name: Build client bundle
+    needs: verify-client
+    runs-on: ubuntu-latest
+    env:
+      VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build client (tsc -b && vite build → client/dist)
+        working-directory: client
+        run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-dist
+          path: client/dist
+          retention-days: 7
+
+  migrate:
+    name: Migrate target Postgres
+    needs: [verify-server, verify-client]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Apply drizzle-kit migrations to target database
+        working-directory: server
+        run: npm run db:migrate
+
+  # --------------------------------------------------------------------
+  # Deploy target isolation: this is the ONE job in the whole pipeline that
+  # touches a real remote host, and everything it needs (host, user, path,
+  # SSH key, restart command) is a named secret. Nothing here is hardcoded,
+  # by design — the actual target is not decided yet (see header comment).
+  # --------------------------------------------------------------------
+  deploy:
+    name: Deploy artifacts to target host
+    needs: [migrate, build-client]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        # Full install (not --omit=dev) here: this runs `tsc` to build, and
+        # `typescript` is a devDependency. Only the target host's own install
+        # (further down) needs to be production-only — this runner's
+        # node_modules is never shipped anywhere, only server/dist is.
+        working-directory: server
+        run: npm ci
+
+      - name: Build server (tsc -p tsconfig.json → server/dist)
+        working-directory: server
+        run: npm run build
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-dist
+          path: client-dist
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add deploy host to known_hosts
+        run: ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Rsync server artifacts
+        run: |
+          rsync -avz --delete \
+            server/dist/ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/server/dist/"
+          rsync -avz \
+            server/package.json server/package-lock.json \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/server/"
+
+      - name: Rsync client artifacts
+        run: |
+          rsync -avz --delete \
+            client-dist/ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/client/dist/"
+
+      - name: Install production dependencies on target and restart service
+        run: |
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "cd ${{ secrets.DEPLOY_PATH }}/server && npm ci --omit=dev"
+          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "${{ secrets.DEPLOY_SERVICE_RESTART_CMD }}"
+
+  health-check:
+    name: Post-deploy health check
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm GET /health returns 200
+        run: |
+          for attempt in 1 2 3 4 5; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.HEALTH_CHECK_URL }}" || echo "000")
+            if [ "$status" = "200" ]; then
+              echo "Health check passed (HTTP $status) on attempt $attempt."
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $status, retrying in 5s..."
+            sleep 5
+          done
+          echo "Health check failed: ${{ secrets.HEALTH_CHECK_URL }} did not return 200 after 5 attempts."
+          exit 1

@@ -1,0 +1,161 @@
+/*
+ * Ported verbatim from siamClient/src/components/Measurements/Measurements.css
+ * (PHASE_9_TASKS.md Group 3) — hides the native number-input spinner on the
+ * measurement value/adjustment/total inputs.
+ */
+.searchinput-measurement::-webkit-outer-spin-button,
+.searchinput-measurement::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.searchinput-measurement[type=number] {
+  -moz-appearance: textfield;
+}
+
+.searchinput::-webkit-outer-spin-button,
+.searchinput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.searchinput[type=number] {
+  -moz-appearance: textfield;
+}
+
+/*
+ * The classNames Measurements.jsx actually renders with (`.selecting-size`,
+ * `.step-2styles-NM`, `.searchinput-measurement`'s width, `.fabric-types_NM`,
+ * `.fabricselection_Common_NM`, `.note`, `.steper-title`) are NOT defined in
+ * its own Measurements.css — verified by grep, they live in the page-level
+ * siamClient/src/components/retailerAdmin/retailerPages/Step4/Step4.css
+ * instead (that file is shared across the whole order-builder step and isn't
+ * itself a candidate for verbatim whole-file porting here — it also contains
+ * many unrelated table/tab-bar rules Groups 5-7 will separately port pieces
+ * of as they rebuild the rest of that flow). The block below is copied
+ * verbatim from Step4.css's "Latest-css" section, limited to the rules this
+ * component's real classNames need, in their original source order.
+ */
+.step-2styles-NM {
+  display: flex;
+  justify-content: space-between;
+  border: 2px solid #e1e1e1;
+  margin: 15px;
+  padding: 10px;
+}
+.selecting-size {
+  text-align: center;
+}
+.step-2styles-NM td .searchinput {
+  width: 85% !important;
+  margin: 6px 0px 0px 0px !important;
+}
+.step-2styles-NM tr:nth-child(even) {
+  background-color: #fff;
+}
+.step-2styles-NM th, .step-2styles-NM td {
+  text-align: left;
+  padding: 3px 5px;
+}
+.step-2styles-NM th {
+  color: #051a2d;
+  text-align: center;
+}
+.step-2styles-NM td:first-child {
+  text-align: right;
+  font-size: 14px;
+  color: #051a2d;
+  font-weight: 550;
+}
+.searchinput-measurement {
+  width: 20% !important;
+}
+.fabric-types_NM ul {
+  padding: 0;
+  list-style: none;
+  margin-bottom: 0;
+}
+.fabric-types_NM ul li p {
+  margin: 0;
+  color: #051a2d;
+}
+.fabric-types_NM ul li {
+  display: inline-block;
+  margin: .5rem .5rem 0;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+}
+.fabric-types_NM ul li img {
+  border: 1px solid #ddd;
+  border-radius: 50px;
+}
+h3.steper-title {
+  font-family: 'Montserrat', sans-serif;
+}
+.fabric-types_NM {
+  text-align: center;
+  border-top: 3px solid #ddd;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+/* Monogram Font Style Position */
+.fabricselection_Common_NM ul {
+  padding: 0;
+}
+.fabricselection_Common_NM ul li {
+  display: inline-block;
+  margin-right: 10px;
+}
+.fabricselection_Common_NM label {
+  background: transparent;
+  padding: 0;
+  display: block;
+  position: relative;
+  margin: 0 10px 10px 0;
+  cursor: pointer;
+  text-align: center;
+  border-radius: 25px;
+}
+.fabricselection_Common_NM input[type="radio"] {
+  display: none;
+  opacity: 0;
+}
+.fabricselection_Common_NM label:before {
+  background-color: white;
+  color: white;
+  content: " ";
+  display: block;
+  border-radius: 50%;
+  border: 1px solid grey;
+  position: absolute;
+  z-index: 11;
+  top: -5px;
+  left: -5px;
+  width: 25px;
+  height: 25px;
+  text-align: center;
+  line-height: 28px;
+  transition-duration: 0.4s;
+  transform: scale(0);
+}
+.fabricselection_Common_NM input[type="radio"]:checked ~ label img {
+  border-color: #4caf50;
+  border-width: 2px;
+}
+
+.note {
+  margin-bottom: 0.2rem !important;
+}
+
+.fabric-types_NM ul {
+  margin-top: 0;
+}
+
+.fabric-types_NM ul li img {
+  width: 50px;
+}
+.fabric-types_NM {
+  margin-top: 0.5rem !important;
+  padding-top: 0.5rem !important;
+}
