@@ -252,11 +252,31 @@ function getUnitContent(index: number): HTMLElement {
  * zero tabs and skipped the whole loop for the second line item styled in a
  * row, leaving it permanently "Missing" with no thrown error at all).
  */
+/**
+ * A style with no sub-options renders as an image-card button (`aria-pressed`); a style WITH
+ * sub-options renders as a plain radio instead (PHASE_10_TASKS.md follow-up — legacy
+ * `Options.jsx`'s real shape, `ChoiceFeatureField.tsx`'s own doc comment) — so picking "the
+ * first/last unselected style in this tab" has to try both kinds, since a tab can be made up
+ * entirely of either depending on the real catalog data.
+ *
+ * Scoped to the active tab's own real `role="tabpanel"` (`ChoiceTabBar`'s own doc comment),
+ * NOT the whole component `section` — `section` also contains sibling inline features (e.g.
+ * Monogram Position/Font Style) that render their own real `role="radio"` elements
+ * unconditionally, which would otherwise be indistinguishable from this tab's actual style
+ * choices and get picked by mistake.
+ */
+function unselectedStyleElements(section: HTMLElement): HTMLElement[] {
+  const panel = within(section).getByRole("tabpanel");
+  const buttons = within(panel).queryAllByRole("button", { pressed: false });
+  if (buttons.length > 0) return buttons;
+  return within(panel).queryAllByRole("radio", { checked: false });
+}
+
 async function completeAllStyleTabsFirst(user: ReturnType<typeof userEvent.setup>, section: HTMLElement) {
   const tabs = await within(section).findAllByRole("tab", {}, NETWORK_WAIT);
   for (const tab of tabs) {
     await user.click(tab);
-    const unselected = within(section).queryAllByRole("button", { pressed: false });
+    const unselected = unselectedStyleElements(section);
     if (unselected.length > 0) {
       await user.click(unselected[0] as HTMLElement);
     }
@@ -268,7 +288,7 @@ async function completeAllStyleTabsLast(user: ReturnType<typeof userEvent.setup>
   const tabs = await within(section).findAllByRole("tab", {}, NETWORK_WAIT);
   for (const tab of tabs) {
     await user.click(tab);
-    const unselected = within(section).queryAllByRole("button", { pressed: false });
+    const unselected = unselectedStyleElements(section);
     if (unselected.length > 0) {
       await user.click(unselected[unselected.length - 1] as HTMLElement);
     }

@@ -294,12 +294,13 @@ describe.skipIf(!seededToken)("OrderDetailPage (live siam/server integration)", 
       expect(Number(within(measurementRow).getAllByRole("cell")[1]?.textContent)).toBe(40);
       expect(within(componentSection).getByText("No features selected.")).toBeInTheDocument();
 
-      // Generate PDF: real Puppeteer rendering (Group 3), confirm success
-      // and that the response's real (server-local, non-URL) path shape is
-      // surfaced honestly rather than a fabricated download link.
+      // Generate PDF: real Puppeteer rendering (Group 3), confirm success and that the
+      // response is a real, resolvable URL (PHASE_10_TASKS.md follow-up — `generateOrderPdf`
+      // now uploads through the same storage backend `uploadsApi.ts` uses, rather than a
+      // server-local filesystem path with no static route serving it).
       await user.click(screen.getByRole("button", { name: "Generate PDF" }));
       const pdfAlert = await screen.findByText(/PDF generated and stored on the server at:/, {}, PDF_WAIT);
-      expect(pdfAlert.textContent).toContain(`${order.data.orderNumber}.pdf`);
+      expect(pdfAlert.textContent).toMatch(/\/uploads\/order-pdfs\/.+\.pdf$/);
 
       // Repeat this order: navigates the real OrderBuilderPage with
       // `?repeatOfOrderId=`, which must fetch the source order and pre-fill

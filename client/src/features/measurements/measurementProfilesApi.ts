@@ -40,6 +40,30 @@ interface CustomerMeasurementProfileResponseEnvelope {
 }
 
 /**
+ * `measurementProfiles.service.ts#getMeasurementBaseline`'s real return shape — deliberately
+ * NOT `CustomerMeasurementProfile` above: this is the customer's most recent specific PRIOR
+ * ORDER's measurements for this product (excluding `excludeOrderId`, when editing), the same
+ * comparison `order_item_component_measurements.changed_from_profile` uses server-side, not
+ * the "latest known value across any write" the profile answers (see that column's own schema
+ * doc comment for why the two diverge). No `id`/`profileId` — these rows are
+ * `order_item_component_measurements`, not `customer_measurement_profile_values`.
+ */
+export interface MeasurementBaselineValue {
+  measurementDefinitionId: string;
+  value: string | null;
+  adjustmentValue: string | null;
+  totalValue: string | null;
+}
+
+export interface MeasurementBaseline {
+  values: MeasurementBaselineValue[];
+}
+
+interface MeasurementBaselineResponseEnvelope {
+  data: MeasurementBaseline | null;
+}
+
+/**
  * A brand-new customer+product pairing legitimately has no profile yet —
  * `GET /customers/:customerId/measurement-profiles/:productId` returns
  * `{ data: null }`, not a 404, for that case (`measurementProfiles.routes.ts`'s
@@ -79,7 +103,28 @@ export const measurementProfilesApi = baseApi.injectEndpoints({
         { type: "CustomerMeasurementProfile" as const, id: customerId },
       ],
     }),
+    /**
+     * Backs the order-builder's live "changed from profile" checkmark (PHASE_10_TASKS.md
+     * follow-up) — `excludeOrderId` is the order currently open in the edit wizard, if any, so
+     * that order's own not-yet-resaved component never counts as its own baseline (omitted
+     * entirely for order creation, where nothing exists yet to exclude). Same
+     * `CustomerMeasurementProfile` tags as the query above: an order write invalidates both,
+     * since either could change as a result (a new order becomes the next baseline, and/or
+     * updates the profile pre-fill).
+     */
+    getMeasurementBaseline: builder.query<
+      MeasurementBaseline | null,
+      { customerId: string; productId: string; excludeOrderId?: string | undefined }
+    >({
+      query: ({ customerId, productId, excludeOrderId }) =>
+        `/customers/${customerId}/measurement-baseline/${productId}${excludeOrderId ? `?excludeOrderId=${excludeOrderId}` : ""}`,
+      transformResponse: (response: MeasurementBaselineResponseEnvelope) => response.data,
+      providesTags: (_result, _error, { customerId, productId }) => [
+        { type: "CustomerMeasurementProfile" as const, id: `${customerId}:${productId}` },
+        { type: "CustomerMeasurementProfile" as const, id: customerId },
+      ],
+    }),
   }),
 });
 
-export const { useGetCustomerMeasurementProfileQuery } = measurementProfilesApi;
+export const { useGetCustomerMeasurementProfileQuery, useGetMeasurementBaselineQuery } = measurementProfilesApi;

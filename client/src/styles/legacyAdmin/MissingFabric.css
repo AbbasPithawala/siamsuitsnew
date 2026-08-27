@@ -54,8 +54,8 @@ button.fabric-btn span svg {
     width: 25%;
 }
 .fabric-left {
-    width: 75%;
-    margin-right: 1.5rem;
+    width: 100%;
+    margin-right: 0.5rem;
 }
 
 .fabric-customer-info p {

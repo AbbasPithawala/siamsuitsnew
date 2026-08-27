@@ -110,6 +110,36 @@ describe("/api/features", () => {
     expect(listBody.data.map((f) => f.id)).not.toContain(feature.data.id);
   });
 
+  it(
+    "sets isAdditional on create, defaults to false when omitted, and can be flipped via PATCH " +
+      "(PHASE_10_TASKS.md Workstream B's PDF-fidelity pass — previously read-only, no admin write path at all)",
+    async () => {
+      const defaultRes = await fetch(`${baseUrl}/api/features`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${managerA.token}` },
+        body: JSON.stringify({ name: `Default Additional ${randomUUID()}`, type: "text" }),
+      });
+      const defaultFeature = (await defaultRes.json()) as { data: { id: string; isAdditional: boolean } };
+      expect(defaultFeature.data.isAdditional).toBe(false);
+
+      const createdRes = await fetch(`${baseUrl}/api/features`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${managerA.token}` },
+        body: JSON.stringify({ name: `Additional Trim ${randomUUID()}`, type: "text", isAdditional: true }),
+      });
+      const created = (await createdRes.json()) as { data: { id: string; isAdditional: boolean } };
+      expect(created.data.isAdditional).toBe(true);
+
+      const updateRes = await fetch(`${baseUrl}/api/features/${created.data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${managerA.token}` },
+        body: JSON.stringify({ isAdditional: false }),
+      });
+      const updated = (await updateRes.json()) as { data: { isAdditional: boolean } };
+      expect(updated.data.isAdditional).toBe(false);
+    }
+  );
+
   it("rejects creating a style under a non-choice feature", async () => {
     const featureRes = await fetch(`${baseUrl}/api/features`, {
       method: "POST",

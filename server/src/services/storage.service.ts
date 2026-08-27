@@ -15,6 +15,7 @@ const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
   "image/webp": "webp",
   "image/avif": "avif",
   "image/svg+xml": "svg",
+  "application/pdf": "pdf",
 };
 
 function extensionFor(contentType: string): string {

@@ -262,12 +262,18 @@ export function OrderDetailPage() {
       )}
       {pdfResult && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          PDF generated and stored on the server at: {pdfResult.path}
+          PDF generated and stored on the server at:{" "}
+          <a href={resolveUploadUrl(pdfResult.path)} target="_blank" rel="noopener noreferrer">
+            {pdfResult.path}
+          </a>
         </Alert>
       )}
       {!pdfResult && order.pdfPath && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          A PDF was previously generated for this order, stored on the server at: {order.pdfPath}
+          A PDF was previously generated for this order, stored on the server at:{" "}
+          <a href={resolveUploadUrl(order.pdfPath)} target="_blank" rel="noopener noreferrer">
+            {order.pdfPath}
+          </a>
         </Alert>
       )}
 

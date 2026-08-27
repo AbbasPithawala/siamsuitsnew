@@ -344,6 +344,69 @@ describe("/api/orders", () => {
     expect(created.data.items[0]?.components[0]?.manufacturingSteps.map((s) => s.sequenceOrder)).toEqual([1, 2, 3]);
   });
 
+  it(
+    "backfills every measurement definition genuinely linked to the product, not just the ones submitted " +
+      "(PHASE_10_TASKS.md issue #2) — and never lets the backfilled zeros pollute the customer's saved profile",
+    async () => {
+      const waistDefId = await createMeasurementDefinition(baseUrl, owner, "Waist");
+      const linkRes = await fetch(`${baseUrl}/api/products/${jacketId}/measurements`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${owner.token}` },
+        body: JSON.stringify({ measurementDefinitionIds: [chestDefId, waistDefId] }),
+      });
+      expect(linkRes.status).toBe(200);
+
+      const backfillCustomerId = await createCustomer(baseUrl, owner, retailer.id);
+
+      const res = await postJson(baseUrl, "/api/orders", owner.token, {
+        retailerId: retailer.id,
+        customerId: backfillCustomerId,
+        items: [
+          {
+            superProductId: onePiece.id,
+            components: [
+              {
+                superProductComponentId: onePiece.components[0]!.id,
+                measurements: [{ measurementDefinitionId: chestDefId, value: "40" }],
+              },
+            ],
+          },
+        ],
+      });
+      expect(res.status).toBe(201);
+      const created = (await res.json()) as {
+        data: {
+          items: Array<{
+            components: Array<{ measurements: Array<{ measurementDefinitionId: string; value: string | null; totalValue: string | null; changedFromProfile: boolean | null }> }>;
+          }>;
+        };
+      };
+      const measurements = created.data.items[0]!.components[0]!.measurements;
+      expect(measurements).toHaveLength(2);
+
+      const chest = measurements.find((m) => m.measurementDefinitionId === chestDefId);
+      expect(chest?.value).toBe("40.00");
+      expect(chest?.totalValue).toBe("40.00");
+      expect(chest?.changedFromProfile).toBe(null); // no prior profile existed for this brand-new customer
+
+      const waist = measurements.find((m) => m.measurementDefinitionId === waistDefId);
+      expect(waist?.value).toBe("0.00");
+      expect(waist?.totalValue).toBe("0.00");
+      // Never evaluated against the profile (it was never fed in) — not `false` ("checked,
+      // unchanged"), genuinely `null` ("no comparison attempted"), same as issue #2's own
+      // real-value case just above.
+      expect(waist?.changedFromProfile).toBe(null);
+
+      // The customer's saved profile only ever recorded the real chest value — the
+      // zero-backfilled waist measurement never touched it.
+      const profileRes = await fetch(`${baseUrl}/api/customers/${backfillCustomerId}/measurement-profiles/${jacketId}`, {
+        headers: { Authorization: `Bearer ${owner.token}` },
+      });
+      const profile = (await profileRes.json()) as { data: { values: Array<{ measurementDefinitionId: string }> } | null };
+      expect(profile.data?.values.map((v) => v.measurementDefinitionId)).toEqual([chestDefId]);
+    }
+  );
+
   it("rejects an order missing one of the super product's real components", async () => {
     const res = await postJson(baseUrl, "/api/orders", owner.token, {
       retailerId: retailer.id,

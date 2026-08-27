@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
@@ -9,8 +9,8 @@ import { MeasurementForm } from "../measurements/MeasurementForm";
 import type { MeasurementValue } from "../measurements/MeasurementForm";
 import { useProductMeasurementsQuery } from "../measurements/measurementsApi";
 import type { ProductMeasurementLink } from "../measurements/measurementsApi";
-import { useGetCustomerMeasurementProfileQuery } from "../measurements/measurementProfilesApi";
-import type { CustomerMeasurementProfileValue } from "../measurements/measurementProfilesApi";
+import { useGetCustomerMeasurementProfileQuery, useGetMeasurementBaselineQuery } from "../measurements/measurementProfilesApi";
+import type { CustomerMeasurementProfileValue, MeasurementBaselineValue } from "../measurements/measurementProfilesApi";
 import type { FeatureValue } from "../featureSelector/featuresApi";
 import type { SuperProductComponent } from "../catalog/superProductsApi";
 
@@ -85,6 +85,15 @@ export interface LineItemMeasurementsPanelProps {
    * simply not rendered when the caller doesn't pass it.
    */
   onOpenManualSize?: (component: SuperProductComponent) => void;
+  /**
+   * PHASE_10_TASKS.md follow-up — the order currently open in the edit wizard, if any. Fed
+   * straight through to `useGetMeasurementBaselineQuery`'s `excludeOrderId` (see that hook's
+   * own doc comment): without it, editing an order could show its own not-yet-resaved
+   * component as its own "changed" baseline. Absent/undefined for order creation, where there
+   * is no current order yet to exclude — same optional, create-vs-edit-agnostic shape as
+   * `onOpenManualSize` above.
+   */
+  excludeOrderId?: string;
 }
 
 /**
@@ -154,7 +163,7 @@ export function useLineItemMeasurementsCompleteness(
  * copies this shared draft verbatim into every one of the line item's N
  * sibling units' components, per Decision 3).
  */
-export function LineItemMeasurementsPanel({ components, draft, onChange, customerId, onOpenManualSize }: LineItemMeasurementsPanelProps) {
+export function LineItemMeasurementsPanel({ components, draft, onChange, customerId, onOpenManualSize, excludeOrderId }: LineItemMeasurementsPanelProps) {
   const complete = useLineItemMeasurementsCompleteness(components, draft);
 
   return (
@@ -199,6 +208,7 @@ export function LineItemMeasurementsPanel({ components, draft, onChange, custome
               component={component}
               componentDraft={componentDraft}
               customerId={customerId}
+              excludeOrderId={excludeOrderId}
               onChange={(next) => onChange(component.id, next)}
             />
             {index < components.length - 1 && <Divider sx={{ mt: 2 }} />}
@@ -216,10 +226,41 @@ function toProfileMeasurementValue(entry: CustomerMeasurementProfileValue): Meas
   return value;
 }
 
+/** Body value + adjustment, treating an unset field as 0 — same total `MeasurementForm.tsx`'s own live Total column computes, and the same field `server/src/services/orders.service.ts#measurementValueDiffers` compares (PHASE_10_TASKS.md follow-up: switched from comparing the raw body value alone to matching legacy's real diff). */
+function liveTotal(value: string | undefined, adjustmentValue: string | undefined): number {
+  return Number(value ?? "0") + Number(adjustmentValue ?? "0");
+}
+
+/**
+ * The live, client-side counterpart to the server's own `changed_from_profile` — computed the
+ * exact same way (total value vs. the customer's specific prior order for this product,
+ * `useGetMeasurementBaselineQuery`, not the general "latest known value" profile — see that
+ * hook's own doc comment for why those two diverge), but recomputed on every keystroke here so
+ * the checkmark (`MeasurementForm.tsx`'s `changedMeasurementDefinitionIds` prop) shows up as
+ * the retailer types, not only after the order is placed and the PDF is generated.
+ */
+function computeChangedMeasurementDefinitionIds(
+  baselineValues: MeasurementBaselineValue[] | undefined,
+  currentMeasurements: MeasurementValue[]
+): Set<string> {
+  const changed = new Set<string>();
+  if (!baselineValues) return changed;
+  for (const baselineValue of baselineValues) {
+    const current = currentMeasurements.find((m) => m.measurementDefinitionId === baselineValue.measurementDefinitionId);
+    const baselineTotal = Number(baselineValue.totalValue ?? "0");
+    if (baselineTotal !== liveTotal(current?.value, current?.adjustmentValue)) {
+      changed.add(baselineValue.measurementDefinitionId);
+    }
+  }
+  return changed;
+}
+
 interface ComponentMeasurementsSectionProps {
   component: SuperProductComponent;
   componentDraft: LineItemComponentMeasurementDraft;
   customerId: string | null;
+  /** See `LineItemMeasurementsPanelProps.excludeOrderId`'s own doc comment. */
+  excludeOrderId?: string;
   onChange: (next: LineItemComponentMeasurementDraft) => void;
 }
 
@@ -275,9 +316,16 @@ interface ComponentMeasurementsSectionProps {
  * "renders before its query resolves" as a real, not just theoretical, bug
  * class in this codebase.
  */
-function ComponentMeasurementsSection({ component, componentDraft, customerId, onChange }: ComponentMeasurementsSectionProps) {
+function ComponentMeasurementsSection({ component, componentDraft, customerId, excludeOrderId, onChange }: ComponentMeasurementsSectionProps) {
   const { data: profile, isLoading: profileLoading } = useGetCustomerMeasurementProfileQuery(
     { customerId: customerId ?? "", productId: component.productId },
+    { skip: !customerId }
+  );
+  // Deliberately a separate query/hook from `profile` above, not a shared one — pre-fill (right
+  // above) and the live checkmark (below) are genuinely different questions, per
+  // `useGetMeasurementBaselineQuery`'s own doc comment.
+  const { data: baseline } = useGetMeasurementBaselineQuery(
+    { customerId: customerId ?? "", productId: component.productId, excludeOrderId },
     { skip: !customerId }
   );
 
@@ -286,6 +334,11 @@ function ComponentMeasurementsSection({ component, componentDraft, customerId, o
     if (componentDraft.measurements.length > 0) return;
     onChange({ ...componentDraft, measurements: profile.values.map(toProfileMeasurementValue) });
   }, [profile, componentDraft, onChange]);
+
+  const changedMeasurementDefinitionIds = useMemo(
+    () => computeChangedMeasurementDefinitionIds(baseline?.values, componentDraft.measurements),
+    [baseline, componentDraft.measurements]
+  );
 
   if (customerId && profileLoading) {
     return <LoadingSpinner />;
@@ -300,6 +353,7 @@ function ComponentMeasurementsSection({ component, componentDraft, customerId, o
       onMeasurementNoteChange={(measurementNote) => onChange({ ...componentDraft, measurementNote })}
       features={componentDraft.features}
       onFeaturesChange={(features) => onChange({ ...componentDraft, features })}
+      changedMeasurementDefinitionIds={changedMeasurementDefinitionIds}
     />
   );
 }

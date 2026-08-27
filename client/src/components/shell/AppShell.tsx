@@ -184,7 +184,7 @@ export function AppShell() {
           scroll instead of letting that one table scroll internally via its own
           `overflow-x`. A page-layout-level fix, not per-page, since every page under this
           shell shares the same flex parent. */}
-      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, height: "100%", overflowY: "auto", p: 3 }}>
+      <Box component="main" className="app-scroll-area" sx={{ flexGrow: 1, minWidth: 0, height: "100%", overflowY: "auto", p: 3 }}>
         <Toolbar />
         <Outlet />
       </Box>

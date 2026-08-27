@@ -3,7 +3,11 @@ import type { ChangeEvent } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+// Named barrel import — see LoginPage.tsx's comment: this project's Vite dep
+// optimizer mis-transforms `@mui/icons-material/X` deep imports at runtime.
+import { CheckCircleOutline as CheckCircleOutlineIcon } from "@mui/icons-material";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { getApiErrorMessage } from "../../api/errorUtils";
 import { useProductMeasurementsQuery } from "./measurementsApi";
@@ -44,6 +48,15 @@ export interface MeasurementFormProps {
    */
   features: FeatureValue[];
   onFeaturesChange: (features: FeatureValue[]) => void;
+  /**
+   * PHASE_10_TASKS.md follow-up — measurement definition ids whose live total (body value +
+   * adjustment) differs from the customer's saved profile for this product, mirroring legacy's
+   * real `Measurements.jsx` green `CheckCircleOutlineIcon` (shown live as the retailer types,
+   * not only after the order is placed). Optional: callers with no profile context (e.g. no
+   * customer selected yet, or a fresh product with no profile at all) simply omit it, and no
+   * row shows a checkmark, same as before this prop existed.
+   */
+  changedMeasurementDefinitionIds?: Set<string>;
 }
 
 function labelFor(link: ProductMeasurementLink): string {
@@ -98,12 +111,9 @@ function sanitizeMeasurementInput(raw: string): string {
 }
 
 function computeLiveTotal(rawValue: string | undefined, rawAdjustment: string | undefined): string {
-  const trimmedValue = rawValue?.trim();
-  if (!trimmedValue) return "";
-  const numericValue = Number(trimmedValue);
-  const trimmedAdjustment = rawAdjustment?.trim();
-  const numericAdjustment = trimmedAdjustment ? Number(trimmedAdjustment) : 0;
-  if (Number.isNaN(numericValue) || Number.isNaN(numericAdjustment)) return "";
+  const numericValue = Number(rawValue?.trim() || "0");
+  const numericAdjustment = Number(rawAdjustment?.trim() || "0");
+  if (Number.isNaN(numericValue) || Number.isNaN(numericAdjustment)) return "0.00";
   return (numericValue + numericAdjustment).toFixed(2);
 }
 
@@ -137,6 +147,7 @@ export function MeasurementForm({
   onMeasurementNoteChange,
   features,
   onFeaturesChange,
+  changedMeasurementDefinitionIds,
 }: MeasurementFormProps) {
   const { data: links, isLoading, isFetching, isError, error } = useProductMeasurementsQuery(productId);
   const { data: fittings } = useListFittingsForProductQuery(productId);
@@ -203,6 +214,25 @@ export function MeasurementForm({
       nextValue[existingIndex] = updated;
     }
     onChange(nextValue);
+  };
+
+  /**
+   * Mirrors legacy `Measurements.jsx`'s `handleOnFocus`/`handleBlur`: a field
+   * with no real value yet displays "0" (below, `current?.value ?? "0"`) so
+   * body-size/adjustment/total never show blank for a new customer, but a
+   * bare "0" would be annoying to type over character-by-character — so
+   * focusing selects it, letting the first keystroke replace it outright.
+   * Blurring back to an empty string writes a real explicit "0" entry so the
+   * displayed value stays "0" rather than reverting to a stale fallback.
+   */
+  const handleFieldFocus = (event: { target: HTMLInputElement }) => {
+    event.target.select();
+  };
+
+  const handleFieldBlur = (measurementDefinitionId: string, field: "value" | "adjustmentValue", rawFieldValue: string) => {
+    if (rawFieldValue.trim() === "") {
+      handleFieldChange(measurementDefinitionId, field, "0");
+    }
   };
 
   const handleShoulderTypeSelect = (featureId: string, styleId: string) => {
@@ -302,8 +332,10 @@ export function MeasurementForm({
                       fontWeight: "bold",
                     }}
                     aria-label={`${label} value`}
-                    value={current?.value ?? ""}
+                    value={current?.value ?? "0"}
                     onChange={(event) => handleFieldChange(link.measurementDefinitionId, "value", event.target.value)}
+                    onFocus={handleFieldFocus}
+                    onBlur={(event) => handleFieldBlur(link.measurementDefinitionId, "value", event.target.value)}
                   />
                   <input
                     type="text"
@@ -320,10 +352,12 @@ export function MeasurementForm({
                       fontWeight: "bold",
                     }}
                     aria-label={`${label} adjustment`}
-                    value={current?.adjustmentValue ?? ""}
+                    value={current?.adjustmentValue ?? "0"}
                     onChange={(event) =>
                       handleFieldChange(link.measurementDefinitionId, "adjustmentValue", event.target.value)
                     }
+                    onFocus={handleFieldFocus}
+                    onBlur={(event) => handleFieldBlur(link.measurementDefinitionId, "adjustmentValue", event.target.value)}
                   />
                   <input
                     type="number"
@@ -343,6 +377,13 @@ export function MeasurementForm({
                     aria-label={`${label} total`}
                     value={total}
                   />
+                  <Box sx={{ width: 24, display: "flex", justifyContent: "center" }}>
+                    {changedMeasurementDefinitionIds?.has(link.measurementDefinitionId) && (
+                      <Tooltip title="Changed from the customer's saved measurements">
+                        <CheckCircleOutlineIcon aria-label={`${label} changed from profile`} sx={{ color: "green", fontSize: 20 }} />
+                      </Tooltip>
+                    )}
+                  </Box>
                 </Box>
               </Grid>
             );

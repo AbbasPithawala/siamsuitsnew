@@ -9,6 +9,7 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import Divider from "@mui/material/Divider";
 import FormControl from "@mui/material/FormControl";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import InputLabel from "@mui/material/InputLabel";
 import ListItemText from "@mui/material/ListItemText";
@@ -17,6 +18,7 @@ import Paper from "@mui/material/Paper";
 import Select from "@mui/material/Select";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -59,14 +61,23 @@ interface FeatureFormState {
   type: FeatureType;
   processId: string;
   productIds: string[];
+  isAdditional: boolean;
 }
 
-const EMPTY_FORM: FeatureFormState = { name: "", thaiName: "", type: "choice", processId: "", productIds: [] };
+const EMPTY_FORM: FeatureFormState = {
+  name: "",
+  thaiName: "",
+  type: "choice",
+  processId: "",
+  productIds: [],
+  isAdditional: false,
+};
 
 function toFeatureBody(form: FeatureFormState) {
-  const body: { name: string; thaiName?: string; type: FeatureType; processId?: string } = {
+  const body: { name: string; thaiName?: string; type: FeatureType; processId?: string; isAdditional: boolean } = {
     name: form.name.trim(),
     type: form.type,
+    isAdditional: form.isAdditional,
   };
   const thaiName = form.thaiName.trim();
   if (thaiName) body.thaiName = thaiName;
@@ -163,6 +174,7 @@ export function FeaturesPage() {
       type: feature.type,
       processId: feature.processId ?? "",
       productIds: feature.products.map((product) => product.id),
+      isAdditional: feature.isAdditional,
     });
     setDialogOpen(true);
   }
@@ -337,6 +349,15 @@ export function FeaturesPage() {
                 ))}
               </Select>
             </FormControl>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.isAdditional}
+                  onChange={(event) => setForm((current) => ({ ...current, isAdditional: event.target.checked }))}
+                />
+              }
+              label="Additional (shown in the PDF's secondary styling section, not the main icon grid)"
+            />
             <FormControl fullWidth>
               <InputLabel id="feature-products-label">Products</InputLabel>
               <Select

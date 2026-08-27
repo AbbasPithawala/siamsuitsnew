@@ -120,6 +120,20 @@
       "when": 1787469196057,
       "tag": "0016_outgoing_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1787767362230,
+      "tag": "0017_slippery_piledriver",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787767470756,
+      "tag": "0018_dashing_clint_barton",
+      "breakpoints": true
     }
   ]
 }

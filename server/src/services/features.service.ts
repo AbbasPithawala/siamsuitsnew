@@ -17,9 +17,15 @@ export interface CreateFeatureInput {
   type: FeatureType;
   processId?: string;
   productIds?: string[];
+  /** Legacy's "additional" flag (PHASE_9_TASKS.md Group 0) — drives whether `orderPdf.service.ts`
+   * renders this feature's selection in the main styling icon grid (false, the default — a
+   * "core" style choice) or the secondary additional-features cards (true). Previously a
+   * read-only column with no admin write path at all — see PHASE_10_TASKS.md Workstream B's
+   * PDF-fidelity pass, which found the gap while building the icon-grid split this flag drives. */
+  isAdditional?: boolean;
 }
 
-export type UpdateFeatureInput = Partial<Pick<CreateFeatureInput, "name" | "thaiName" | "type" | "processId">>;
+export type UpdateFeatureInput = Partial<Pick<CreateFeatureInput, "name" | "thaiName" | "type" | "processId" | "isAdditional">>;
 
 export interface CreateStyleInput {
   name: string;

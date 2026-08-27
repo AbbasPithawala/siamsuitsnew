@@ -1,5 +1,6 @@
 import type { Server } from "node:http";
 import { promises as fsp } from "node:fs";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -7,7 +8,20 @@ import { app } from "../src/app";
 import { db } from "../src/db/index";
 import { features, retailers } from "../src/db/schema/index";
 import { buildOrderPdfHtml, closePdfBrowser } from "../src/services/orderPdf.service";
+import { LOCAL_STATIC_URL_PREFIX, localStorageRootDir } from "../src/services/storage.service";
 import { createTenantWithUser } from "./helpers/catalog-test-auth";
+
+/** See `orderPdf.routes.test.ts`'s identical helpers' doc comment: `generateOrderPdf` returns a real URL now, not a filesystem path. */
+async function fetchPdfBuffer(baseUrl: string, pdfUrl: string): Promise<Buffer> {
+  const absoluteUrl = /^https?:\/\//i.test(pdfUrl) ? pdfUrl : `${baseUrl}${pdfUrl}`;
+  const res = await fetch(absoluteUrl);
+  if (!res.ok) throw new Error(`Failed to fetch generated PDF at ${absoluteUrl}: ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+function pdfUrlToLocalKey(pdfUrl: string): string {
+  return pdfUrl.startsWith(`${LOCAL_STATIC_URL_PREFIX}/`) ? pdfUrl.slice(LOCAL_STATIC_URL_PREFIX.length + 1) : pdfUrl;
+}
 
 interface Ctx {
   token: string;
@@ -199,7 +213,7 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
   let monogramPosition: { featureId: string; styleIds: Record<string, string> };
   let monogramFeatureId: string;
 
-  const generatedPdfPaths: string[] = [];
+  const generatedPdfKeys: string[] = [];
 
   beforeAll(async () => {
     await new Promise<void>((resolve) => {
@@ -250,8 +264,8 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await closePdfBrowser();
 
-    for (const p of generatedPdfPaths) {
-      await fsp.rm(p, { force: true });
+    for (const key of generatedPdfKeys) {
+      await fsp.rm(path.join(localStorageRootDir, key), { force: true });
     }
 
     await deleteOrderTreeForRetailer(retailer.id);
@@ -370,9 +384,12 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
       data: { id: string; items: Array<{ id: string; components: Array<{ id: string }> }> };
     };
 
-    // Never edited yet — no Manual Size image set.
+    // Never edited yet — no Manual Size image set. Negative assertion targets the actual
+    // rendered `<div>`, not the bare substring — the stylesheet's own `.manual-size-image
+    // img { ... }` rule contains that substring on every page regardless of whether the
+    // element itself is ever rendered.
     const freshPdf = await buildOrderPdfHtml(owner.tenantId, created.data.id);
-    expect(freshPdf.html).not.toContain("manual-size-image");
+    expect(freshPdf.html).not.toContain('class="manual-size-image"');
 
     const editRes = await patchJson(baseUrl, `/api/orders/${created.data.id}`, owner.token, {
       items: [
@@ -468,23 +485,35 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
       expect(html).toContain(baseline.data.orderNumber);
       expect(html).not.toContain("badge-modified");
 
-      // Two-tier structure: one summary page, one detail page per real component.
+      // Two-tier structure: one summary page, two detail pages per real component
+      // (measurements page + monogram/fabric-recap page) — this order has exactly one
+      // component, so exactly one of each.
       expect(html).toContain('class="summary-page"');
       expect(html).toContain('class="summary-table"');
-      expect((html.match(/class="detail-page"/g) ?? []).length).toBe(1);
+      expect((html.match(/class="detail-page measurements-page"/g) ?? []).length).toBe(1);
+      expect((html.match(/class="detail-page monogram-page"/g) ?? []).length).toBe(1);
       expect(html).toContain("page-break-before: always");
+
+      // The repeated per-page header (audit item 1's structural fix): the retailer logo and
+      // customer name now appear once on the summary page AND once on each of this unit's
+      // two detail pages — 3 occurrences total, not 1.
+      expect((html.match(/class="retailer-logo"/g) ?? []).length).toBe(3);
+
+      // "X OF Y" unit indicator — one real component out of one total unit in this order.
+      expect(html).toContain("1 OF 1");
 
       // Measurements table with the changed-from-profile checkmark.
       expect(html).toContain('class="changed-check"');
 
-      // Shoulder Type render-slot value + image.
-      expect(html).toContain('class="render-slot-block"');
+      // Shoulder Type render-slot value + image, now inside the Measurement Note table.
+      expect(html).toContain('class="measurement-note-table"');
       expect(html).toContain("Sloping");
       expect(html).toContain("/ImagesFabric/jacket/sloping.png");
 
       // Fabric/Lining detail cards (generic, not hardcoded field names — asserted via the
-      // real feature names/values submitted above, not a literal "Fabric"/"Lining" string).
-      expect(html).toContain('class="detail-cards"');
+      // real feature names/values submitted above, not a literal "Fabric"/"Lining" string),
+      // rendered on both the measurements page and the monogram/fabric-recap page.
+      expect((html.match(/class="detail-cards"/g) ?? []).length).toBe(2);
       expect(html).toContain("FAB-100");
       expect(html).toContain("LIN-200");
 
@@ -497,19 +526,22 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
       expect(html).toContain("XYZ");
       expect(html).not.toContain(JSON.stringify({ text: "ABC", text2: "XYZ", font: "Style-01", color: "1902" }));
 
-      // The ordinary choice feature (Lapel) still renders via the generic table.
+      // The ordinary choice feature (Lapel, is_additional=false by default) now renders in
+      // the real visual styling icon grid, not a plain text table.
+      expect(html).toContain('class="styling-icon-grid"');
+      expect(html).toContain('class="icon-card"');
       expect(html).toContain("Notch");
 
       // measurementNote/stylingNote.
       expect(html).toContain("Please re-confirm chest at fitting");
       expect(html).toContain("Extra topstitching on lapel");
+      expect(html).toContain('class="styling-note-box"');
 
       // Reference image.
-      expect(html).toContain('class="reference-image"');
+      expect(html).toContain('class="detail-page reference-image-page"');
       expect(html).toContain("https://example.com/reference-image.png");
 
       // Retailer logo, customer gender, final customer-image page.
-      expect(html).toContain('class="retailer-logo"');
       expect(html).toContain("https://example.com/retailer-logo.png");
       expect(html).toContain("Male");
       expect(html).toContain('class="customer-image-page"');
@@ -518,16 +550,17 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
       // Manual Size image rendering is covered by its own dedicated test below (Workstream
       // E Group 6) — this order's one component never had one set, nothing to assert here.
 
-      // Real Puppeteer render: opens, landscape, multiple pages (footer + summary + detail + customer image).
+      // Real Puppeteer render: opens, landscape, multiple pages (summary + 2 detail pages +
+      // reference image + customer image = 5 for this one-component order).
       const pdfRes = await postJson(baseUrl, `/api/orders/${order.data.id}/pdf`, owner.token, {});
       expect(pdfRes.status).toBe(201);
       const pdfBody = (await pdfRes.json()) as { data: { path: string } };
-      generatedPdfPaths.push(pdfBody.data.path);
+      generatedPdfKeys.push(pdfUrlToLocalKey(pdfBody.data.path));
 
-      const buffer = await fsp.readFile(pdfBody.data.path);
+      const buffer = await fetchPdfBuffer(baseUrl, pdfBody.data.path);
       expect(buffer.subarray(0, 4).toString("ascii")).toBe("%PDF");
       expect(firstMediaBoxIsLandscape(buffer)).toBe(true);
-      expect(countPdfPages(buffer)).toBeGreaterThanOrEqual(3);
+      expect(countPdfPages(buffer)).toBeGreaterThanOrEqual(5);
     },
     30000
   );

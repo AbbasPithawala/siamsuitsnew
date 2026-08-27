@@ -56,6 +56,8 @@ export interface OrderCartStepProps {
   onChangeStyling: (id: string, next: UnitStylingDraft[]) => void;
   /** PHASE_10_TASKS.md Workstream E Group 6.3c — threaded straight through to `<LineItemMeasurementsPanel>`'s identically-optional prop of the same name; see its doc comment. */
   onOpenManualSize?: (lineItemId: string, component: SuperProductComponent) => void;
+  /** PHASE_10_TASKS.md follow-up — threaded straight through to `<LineItemMeasurementsPanel>`'s identically-optional prop of the same name; see its doc comment. */
+  excludeOrderId?: string;
   /**
    * `NewGroupOrderPage.tsx`'s shared, group-level cart-building step (built
    * before any customer exists — measurements are entered per-customer,
@@ -95,6 +97,7 @@ export function OrderCartStep({
   onChangeMeasurements,
   onChangeStyling,
   onOpenManualSize,
+  excludeOrderId,
   hideMeasurements = false,
 }: OrderCartStepProps) {
   const [focused, setFocused] = useState<{ lineItemId: string; panel: FocusedPanel } | null>(null);
@@ -197,6 +200,7 @@ export function OrderCartStep({
               components={focusedSuperProduct.components}
               draft={focusedItem.measurementsDraft}
               customerId={customerId}
+              excludeOrderId={excludeOrderId}
               onChange={(componentId, next) => onChangeMeasurements(focusedItem.id, componentId, next)}
               {...(onOpenManualSize
                 ? { onOpenManualSize: (component: SuperProductComponent) => onOpenManualSize(focusedItem.id, component) }

@@ -41,8 +41,11 @@ export interface FeatureStyle {
  * `res.json()` drops entirely rather than sending `"styles": null` — so
  * `styles` is genuinely absent on the wire for those, not just empty.
  *
- * `isAdditional`/`isRequired`/`renderSlot` — PHASE_9_TASKS.md Group 0. No admin UI writes
- * these yet (deliberately out of this group's scope); they're read-only on the wire today.
+ * `isAdditional`/`isRequired`/`renderSlot` — PHASE_9_TASKS.md Group 0. `isAdditional` gained
+ * a real admin write path (`FeaturesPage.tsx`'s form) once PHASE_10_TASKS.md Workstream B's
+ * PDF-fidelity pass found the gap it drives — the other two stay read-only/system-set
+ * (`isRequired` is derived from catalog structure, `renderSlot` is a fixed system enum only
+ * the one-time catalog seed sets).
  */
 export interface ProductFeature {
   id: string;

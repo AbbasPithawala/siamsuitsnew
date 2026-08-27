@@ -9,3 +9,32 @@
 body {
   margin: 0;
 }
+
+/*
+ * Hides the scrollbar on the sidebar nav and every data-table scroll
+ * container app-wide while keeping them fully scrollable — `scrollbar-width`/
+ * `-ms-overflow-style` cover Firefox/legacy Edge, the `::-webkit-scrollbar`
+ * rule covers Chrome/Safari/modern Edge (Chromium ignores the other two
+ * properties entirely, so both are needed for full-browser coverage).
+ * `.MuiDrawer-paper`/`.nano` are the sidebar's real scroll containers
+ * (`AppShell.tsx`); `.MuiTableContainer-root` is MUI's own class on every
+ * `<TableContainer>` across the app; `.app-scroll-area` is the shared
+ * `<main>` panel every page renders inside (also `AppShell.tsx`) — its own
+ * `overflowY: auto` is what actually scrolls a tall page like the Orders
+ * list, so it needs the same treatment as the sidebar/tables, not just them.
+ */
+.MuiDrawer-paper,
+.nano,
+.MuiTableContainer-root,
+.app-scroll-area {
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.MuiDrawer-paper::-webkit-scrollbar,
+.nano::-webkit-scrollbar,
+.MuiTableContainer-root::-webkit-scrollbar,
+.app-scroll-area::-webkit-scrollbar {
+  display: none;
+}

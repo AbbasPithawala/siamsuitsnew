@@ -26,9 +26,14 @@ export interface FeatureInput {
   type: FeatureType;
   processId?: string;
   productIds?: string[];
+  /** Previously read-only (`ProductFeature.isAdditional`, no admin write path — see that
+   * type's own doc comment) — now settable here too. Drives whether `orderPdf.service.ts`
+   * renders this feature's selection in the main styling icon grid (false, default) or the
+   * secondary additional-features cards (true). */
+  isAdditional?: boolean;
 }
 
-export type FeatureUpdateInput = Partial<Pick<FeatureInput, "name" | "thaiName" | "type" | "processId">>;
+export type FeatureUpdateInput = Partial<Pick<FeatureInput, "name" | "thaiName" | "type" | "processId" | "isAdditional">>;
 
 export interface StyleInput {
   name: string;

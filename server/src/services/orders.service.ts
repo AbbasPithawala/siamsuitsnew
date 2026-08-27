@@ -9,6 +9,7 @@ import {
   orderItemComponentFeatures,
   superProductComponents,
   productProcesses,
+  productMeasurements,
   manufacturingSteps,
 } from "../db/schema/index";
 import { HttpError } from "../utils/http-error";
@@ -17,7 +18,7 @@ import { DEFAULT_PAGINATION, toLimitOffset } from "../utils/pagination";
 import type { PaginationParams } from "../utils/pagination";
 import { requireRetailer, requireCustomer } from "./customers.service";
 import { requireSuperProduct, requireMeasurementDefinition, requireFeature, requireStyle, requireStyleOption } from "./catalog-helpers";
-import { upsertCustomerMeasurementProfileValues } from "./measurementProfiles.service";
+import { findMostRecentOrderComponentIdForProduct, upsertCustomerMeasurementProfileValues } from "./measurementProfiles.service";
 
 export const ORDER_NUMBER_CONSTRAINT = "orders_tenant_order_number_unique";
 
@@ -146,13 +147,15 @@ async function generateOrderNumber(tx: Transaction, retailerId: string): Promise
 }
 
 /**
- * Numeric, not string, comparison — the profile's stored value round-trips through
- * `numeric(10,2)` (e.g. "40.00") while a client's submitted value may be formatted
- * differently (e.g. "40") without actually being a different measurement.
+ * Numeric, not string, comparison — the profile's stored total round-trips through
+ * `numeric(10,2)` (e.g. "40.00") while a freshly computed total may be formatted
+ * differently (e.g. "40") without actually being a different measurement. Compares
+ * `total_value` (body value + adjustment), not the raw body value alone — matching
+ * legacy's own `Measurements.jsx` diff, so an adjustment-only edit counts as "changed" too.
  */
-function measurementValueDiffers(priorValue: string, newValue: string | undefined): boolean {
-  if (newValue === undefined) return true;
-  return Number(priorValue) !== Number(newValue);
+function measurementValueDiffers(priorTotalValue: string, newTotalValue: string | undefined): boolean {
+  if (newTotalValue === undefined) return true;
+  return Number(priorTotalValue) !== Number(newTotalValue);
 }
 
 async function resolveFeature(tx: Transaction, input: CreateFeatureInput): Promise<CreateFeatureInput> {
@@ -181,6 +184,39 @@ async function resolveFeature(tx: Transaction, input: CreateFeatureInput): Promi
 async function resolveMeasurement(tx: Transaction, input: CreateMeasurementInput): Promise<CreateMeasurementInput> {
   await requireMeasurementDefinition(tx, input.measurementDefinitionId);
   return input;
+}
+
+/**
+ * PHASE_10_TASKS.md issue #2 ("if there are 10 measurements... fill even 1 and the others
+ * should automatically be 0") — this was previously enforced only client-side
+ * (`OrderBuilderPage.tsx`'s `sanitizeMeasurements`), which is bypassable (any other API
+ * consumer, a future admin tool, or a client bug produces an incomplete measurement set
+ * with no server-side guarantee) and confirmed live to actually be happening: a real order
+ * placed with only 1 of a 12-measurement product's definitions submitted wrote exactly 1
+ * `order_item_component_measurements` row, not 12.
+ *
+ * Called from `writeComponentContent` — deliberately *after* that function's own profile
+ * upsert, not folded into `resolveItemsFromInput`'s general resolution step, so the
+ * zero-backfilled entries this returns never reach `upsertCustomerMeasurementProfileValues`
+ * (see that call site's own comment on why: a blank measurement on this order isn't the
+ * customer's real value becoming "0", and shouldn't overwrite a real value a prior order
+ * already saved to their profile). Every measurement definition genuinely linked to this
+ * specific `productId` (`product_measurements`) ends up with a real
+ * `order_item_component_measurements` row regardless — backfilled to `"0"`/`"0"` when the
+ * client didn't submit a value, never silently omitted — across every write path through
+ * `writeComponentContent` (create, repeat, edit).
+ */
+async function backfillMissingMeasurements(
+  tx: Transaction,
+  productId: string,
+  provided: CreateMeasurementInput[]
+): Promise<CreateMeasurementInput[]> {
+  const providedIds = new Set(provided.map((m) => m.measurementDefinitionId));
+  const links = await tx.query.productMeasurements.findMany({ where: eq(productMeasurements.productId, productId) });
+  const missing = links
+    .filter((link) => !providedIds.has(link.measurementDefinitionId))
+    .map((link): CreateMeasurementInput => ({ measurementDefinitionId: link.measurementDefinitionId, value: "0", adjustmentValue: "0" }));
+  return [...provided, ...missing];
 }
 
 /**
@@ -333,6 +369,68 @@ async function createManufacturingSteps(tx: Transaction, orderItemComponentId: s
 }
 
 /**
+ * Resolves `order_item_components.baseline_component_id` (see that column's own schema
+ * doc comment for the full rationale) — the customer's fixed, specific prior order's
+ * component for this same product, established once and never re-derived.
+ *
+ * For a brand-new component (`isNewComponent`), this is a genuine lookup: one indexed query
+ * across `orders`/`order_items`/`order_item_components` filtered to this customer + this
+ * product, excluding the order currently being written, ordered by `order_date` descending,
+ * limit 1 — an index range scan, not a loop stepping through orders one at a time, so its
+ * cost doesn't grow with how far back a matching product happens to be. Filtering by
+ * `product_id` (not just "the immediately preceding order") is what makes this correct when
+ * an intervening order didn't include this product at all (e.g. order 5 has no pant, order 6
+ * still correctly compares its pant against order 3's, skipping straight past order 5).
+ * Persisted onto the component row immediately so this lookup runs exactly once per
+ * component, ever — every later edit of the same component just reads the stored value back.
+ *
+ * For an existing component (an edit resending it), this is a plain read of the
+ * already-stored value — the whole point is that it must NOT be recomputed here, or an edit
+ * could silently re-anchor to a different (e.g. newer) order than the one this component was
+ * originally compared against.
+ */
+async function resolveBaselineComponentId(
+  tx: Transaction,
+  orderItemComponentId: string,
+  customerId: string,
+  productId: string,
+  orderId: string,
+  isNewComponent: boolean
+): Promise<string | null> {
+  if (!isNewComponent) {
+    const existing = await tx.query.orderItemComponents.findFirst({
+      where: eq(orderItemComponents.id, orderItemComponentId),
+      columns: { baselineComponentId: true },
+    });
+    return existing?.baselineComponentId ?? null;
+  }
+
+  // Same query `measurementProfiles.service.ts#getMeasurementBaseline` uses for the
+  // order-builder's live preview — one shared implementation so the two can never drift.
+  const baselineComponentId = await findMostRecentOrderComponentIdForProduct(tx, customerId, productId, orderId);
+  await tx.update(orderItemComponents).set({ baselineComponentId }).where(eq(orderItemComponents.id, orderItemComponentId));
+  return baselineComponentId;
+}
+
+/**
+ * The baseline component's own current measurement totals, keyed by measurement definition —
+ * "current" deliberately, not a frozen snapshot: if the baseline order is itself edited later,
+ * the next write of the component pointing at it picks up the new value (a real product
+ * decision, not an oversight — see `baseline_component_id`'s own schema doc comment).
+ */
+async function getBaselineMeasurementTotals(tx: Transaction, baselineComponentId: string | null): Promise<Map<string, string>> {
+  const totals = new Map<string, string>();
+  if (!baselineComponentId) return totals;
+  const rows = await tx.query.orderItemComponentMeasurements.findMany({
+    where: eq(orderItemComponentMeasurements.orderItemComponentId, baselineComponentId),
+  });
+  for (const row of rows) {
+    if (row.totalValue !== null) totals.set(row.measurementDefinitionId, row.totalValue);
+  }
+  return totals;
+}
+
+/**
  * Writes one already-inserted (or already-existing) component's own measurements/features
  * rows and upserts the customer's measurement profile from them — the one real
  * implementation of "write a component's measurement/feature content" shared by `buildOrder`
@@ -343,6 +441,10 @@ async function createManufacturingSteps(tx: Transaction, orderItemComponentId: s
  * resend a component's complete measurement/feature set every time, same as `create` already
  * requires (omitting `measurements` there has always meant "no measurements for this
  * component," not "leave whatever was there").
+ *
+ * `orderId`/`isNewComponent` feed `resolveBaselineComponentId` above — the caller (`buildOrder`/
+ * `editOrderItems`) already knows unambiguously whether this component was just freshly
+ * inserted or already existed, so it's passed in rather than re-derived here.
  */
 async function writeComponentContent(
   tx: Transaction,
@@ -350,22 +452,39 @@ async function writeComponentContent(
   customerId: string,
   productId: string,
   orderItemComponentId: string,
-  component: Pick<ResolvedComponent, "measurements" | "features">
+  component: Pick<ResolvedComponent, "measurements" | "features">,
+  orderId: string,
+  isNewComponent: boolean
 ): Promise<void> {
   await tx.delete(orderItemComponentMeasurements).where(eq(orderItemComponentMeasurements.orderItemComponentId, orderItemComponentId));
   await tx.delete(orderItemComponentFeatures).where(eq(orderItemComponentFeatures.orderItemComponentId, orderItemComponentId));
 
-  const priorProfileValues = await upsertCustomerMeasurementProfileValues(tx, tenantId, customerId, productId, component.measurements);
+  // Keeps the customer's "current default" profile (used purely for pre-filling a *brand-new*
+  // order, `measurementProfiles.service.ts`'s own doc comment) up to date — a separate concern
+  // from the `changedFromProfile` comparison below, which now compares against a fixed prior
+  // ORDER instead (see `baseline_component_id`'s schema doc comment for why these two were
+  // split apart). Only the measurements the caller actually submitted feed the profile —
+  // deliberately NOT the zero-backfilled ones added below.
+  await upsertCustomerMeasurementProfileValues(tx, tenantId, customerId, productId, component.measurements);
 
-  for (const measurement of component.measurements) {
-    const priorValue = priorProfileValues.get(measurement.measurementDefinitionId) ?? null;
+  const baselineComponentId = await resolveBaselineComponentId(tx, orderItemComponentId, customerId, productId, orderId, isNewComponent);
+  const baselineTotals = await getBaselineMeasurementTotals(tx, baselineComponentId);
+
+  // Every measurement definition genuinely linked to this product gets a real row — backfilled
+  // to "0"/"0" when not submitted — so the order's own record (and the generated PDF) is always
+  // complete, never silently missing rows for whatever the client happened to omit.
+  const measurementsToWrite = await backfillMissingMeasurements(tx, productId, component.measurements);
+
+  for (const measurement of measurementsToWrite) {
+    const baselineTotalValue = baselineTotals.get(measurement.measurementDefinitionId) ?? null;
+    const totalValue = computeTotalValue(measurement.value, measurement.adjustmentValue);
     await tx.insert(orderItemComponentMeasurements).values({
       orderItemComponentId,
       measurementDefinitionId: measurement.measurementDefinitionId,
       value: measurement.value ?? null,
       adjustmentValue: measurement.adjustmentValue ?? null,
-      totalValue: computeTotalValue(measurement.value, measurement.adjustmentValue) ?? null,
-      changedFromProfile: priorValue === null ? null : measurementValueDiffers(priorValue, measurement.value),
+      totalValue: totalValue ?? null,
+      changedFromProfile: baselineTotalValue === null ? null : measurementValueDiffers(baselineTotalValue, totalValue),
     });
   }
 
@@ -450,8 +569,9 @@ export async function buildOrder(tx: Transaction, tenantId: string, input: Creat
       if (!orderItemComponent) throw new HttpError(500, "INTERNAL_ERROR", "Failed to create order item component");
 
       // Same tx as the component insert above, so a rolled-back order rolls back the
-      // profile write with it (PHASE_10_TASKS.md Workstream D Decision 2).
-      await writeComponentContent(tx, tenantId, order.customerId, component.productId, orderItemComponent.id, component);
+      // profile write with it (PHASE_10_TASKS.md Workstream D Decision 2). Every component
+      // built here is freshly inserted above, so `isNewComponent` is always true.
+      await writeComponentContent(tx, tenantId, order.customerId, component.productId, orderItemComponent.id, component, order.id, true);
       await createManufacturingSteps(tx, orderItemComponent.id, component.productId);
     }
   }
@@ -600,7 +720,9 @@ export async function editOrderItems(
               updatedAt: new Date(),
             })
             .where(eq(orderItemComponents.id, component.id));
-          await writeComponentContent(tx, tenantId, order.customerId, component.productId, component.id, component);
+          // Pre-existing component — `isNewComponent: false` so its baseline stays whatever
+          // was resolved when it was first created, never re-anchored by this edit.
+          await writeComponentContent(tx, tenantId, order.customerId, component.productId, component.id, component, order.id, false);
         } else {
           const [insertedComponent] = await tx
             .insert(orderItemComponents)
@@ -615,7 +737,9 @@ export async function editOrderItems(
             })
             .returning();
           if (!insertedComponent) throw new HttpError(500, "INTERNAL_ERROR", "Failed to create order item component");
-          await writeComponentContent(tx, tenantId, order.customerId, component.productId, insertedComponent.id, component);
+          // A component newly added by this edit — same `isNewComponent: true` baseline
+          // resolution as a fresh order create.
+          await writeComponentContent(tx, tenantId, order.customerId, component.productId, insertedComponent.id, component, order.id, true);
           await createManufacturingSteps(tx, insertedComponent.id, component.productId);
         }
       }
@@ -691,29 +815,42 @@ export interface ListOrdersFilter {
 async function attachManufacturingSummary<T extends { id: string }>(
   tx: Transaction,
   orderRows: T[]
-): Promise<(T & { manufacturingStepsTotal: number; manufacturingStepsComplete: number })[]> {
+): Promise<(T & { manufacturingStepsTotal: number; manufacturingStepsComplete: number; itemCount: number })[]> {
   const orderIds = orderRows.map((o) => o.id);
   if (orderIds.length === 0) return [];
 
-  const counts = orderIds.length
-    ? await tx
-        .select({
-          orderId: orderItems.orderId,
-          total: sql<number>`count(*)::int`,
-          complete: sql<number>`count(*) filter (where ${manufacturingSteps.status} = 'complete')::int`,
-        })
-        .from(manufacturingSteps)
-        .innerJoin(orderItemComponents, eq(manufacturingSteps.orderItemComponentId, orderItemComponents.id))
-        .innerJoin(orderItems, eq(orderItemComponents.orderItemId, orderItems.id))
-        .where(inArray(orderItems.orderId, orderIds))
-        .groupBy(orderItems.orderId)
-    : [];
+  // `itemCount` is a separate aggregate from the manufacturing-steps one above: it counts
+  // real physical units (`order_item_components` rows — e.g. a suit's jacket+pant are 2, not
+  // 1), the "items not products" measure the order-list UI's Quantity column needs, distinct
+  // from a count of order_items (line items/products). An order can have components with zero
+  // manufacturing steps defined at all, so this can't be derived from the query above.
+  const [stepCounts, itemCounts] = await Promise.all([
+    tx
+      .select({
+        orderId: orderItems.orderId,
+        total: sql<number>`count(*)::int`,
+        complete: sql<number>`count(*) filter (where ${manufacturingSteps.status} = 'complete')::int`,
+      })
+      .from(manufacturingSteps)
+      .innerJoin(orderItemComponents, eq(manufacturingSteps.orderItemComponentId, orderItemComponents.id))
+      .innerJoin(orderItems, eq(orderItemComponents.orderItemId, orderItems.id))
+      .where(inArray(orderItems.orderId, orderIds))
+      .groupBy(orderItems.orderId),
+    tx
+      .select({ orderId: orderItems.orderId, count: sql<number>`count(*)::int` })
+      .from(orderItemComponents)
+      .innerJoin(orderItems, eq(orderItemComponents.orderItemId, orderItems.id))
+      .where(inArray(orderItems.orderId, orderIds))
+      .groupBy(orderItems.orderId),
+  ]);
 
-  const byOrderId = new Map(counts.map((c) => [c.orderId, c]));
+  const stepsByOrderId = new Map(stepCounts.map((c) => [c.orderId, c]));
+  const itemsByOrderId = new Map(itemCounts.map((c) => [c.orderId, c.count]));
   return orderRows.map((o) => ({
     ...o,
-    manufacturingStepsTotal: byOrderId.get(o.id)?.total ?? 0,
-    manufacturingStepsComplete: byOrderId.get(o.id)?.complete ?? 0,
+    manufacturingStepsTotal: stepsByOrderId.get(o.id)?.total ?? 0,
+    manufacturingStepsComplete: stepsByOrderId.get(o.id)?.complete ?? 0,
+    itemCount: itemsByOrderId.get(o.id) ?? 0,
   }));
 }
 

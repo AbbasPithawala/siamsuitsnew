@@ -1,22 +1,19 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { baseApi } from "../../api/baseApi";
 import type { AuthTokenSliceState } from "../../api/baseApi";
-import { createLimitedUserInTenant } from "../../routes/testSupport/permissionFixtures";
+import { createLimitedUserInTenant, createRetailerLinkedUserInTenant } from "../../routes/testSupport/permissionFixtures";
 import { OrderListPage } from "./OrderListPage";
 
 /**
  * Integration tests against a real, running `siam/server` (not mocked),
  * mirroring `CustomersPage.live.test.tsx`'s/`OrderBuilderPage.live.test.tsx`'s
  * pattern. Covers PHASE_6_TASKS.md Group 6's order list: filterable by
- * retailer/customer/status, showing the manufacturing progress rollup
- * (`manufacturingStepsTotal`/`manufacturingStepsComplete`, a small additive
- * aggregate query Group 6 added to `listOrders`), and row-click navigation
- * to the detail route.
+ * retailer/customer/status, and row-click navigation to the detail route.
  *
  * The order fixture is placed via a direct `POST /orders` call rather than
  * through the wizard UI — `OrderBuilderPage.live.test.tsx` already proves
@@ -161,8 +158,8 @@ async function placeOrderFixture(
   return created.data;
 }
 
-function buildTestStore() {
-  const authReducer = (state: AuthTokenSliceState["auth"] = { token: seededToken }) => state;
+function buildTestStore(token: string | null = seededToken) {
+  const authReducer = (state: AuthTokenSliceState["auth"] = { token }) => state;
   return configureStore({
     reducer: {
       [baseApi.reducerPath]: baseApi.reducer,
@@ -177,9 +174,9 @@ function DetailStub() {
   return <div>Navigated to order detail {id}</div>;
 }
 
-function renderOrderList() {
+function renderOrderList(token: string | null = seededToken) {
   return render(
-    <Provider store={buildTestStore()}>
+    <Provider store={buildTestStore(token)}>
       <MemoryRouter initialEntries={["/orders"]}>
         <Routes>
           <Route path="/orders" element={<OrderListPage />} />
@@ -245,7 +242,7 @@ afterAll(async () => {
 
 describe.skipIf(!seededToken)("OrderListPage (live siam/server integration)", () => {
   it(
-    "lists a real order filterable by retailer, showing customer/retailer/status and the manufacturing progress rollup, and navigates to its detail on click",
+    "lists a real order filterable by retailer, showing customer/status/quantity, and navigates to its detail on click",
     async () => {
       const token = seededToken as string;
 
@@ -285,19 +282,194 @@ describe.skipIf(!seededToken)("OrderListPage (live siam/server integration)", ()
       // retailer filter is selected above — it can still be in flight the
       // instant the order row itself (from `useListOrdersQuery`) appears.
       await within(row).findByText(customer.firstName, {}, NETWORK_WAIT);
-      expect(within(row).getByText(retailer.name)).toBeInTheDocument();
       expect(within(row).getByText("New Order")).toBeInTheDocument();
-      expect(within(row).getByText(/steps complete|No manufacturing steps/)).toBeInTheDocument();
+      // Quantity column: real physical units (order_item_components), not products —
+      // this fixture's one super product has exactly one component, so itemCount is 1.
+      expect(within(row).getByRole("cell", { name: "1" })).toBeInTheDocument();
 
-      // Status filter: an unmatched status hides the fixture's row.
-      const statusField = screen.getByLabelText("Filter by status");
-      await user.type(statusField, "Nonexistent Status XYZ");
+      // Status tabs (PHASE_10_TASKS.md follow-up, legacy parity): a fresh order is "New Order",
+      // so the "Modified" tab hides it and the "New Order" tab (or "All Orders") shows it again.
+      await user.click(screen.getByRole("tab", { name: /^Modified/ }));
       await waitFor(() => expect(screen.queryByText(order.orderNumber)).not.toBeInTheDocument(), NETWORK_WAIT);
-      await user.clear(statusField);
+      await user.click(screen.getByRole("tab", { name: /^New Order/ }));
       await screen.findByText(order.orderNumber, {}, NETWORK_WAIT);
 
       await user.click(screen.getByText(order.orderNumber));
       await screen.findByText(`Navigated to order detail ${order.id}`);
+    },
+    30000
+  );
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it(
+    "View shows an error toast when no PDF exists yet, and a real Generate produces a fetchable PDF URL View can open",
+    async () => {
+      const token = seededToken as string;
+      const shirtProductId = await fetchShirtProductId(token);
+      const retailer = await createRetailerFixture(token);
+      createdRetailerIds.push(retailer.id);
+      const customer = await createCustomerFixture(token, retailer.id);
+      createdCustomerIds.push(customer.id);
+      const superProduct = await createSuperProductFixture(token, shirtProductId);
+      createdSuperProductIds.push(superProduct.id);
+      if (!orderCreatorToken) {
+        throw new Error("Expected an orders.create-holding fixture token to have been minted for this file");
+      }
+      const order = await placeOrderFixture(
+        orderCreatorToken,
+        retailer.id,
+        customer.id,
+        superProduct.id,
+        superProduct.components[0]!.id
+      );
+      createdOrderIds.push(order.id);
+
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const user = userEvent.setup();
+      renderOrderList();
+
+      await screen.findByRole("heading", { name: "Orders" });
+      await selectInCombobox("Filter by retailer", retailer.name);
+
+      const orderNumberCell = await screen.findByText(order.orderNumber, {}, NETWORK_WAIT);
+      const row = orderNumberCell.closest("tr") as HTMLElement;
+
+      // No PDF generated yet — View must not silently no-op, it must surface a real error.
+      await user.click(within(row).getByRole("button", { name: "View" }));
+      await screen.findByText(/pdf doesn't exist yet.*please generate/i);
+      expect(openSpy).not.toHaveBeenCalled();
+
+      await user.click(within(row).getByRole("button", { name: "Generate" }));
+      await waitFor(
+        () => expect(within(row).getByRole("button", { name: "Generate" })).not.toBeDisabled(),
+        { timeout: 20000 }
+      );
+
+      await user.click(within(row).getByRole("button", { name: "View" }));
+      await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      const [openedUrl] = openSpy.mock.calls[0] as [string];
+      expect(openedUrl).toMatch(/\/uploads\/order-pdfs\/.+\.pdf$/);
+    },
+    30000
+  );
+
+  it(
+    "an admin (orders.edit) session can change an order's status inline, moving it off the currently-selected status tab and updating both tab counts",
+    async () => {
+      const token = seededToken as string;
+      const shirtProductId = await fetchShirtProductId(token);
+      const retailer = await createRetailerFixture(token);
+      createdRetailerIds.push(retailer.id);
+      const customer = await createCustomerFixture(token, retailer.id);
+      createdCustomerIds.push(customer.id);
+      const superProduct = await createSuperProductFixture(token, shirtProductId);
+      createdSuperProductIds.push(superProduct.id);
+      if (!orderCreatorToken) {
+        throw new Error("Expected an orders.create-holding fixture token to have been minted for this file");
+      }
+      const order = await placeOrderFixture(
+        orderCreatorToken,
+        retailer.id,
+        customer.id,
+        superProduct.id,
+        superProduct.components[0]!.id
+      );
+      createdOrderIds.push(order.id);
+
+      const user = userEvent.setup();
+      renderOrderList();
+
+      await screen.findByRole("heading", { name: "Orders" });
+      await selectInCombobox("Filter by retailer", retailer.name);
+
+      // Pin the view to the "New Order" tab so a status change away from it is actually
+      // observable as the row disappearing, not just its own cell value updating.
+      await user.click(screen.getByRole("tab", { name: /^New Order/ }));
+      await screen.findByText(order.orderNumber, {}, NETWORK_WAIT);
+
+      const beforeNewOrderTab = await screen.findByRole("tab", { name: /^New Order \(\d+\)/ });
+      const beforeModifiedTab = await screen.findByRole("tab", { name: /^Modified \(\d+\)/ });
+      const beforeNewOrderCount = Number(beforeNewOrderTab.textContent?.match(/\((\d+)\)/)?.[1]);
+      const beforeModifiedCount = Number(beforeModifiedTab.textContent?.match(/\((\d+)\)/)?.[1]);
+
+      const orderNumberCell = await screen.findByText(order.orderNumber, {}, NETWORK_WAIT);
+      const row = orderNumberCell.closest("tr") as HTMLElement;
+      // No `InputLabel` on the per-row status `Select` (matching legacy's own bare
+      // `<select>`), so it's found by role within the row rather than by label text.
+      await user.click(within(row).getByRole("combobox"));
+      const listbox = await screen.findByRole("listbox");
+      await user.click(within(listbox).getByRole("option", { name: "Modified" }));
+      await waitForNoOpenListbox();
+
+      // Row moves out of the "New Order" tab it was pinned to.
+      await waitFor(() => expect(screen.queryByText(order.orderNumber)).not.toBeInTheDocument(), NETWORK_WAIT);
+
+      const afterNewOrderTab = await screen.findByRole("tab", { name: /^New Order \(\d+\)/ });
+      const afterModifiedTab = await screen.findByRole("tab", { name: /^Modified \(\d+\)/ });
+      expect(Number(afterNewOrderTab.textContent?.match(/\((\d+)\)/)?.[1])).toBe(beforeNewOrderCount - 1);
+      expect(Number(afterModifiedTab.textContent?.match(/\((\d+)\)/)?.[1])).toBe(beforeModifiedCount + 1);
+
+      // Row reappears under the "Modified" tab it was just moved to.
+      await user.click(afterModifiedTab);
+      await screen.findByText(order.orderNumber, {}, NETWORK_WAIT);
+    },
+    30000
+  );
+
+  it(
+    "a retailer-linked session (Retailer role, no orders.edit) hides the Retailer filter and the Status column stays a read-only chip, not an editable select",
+    async () => {
+      const token = seededToken as string;
+      const shirtProductId = await fetchShirtProductId(token);
+      const retailer = await createRetailerFixture(token);
+      createdRetailerIds.push(retailer.id);
+      const customer = await createCustomerFixture(token, retailer.id);
+      createdCustomerIds.push(customer.id);
+      const superProduct = await createSuperProductFixture(token, shirtProductId);
+      createdSuperProductIds.push(superProduct.id);
+      if (!orderCreatorToken) {
+        throw new Error("Expected an orders.create-holding fixture token to have been minted for this file");
+      }
+      const order = await placeOrderFixture(
+        orderCreatorToken,
+        retailer.id,
+        customer.id,
+        superProduct.id,
+        superProduct.components[0]!.id
+      );
+      createdOrderIds.push(order.id);
+
+      // Real Retailer-role identity: linked via `retailer_users` to this fixture's own
+      // retailer, holding `orders.view` but deliberately not `orders.edit` (Retailer never
+      // holds it — PHASE_10_TASKS.md Workstream E Group 5).
+      const retailerUser = await createRetailerLinkedUserInTenant("siam-suits", retailer.id, ["orders.view"]);
+      const retailerToken = await fetchToken({ tenant: "siam-suits", username: retailerUser.username, password: retailerUser.password });
+      if (!retailerToken) throw new Error("Expected the retailer-linked fixture user to log in successfully");
+
+      try {
+        renderOrderList(retailerToken);
+
+        await screen.findByRole("heading", { name: "Orders" });
+
+        // This session's own order, auto-scoped server-side regardless of what the UI shows —
+        // waiting for it also guarantees `useMeQuery` has resolved by the time the retailer
+        // filter's absence is checked below (it renders unconditionally until `me` loads).
+        const orderNumberCell = await screen.findByText(order.orderNumber, {}, NETWORK_WAIT);
+        const row = orderNumberCell.closest("tr") as HTMLElement;
+        await waitFor(() => expect(screen.queryByLabelText(/^Filter by retailer/i)).not.toBeInTheDocument());
+        expect(within(row).queryByText(retailer.name)).not.toBeInTheDocument();
+        // Read-only chip, not a `<select>`/combobox — this session can't edit order status.
+        expect(within(row).getByText("New Order")).toBeInTheDocument();
+        expect(within(row).queryByRole("combobox")).not.toBeInTheDocument();
+        // View/Generate/Quantity still apply to the retailer role exactly as they do for admin.
+        expect(within(row).getByRole("button", { name: "View" })).toBeInTheDocument();
+        expect(within(row).getByRole("button", { name: "Generate" })).toBeInTheDocument();
+      } finally {
+        await retailerUser.cleanup();
+      }
     },
     30000
   );

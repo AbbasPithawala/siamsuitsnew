@@ -1,5 +1,6 @@
 import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Radio from "@mui/material/Radio";
 import type { FeatureStyle, FeatureStyleOption, FeatureValue, ProductFeature } from "./featuresApi";
 import { StyleOptionButton } from "./StyleOptionButton";
 
@@ -11,21 +12,26 @@ interface ChoiceFeatureFieldProps {
 }
 
 /**
- * Renders one `type: "choice"` feature: a grid of its styles, and — once a
- * style with `style_options` is picked — a nested sub-option tier. This is
- * the generic replacement for the legacy's per-garment `Styles.jsx` +
- * `Options.jsx` pair; the same component renders "collar" (which has
- * style_options) and "back pocket" (which doesn't) identically, driven only
- * by whether the selected style's `options` array is empty.
+ * Renders one `type: "choice"` feature's style list — the generic replacement for legacy's
+ * per-garment `Styles.jsx` + `Options.jsx` pair. Ported verbatim from legacy's own real,
+ * per-style branch (`Styles.jsx` lines ~220-296), not a feature-level choice: EACH style
+ * independently renders as either a plain image card (`style.options.length === 0`, e.g.
+ * "Back Pocket" with no sub-choices) or a compact radio row that expands its own sub-option
+ * picker inline directly beneath it once selected (`style.options.length > 0`, e.g. "Notch
+ * Lapel" with "2.5 inches"/"3 inches" sub-options) — legacy's real `Options.jsx` component,
+ * one instance per qualifying style, not a single shared "selected style's options" section
+ * at the bottom of the whole grid. A feature whose styles are ALL sub-option-bearing (like
+ * legacy's real "Front Button" tab) ends up rendering as a plain radio list with no cards
+ * mixed in at all, purely as a consequence of the real per-style data, matching legacy's own
+ * visual exactly without special-casing which feature this is.
  */
 export function ChoiceFeatureField({ feature, styleId, styleOptionId, onSelect }: ChoiceFeatureFieldProps) {
   const styles = feature.styles ?? [];
-  const selectedStyle = styles.find((style) => style.id === styleId);
 
   return (
-    <Box className="form-group frontbutton-info">
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-        {styles.map((style) => (
+    <Box className="form-group frontbutton-info" sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "flex-start" }}>
+      {styles.map((style) =>
+        style.options.length === 0 ? (
           <StyleOptionButton
             key={style.id}
             selected={style.id === styleId}
@@ -34,20 +40,46 @@ export function ChoiceFeatureField({ feature, styleId, styleOptionId, onSelect }
             image={style.image}
             onClick={() => onSelect({ styleId: style.id, styleOptionId: undefined })}
           />
-        ))}
-      </Box>
-      {selectedStyle && selectedStyle.options.length > 0 && (
-        <Box sx={{ mt: 2, pl: 2, borderLeft: "3px solid", borderColor: "primary.light" }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            {selectedStyle.name} options
-          </Typography>
-          <SubOptionField
-            style={selectedStyle}
-            selectedOptionId={styleOptionId}
-            onSelect={(optionId) => onSelect({ styleId: selectedStyle.id, styleOptionId: optionId })}
+        ) : (
+          <StyleWithSubOptions
+            key={style.id}
+            style={style}
+            selected={style.id === styleId}
+            selectedOptionId={style.id === styleId ? styleOptionId : undefined}
+            onSelectStyle={() => onSelect({ styleId: style.id, styleOptionId: undefined })}
+            onSelectOption={(optionId) => onSelect({ styleId: style.id, styleOptionId: optionId })}
           />
-        </Box>
+        )
       )}
+    </Box>
+  );
+}
+
+interface StyleWithSubOptionsProps {
+  style: FeatureStyle;
+  selected: boolean;
+  selectedOptionId: string | undefined;
+  onSelectStyle: () => void;
+  onSelectOption: (optionId: string) => void;
+}
+
+/**
+ * Legacy `Options.jsx`'s real shape: a real, visible radio + the style's bare name only (legacy's
+ * own `styleHeading` — `<label>{styles['name']}</label>` — never appends the Thai name here,
+ * unlike the image-card path's own separate secondary line), not an image card — `Styles.jsx`'s
+ * own hidden-radio-plus-image treatment is reserved for styles with no sub-options — and, only
+ * while this particular style is the selected one, its sub-option picker rendered directly
+ * beneath this same row.
+ */
+function StyleWithSubOptions({ style, selected, selectedOptionId, onSelectStyle, onSelectOption }: StyleWithSubOptionsProps) {
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <FormControlLabel
+        control={<Radio checked={selected} onChange={onSelectStyle} />}
+        label={style.name}
+        sx={{ textTransform: "capitalize" }}
+      />
+      {selected && <SubOptionField style={style} selectedOptionId={selectedOptionId} onSelect={onSelectOption} />}
     </Box>
   );
 }
@@ -75,7 +107,7 @@ function SubOptionField({ style, selectedOptionId, onSelect }: SubOptionFieldPro
 
   if (anyOptionHasImage) {
     return (
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }} className="styleOptions">
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, pl: 2 }} className="styleOptions">
         {options.map((option) => (
           <div className="styleOptions2 frontbutton-info" key={option.id}>
             <StyleOptionButton
@@ -95,7 +127,7 @@ function SubOptionField({ style, selectedOptionId, onSelect }: SubOptionFieldPro
   }
 
   return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }} className="styleOptions">
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, pl: 2 }} className="styleOptions">
       {options.map((option) => (
         <div className="styleOptions2 frontbutton-info" key={option.id}>
           <StyleOptionButton selected={option.id === selectedOptionId} label={option.name} onClick={() => onSelect(option.id)} />
@@ -114,7 +146,7 @@ interface ImageDropdownSubOptionsProps {
 
 function ImageDropdownSubOptions({ style, options, selectedOptionId, onSelect }: ImageDropdownSubOptionsProps) {
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, pl: 2 }}>
       <Box
         component="img"
         src={style.image ?? undefined}
@@ -125,6 +157,7 @@ function ImageDropdownSubOptions({ style, options, selectedOptionId, onSelect }:
         }}
       />
       <select
+        aria-label={`${style.name} options`}
         value={selectedOptionId ?? ""}
         onChange={(event) => {
           if (event.target.value) onSelect(event.target.value);

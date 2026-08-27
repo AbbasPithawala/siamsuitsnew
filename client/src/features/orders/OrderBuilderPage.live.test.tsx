@@ -340,14 +340,40 @@ async function fillMeasurementValues(
  * selection) reaches every tab regardless of whether its first style reveals
  * sub-options.
  */
+/**
+ * A style with no sub-options renders as an image-card button (`aria-pressed`); a style WITH
+ * sub-options renders as a plain radio instead (PHASE_10_TASKS.md follow-up — legacy `Options.jsx`'s
+ * real shape, `ChoiceFeatureField.tsx`'s own doc comment) — so "pick any unselected style in this
+ * tab" has to try both, a tab can be made up entirely of either kind depending on the real
+ * catalog data.
+ *
+ * Scoped to the active tab's own real `role="tabpanel"` (`ChoiceTabBar`'s own doc comment on
+ * why it exists), NOT the whole component `section` — `section` also contains sibling inline
+ * features rendered unconditionally alongside the tab bar (e.g. Monogram Position/Font Style,
+ * which render their own real `role="radio"` elements) that would otherwise be indistinguishable
+ * from this tab's actual style choices and get clicked by mistake, confirmed live: without this
+ * scoping, a required choice feature whose every style has sub-options (e.g. the real seeded
+ * "jacket lapel", where all 5 styles have real sub-options) could end up never receiving a real
+ * selection at all, leaving "styling" permanently Missing.
+ */
+async function selectAnUnselectedStyle(user: ReturnType<typeof userEvent.setup>, section: HTMLElement): Promise<void> {
+  const panel = within(section).getByRole("tabpanel");
+  const unselectedButtons = within(panel).queryAllByRole("button", { pressed: false });
+  if (unselectedButtons.length > 0) {
+    await user.click(unselectedButtons[0]!);
+    return;
+  }
+  const uncheckedRadios = within(panel).queryAllByRole("radio", { checked: false });
+  if (uncheckedRadios.length > 0) {
+    await user.click(uncheckedRadios[0]!);
+  }
+}
+
 async function completeAllStyleTabs(user: ReturnType<typeof userEvent.setup>, section: HTMLElement) {
   const tabs = within(section).queryAllByRole("tab");
   for (const tab of tabs) {
     await user.click(tab);
-    const unselected = within(section).queryAllByRole("button", { pressed: false });
-    if (unselected.length > 0) {
-      await user.click(unselected[0]!);
-    }
+    await selectAnUnselectedStyle(user, section);
   }
 }
 
@@ -368,10 +394,7 @@ async function completeAllStyleTabsExceptFirst(user: ReturnType<typeof userEvent
   const tabs = within(section).queryAllByRole("tab");
   for (const tab of tabs.slice(1)) {
     await user.click(tab);
-    const unselected = within(section).queryAllByRole("button", { pressed: false });
-    if (unselected.length > 0) {
-      await user.click(unselected[0]!);
-    }
+    await selectAnUnselectedStyle(user, section);
   }
 }
 

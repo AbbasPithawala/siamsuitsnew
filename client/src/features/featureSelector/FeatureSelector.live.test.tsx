@@ -370,8 +370,10 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
 
     const collarTab = await screen.findByRole("tab", { name: /^collar/i });
     await user.click(collarTab);
-    const pinCollar = await screen.findByText(/^pin collar$/i);
-    await user.click(pinCollar.closest("button") as HTMLElement);
+    // A style with real sub-options renders as a radio row (legacy `Options.jsx`'s real shape,
+    // PHASE_10_TASKS.md follow-up), not an image card — only a leaf style with no sub-options does.
+    const pinCollarRadio = await screen.findByRole("radio", { name: /^pin collar$/i });
+    await user.click(pinCollarRadio);
 
     const curvedOption = await screen.findByText(/curved pin collar/i);
     const pointOption = screen.getByText(/point pin collar/i);
@@ -386,8 +388,8 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
 
     const collarTab = await screen.findByRole("tab", { name: /^collar/i });
     await user.click(collarTab);
-    const buttonDown = await screen.findByText(/^button down$/i);
-    await user.click(buttonDown.closest("button") as HTMLElement);
+    const buttonDownRadio = await screen.findByRole("radio", { name: /^button down$/i });
+    await user.click(buttonDownRadio);
 
     const dropdown = await screen.findByRole("combobox");
     expect(dropdown.closest("div")?.querySelector("img")).toBeInTheDocument();
@@ -418,8 +420,8 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
 
       const tab = await screen.findByRole("tab", { name: new RegExp(fixture.featureName, "i") });
       expect(tab).toHaveAttribute("aria-selected", "true");
-      const styleTile = await screen.findByText(fixture.styleName);
-      await user.click(styleTile.closest("button") as HTMLElement);
+      const styleRadio = await screen.findByRole("radio", { name: new RegExp(`^${fixture.styleName}$`, "i") });
+      await user.click(styleRadio);
 
       const [optionAName, optionBName] = fixture.optionNames;
       const optionAButton = await screen.findByRole("button", { name: new RegExp(`^${optionAName}$`, "i") });

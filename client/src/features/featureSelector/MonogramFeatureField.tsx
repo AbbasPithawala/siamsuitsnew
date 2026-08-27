@@ -125,7 +125,6 @@ export function MonogramFeatureField({ value, onChange, position }: MonogramFeat
         <div className="form-group monogram-info" style={{ flex: 1 }}>
           <TextField
             fullWidth
-            label="Tag"
             placeholder="Tag"
             value={current.text ?? ""}
             onChange={(event) => set({ text: event.target.value })}
@@ -134,7 +133,6 @@ export function MonogramFeatureField({ value, onChange, position }: MonogramFeat
         <div className="form-group monogram-info" style={{ flex: 1 }}>
           <TextField
             fullWidth
-            label="Tag Optional"
             placeholder="Tag Optional"
             value={current.text2 ?? ""}
             onChange={(event) => set({ text2: event.target.value })}
@@ -152,8 +150,10 @@ export function MonogramFeatureField({ value, onChange, position }: MonogramFeat
                 <li key={style.id}>
                   <input
                     type="radio"
+                    className="radio"
                     name={positionName}
                     id={inputId}
+                    style={{ display: "none" }}
                     checked={position.selectedStyleId === style.id}
                     onChange={() => position.onSelect(style.id)}
                   />
@@ -176,8 +176,10 @@ export function MonogramFeatureField({ value, onChange, position }: MonogramFeat
               <li key={fontStyle.id}>
                 <input
                   type="radio"
+                  className="radio"
                   name={fontName}
                   id={inputId}
+                  style={{ display: "none" }}
                   checked={current.font === fontStyle.styleName}
                   onChange={() => set({ font: fontStyle.styleName })}
                 />

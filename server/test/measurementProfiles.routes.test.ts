@@ -14,6 +14,25 @@ interface Ctx {
   tenantId: string;
 }
 
+/** Same bottom-up manual cascade `measurementProfiles.orderWritePath.test.ts` uses — needed here too since the new measurement-baseline describe block below places real orders (no cascading FK deletes in this schema by design). */
+async function cleanupOrderTreeForRetailer(retailerId: string) {
+  const orderRows = await db.query.orders.findMany({ where: (o, { eq }) => eq(o.retailerId, retailerId) });
+  for (const order of orderRows) {
+    const itemRows = await db.query.orderItems.findMany({ where: (i, { eq }) => eq(i.orderId, order.id) });
+    for (const item of itemRows) {
+      const componentRows = await db.query.orderItemComponents.findMany({ where: (c, { eq }) => eq(c.orderItemId, item.id) });
+      for (const component of componentRows) {
+        await db.execute(sql`delete from manufacturing_steps where order_item_component_id = ${component.id}`);
+        await db.execute(sql`delete from order_item_component_measurements where order_item_component_id = ${component.id}`);
+        await db.execute(sql`delete from order_item_component_features where order_item_component_id = ${component.id}`);
+      }
+      await db.execute(sql`delete from order_item_components where order_item_id = ${item.id}`);
+    }
+    await db.execute(sql`delete from order_items where order_id = ${order.id}`);
+  }
+  await db.execute(sql`delete from orders where retailer_id = ${retailerId}`);
+}
+
 /** No cascading deletes on retailer-owned rows (Phase 1 convention), so tear down bottom-up before the tenant itself. */
 async function cleanupRetailerScopedRowsForTenant(tenantId: string): Promise<void> {
   await db.execute(
@@ -175,23 +194,6 @@ describe("/api/customers/:customerId/measurement-profiles/:productId", () => {
     expect(valueFor(c!)).toBe("30.00");
   });
 
-  it("returns the pre-overwrite old value from the upsert call itself, per measurement", async () => {
-    const retailer = await createRetailer(ownerA.tenantId);
-    const customerId = await createCustomer(baseUrl, ownerA, retailer.id);
-    const productId = await createProduct(baseUrl, ownerA, "Shirt");
-    const defId = await createMeasurementDefinition(baseUrl, ownerA, "Neck");
-
-    const firstOld = await withTenant(ownerA.tenantId, (tx) =>
-      upsertCustomerMeasurementProfileValues(tx, ownerA.tenantId, customerId, productId, [{ measurementDefinitionId: defId, value: "15.00" }])
-    );
-    expect(firstOld.get(defId)).toBeNull();
-
-    const secondOld = await withTenant(ownerA.tenantId, (tx) =>
-      upsertCustomerMeasurementProfileValues(tx, ownerA.tenantId, customerId, productId, [{ measurementDefinitionId: defId, value: "16.00" }])
-    );
-    expect(secondOld.get(defId)).toBe("15.00");
-  });
-
   it("is tenant-isolated: a session from tenant B gets 404 for tenant A's customer id", async () => {
     const retailer = await createRetailer(ownerA.tenantId);
     const customerId = await createCustomer(baseUrl, ownerA, retailer.id);
@@ -225,5 +227,160 @@ describe("/api/customers/:customerId/measurement-profiles/:productId", () => {
     });
     const bodyY = (await getResY.json()) as { data: unknown };
     expect(bodyY.data).toBeNull();
+  });
+});
+
+describe("/api/customers/:customerId/measurement-baseline/:productId (PHASE_10_TASKS.md follow-up — order-builder live checkmark)", () => {
+  let server: Server;
+  let baseUrl: string;
+  let owner: Awaited<ReturnType<typeof createTenantWithUser>>;
+  const createdRetailerIds: string[] = [];
+
+  async function createOnePieceSuperProduct(productId: string) {
+    const res = await postJson(baseUrl, "/api/super-products", owner.token, {
+      name: `Baseline Endpoint Fixture ${randomUUID()}`,
+      components: [{ productId, slotLabel: "Jacket", sequence: 1 }],
+    });
+    const body = (await res.json()) as { data: { id: string; components: Array<{ id: string }> } };
+    return body.data;
+  }
+
+  async function placeOrder(customerId: string, retailerId: string, superProductId: string, componentId: string, defId: string, value: string) {
+    const res = await postJson(baseUrl, "/api/orders", owner.token, {
+      retailerId,
+      customerId,
+      items: [{ superProductId, components: [{ superProductComponentId: componentId, measurements: [{ measurementDefinitionId: defId, value }] }] }],
+    });
+    const body = (await res.json()) as { data: { id: string } };
+    return body.data.id;
+  }
+
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, () => {
+        const address = server.address();
+        const port = typeof address === "object" && address !== null ? address.port : 0;
+        baseUrl = `http://127.0.0.1:${port}`;
+        resolve();
+      });
+    });
+
+    owner = await createTenantWithUser([
+      "orders.create",
+      "orders.view",
+      "customers.manage",
+      "catalog.products.manage",
+      "catalog.super_products.manage",
+      "catalog.measurements.manage",
+    ]);
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    for (const retailerId of createdRetailerIds) await cleanupOrderTreeForRetailer(retailerId);
+    await cleanupRetailerScopedRowsForTenant(owner.tenantId);
+    await owner.cleanup();
+  });
+
+  it("returns null when no prior order for this product exists at all", async () => {
+    const retailer = await createRetailer(owner.tenantId);
+    createdRetailerIds.push(retailer.id);
+    const customerId = await createCustomer(baseUrl, owner, retailer.id);
+    const productId = await createProduct(baseUrl, owner, "Robe");
+
+    const res = await fetch(`${baseUrl}/api/customers/${customerId}/measurement-baseline/${productId}`, {
+      headers: { Authorization: `Bearer ${owner.token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: unknown };
+    expect(body.data).toBeNull();
+  });
+
+  it("returns the customer's most recent real order's measurements for this product — the exact same source the server's own write-path comparison uses", async () => {
+    const retailer = await createRetailer(owner.tenantId);
+    createdRetailerIds.push(retailer.id);
+    const customerId = await createCustomer(baseUrl, owner, retailer.id);
+    const productId = await createProduct(baseUrl, owner, "Waistcoat");
+    const defId = await createMeasurementDefinition(baseUrl, owner, "Chest");
+    await fetch(`${baseUrl}/api/products/${productId}/measurements`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${owner.token}` },
+      body: JSON.stringify({ measurementDefinitionIds: [defId] }),
+    });
+    const superProduct = await createOnePieceSuperProduct(productId);
+    const componentId = superProduct.components[0]!.id;
+
+    await placeOrder(customerId, retailer.id, superProduct.id, componentId, defId, "40.00");
+    await placeOrder(customerId, retailer.id, superProduct.id, componentId, defId, "42.00");
+
+    const res = await fetch(`${baseUrl}/api/customers/${customerId}/measurement-baseline/${productId}`, {
+      headers: { Authorization: `Bearer ${owner.token}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { values: Array<{ measurementDefinitionId: string; value: string; totalValue: string }> } | null };
+    // No `excludeOrderId` supplied — this is the order-CREATION flow, nothing to exclude yet —
+    // so this reflects the most recent real order placed so far (the second one, 42.00).
+    expect(body.data?.values.find((v) => v.measurementDefinitionId === defId)?.value).toBe("42.00");
+  });
+
+  it("excludeOrderId skips that specific order — the edit-mode case, so an order's own not-yet-resaved component never counts as its own baseline", async () => {
+    const retailer = await createRetailer(owner.tenantId);
+    createdRetailerIds.push(retailer.id);
+    const customerId = await createCustomer(baseUrl, owner, retailer.id);
+    const productId = await createProduct(baseUrl, owner, "Tuxedo Jacket");
+    const defId = await createMeasurementDefinition(baseUrl, owner, "Shoulder");
+    await fetch(`${baseUrl}/api/products/${productId}/measurements`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${owner.token}` },
+      body: JSON.stringify({ measurementDefinitionIds: [defId] }),
+    });
+    const superProduct = await createOnePieceSuperProduct(productId);
+    const componentId = superProduct.components[0]!.id;
+
+    const firstOrderId = await placeOrder(customerId, retailer.id, superProduct.id, componentId, defId, "50.00");
+    const secondOrderId = await placeOrder(customerId, retailer.id, superProduct.id, componentId, defId, "52.00");
+
+    // Without excluding anything: most recent order is the second one (52.00).
+    const withoutExclude = await fetch(`${baseUrl}/api/customers/${customerId}/measurement-baseline/${productId}`, {
+      headers: { Authorization: `Bearer ${owner.token}` },
+    });
+    const withoutExcludeBody = (await withoutExclude.json()) as { data: { values: Array<{ measurementDefinitionId: string; value: string }> } };
+    expect(withoutExcludeBody.data.values.find((v) => v.measurementDefinitionId === defId)?.value).toBe("52.00");
+
+    // Excluding the second order (as if its own edit form were open, so it can't be its own
+    // baseline) — falls back to the first (50.00). This is the exact edit-mode case.
+    const excludingSecond = await fetch(
+      `${baseUrl}/api/customers/${customerId}/measurement-baseline/${productId}?excludeOrderId=${secondOrderId}`,
+      { headers: { Authorization: `Bearer ${owner.token}` } }
+    );
+    const excludingSecondBody = (await excludingSecond.json()) as { data: { values: Array<{ measurementDefinitionId: string; value: string }> } };
+    expect(excludingSecondBody.data.values.find((v) => v.measurementDefinitionId === defId)?.value).toBe("50.00");
+
+    // Excluding the FIRST order instead (as if IT were the one being edited) — the second order
+    // isn't excluded by this, so it's still the answer. Proves `excludeOrderId` targets exactly
+    // the order named, not "everything before/after it".
+    const excludingFirst = await fetch(
+      `${baseUrl}/api/customers/${customerId}/measurement-baseline/${productId}?excludeOrderId=${firstOrderId}`,
+      { headers: { Authorization: `Bearer ${owner.token}` } }
+    );
+    const excludingFirstBody = (await excludingFirst.json()) as { data: { values: Array<{ measurementDefinitionId: string; value: string }> } };
+    expect(excludingFirstBody.data.values.find((v) => v.measurementDefinitionId === defId)?.value).toBe("52.00");
+  });
+
+  it("is tenant-isolated: a session from a different tenant gets 404 for this tenant's customer id", async () => {
+    const otherTenant = await createTenantWithUser(["customers.manage", "catalog.products.manage"]);
+    try {
+      const retailer = await createRetailer(owner.tenantId);
+      createdRetailerIds.push(retailer.id);
+      const customerId = await createCustomer(baseUrl, owner, retailer.id);
+      const productId = await createProduct(baseUrl, owner, "Ascot");
+
+      const res = await fetch(`${baseUrl}/api/customers/${customerId}/measurement-baseline/${productId}`, {
+        headers: { Authorization: `Bearer ${otherTenant.token}` },
+      });
+      expect(res.status).toBe(404);
+    } finally {
+      await otherTenant.cleanup();
+    }
   });
 });

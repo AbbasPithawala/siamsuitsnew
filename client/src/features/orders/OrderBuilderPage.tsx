@@ -744,6 +744,7 @@ export function OrderBuilderPage() {
                 onChangeQuantity={handleChangeQuantity}
                 onChangeMeasurements={handleChangeMeasurements}
                 onChangeStyling={handleChangeStyling}
+                excludeOrderId={editOrderId}
                 {...(isEditMode
                   ? { onOpenManualSize: (lineItemId: string, component: SuperProductComponent) => setManualSizeTarget({ lineItemId, component }) }
                   : {})}

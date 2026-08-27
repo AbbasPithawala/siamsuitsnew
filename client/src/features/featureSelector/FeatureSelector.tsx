@@ -207,17 +207,25 @@ function ChoiceTabBar({ features, value, updateFeature }: ChoiceTabBarProps) {
         </Tabs>
       </Box>
       {activeFeature && (
-        <ChoiceFeatureField
-          feature={activeFeature}
-          styleId={current?.styleId}
-          styleOptionId={current?.styleOptionId}
-          onSelect={(patch) => {
-            updateFeature(activeFeature.id, patch);
-            if (isFinalChoiceSelection(activeFeature, patch)) {
-              setTabIndex((i) => Math.min(i + 1, features.length - 1));
-            }
-          }}
-        />
+        // Real ARIA `tabpanel`, paired with the MUI `Tab`s above (standard tabs pattern our own
+        // `<Tabs>` didn't previously implement the other half of) — also what lets a caller
+        // scope a query to "this tab's own content" specifically, distinct from sibling inline
+        // features (e.g. Monogram Position/Font Style, which also render real `role="radio"`
+        // elements elsewhere in the same component section and would otherwise be
+        // indistinguishable from a choice feature's own style radios).
+        <Box role="tabpanel" id={`choice-tabpanel-${activeFeature.id}`} aria-label={activeFeature.name}>
+          <ChoiceFeatureField
+            feature={activeFeature}
+            styleId={current?.styleId}
+            styleOptionId={current?.styleOptionId}
+            onSelect={(patch) => {
+              updateFeature(activeFeature.id, patch);
+              if (isFinalChoiceSelection(activeFeature, patch)) {
+                setTabIndex((i) => Math.min(i + 1, features.length - 1));
+              }
+            }}
+          />
+        </Box>
       )}
     </Box>
   );

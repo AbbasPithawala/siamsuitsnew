@@ -215,7 +215,10 @@ describe.skipIf(!seededToken)("MeasurementForm (live siam/server integration)", 
     const adjustmentInput = screen.getByRole("textbox", { name: `${targetLabel} adjustment` });
     const totalInput = screen.getByRole("spinbutton", { name: `${targetLabel} total` }) as HTMLInputElement;
 
-    expect(totalInput.value).toBe("");
+    // Body-size/adjustment fields display "0" (not blank) until the customer has a real
+    // value, per PHASE_10_TASKS.md's measurement-backfill fix — so the live-computed
+    // total for an untouched row is "0.00", not blank.
+    expect(totalInput.value).toBe("0.00");
 
     await user.type(valueInput, "38");
     await user.type(adjustmentInput, "1.5");

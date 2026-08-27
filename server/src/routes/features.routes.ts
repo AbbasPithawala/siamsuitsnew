@@ -14,9 +14,12 @@ const createFeatureSchema = z.object({
   type: z.enum(["choice", "text", "structured"]),
   processId: z.string().uuid().optional(),
   productIds: z.array(z.string().uuid()).optional(),
+  isAdditional: z.boolean().optional(),
 });
 
-const updateFeatureSchema = createFeatureSchema.pick({ name: true, thaiName: true, type: true, processId: true }).partial();
+const updateFeatureSchema = createFeatureSchema
+  .pick({ name: true, thaiName: true, type: true, processId: true, isAdditional: true })
+  .partial();
 
 const productsLinkSchema = z.object({
   productIds: z.array(z.string().uuid()),

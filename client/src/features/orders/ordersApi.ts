@@ -103,6 +103,8 @@ export interface OrderListItem {
   orderDate: string;
   manufacturingStepsTotal: number;
   manufacturingStepsComplete: number;
+  /** Real physical units to produce (e.g. a suit's jacket+pant = 2), not a count of order_items/products — same `order_item_components` aggregate `manufacturingStepsTotal` is computed alongside, server-side (`orders.service.ts`'s `attachManufacturingSummary`). */
+  itemCount: number;
   /** PHASE_10_TASKS.md Workstream E Group 6.1 — set whenever Group 6.2's edit/status/reassign routes actually change the order; `null` until then. */
   lastModifiedAt: string | null;
 }
@@ -175,7 +177,14 @@ export interface ListOrdersFilter {
   status?: string;
 }
 
-/** `POST /orders/:id/pdf`'s real response shape (`orderPdf.service.ts`'s `generateOrderPdf`): `path` is an absolute filesystem path on the server, not a URL — S3/static-file serving isn't wired up anywhere in this codebase yet (see that service's doc comment), so there is no downloadable link to offer, only confirmation that generation succeeded and where the file landed server-side. */
+/**
+ * `POST /orders/:id/pdf`'s real response shape (`orderPdf.service.ts`'s `generateOrderPdf`):
+ * `path` is a real, resolvable URL (via `resolveUploadUrl` — the same storage backend
+ * `uploadsApi.ts` uses), not a server-local filesystem path (a prior version returned one of
+ * those, which had no static route serving it at all — PHASE_10_TASKS.md follow-up fix). This
+ * is also exactly what `order.pdfPath` holds on every `OrderListItem`/`OrderDetail` once a PDF
+ * has been generated at least once.
+ */
 export interface GenerateOrderPdfResult {
   path: string;
   order: OrderDetail;
