@@ -251,11 +251,13 @@ describe("/api/tailors/:tailorId/advances and /api/tailors/:tailorId/settlements
 
     const getRes = await getJson(baseUrl, `/api/tailors/${tailorId}/settlements/${body.data.id}`, owner.token);
     expect(getRes.status).toBe(200);
-    const getBody = (await getRes.json()) as { data: { settlement: { id: string }; jobs: Array<{ id: string; paid: boolean }> } };
+    const getBody = (await getRes.json()) as {
+      data: { settlement: { id: string }; jobs: Array<{ job: { id: string; paid: boolean } }> };
+    };
     expect(getBody.data.settlement.id).toBe(body.data.id);
     expect(getBody.data.jobs).toHaveLength(1);
-    expect(getBody.data.jobs[0]!.id).toBe(jobId);
-    expect(getBody.data.jobs[0]!.paid).toBe(true);
+    expect(getBody.data.jobs[0]!.job.id).toBe(jobId);
+    expect(getBody.data.jobs[0]!.job.paid).toBe(true);
 
     const reloadedTailor = await db.query.tailors.findFirst({ where: eq(tailors.id, tailorId) });
     expect(reloadedTailor?.advanceBalance).toBe("0.00");

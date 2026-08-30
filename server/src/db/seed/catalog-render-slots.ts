@@ -152,3 +152,70 @@ export async function backfillFeatureRequiredFlags(tenantId: string): Promise<Et
     return { domain: "features.is_required backfill (text/structured + piping)", found: eligible.length, migrated: toUpdate.length, skipped: [] };
   });
 }
+
+/**
+ * The real user-reported UX bug this fixes: Piping was migrated as an ordinary `type:
+ * "choice"` feature (Phase 7 ETL), so `FeatureSelector.tsx` routed it into the generic tabbed
+ * style picker alongside Lapel/Pocket/Front Button. Legacy never rendered it that way — it was
+ * its own always-visible swatch grid, same layout as Monogram Color (see the `piping`
+ * `featureRenderSlotEnum` value's own doc comment in `catalog.ts`). This is a pure UPDATE, not
+ * a merge/dedup — unlike fabric/lining-code/monogram, the Phase 7 ETL already backfilled
+ * Piping as a single feature row per tenant (matched case-insensitively by name, same as
+ * `backfillFeatureRequiredFlags` above), so there's exactly one row to tag. Idempotent: only
+ * touches rows still `render_slot IS NULL`.
+ */
+export async function backfillPipingRenderSlot(tenantId: string): Promise<EtlDomainResult> {
+  return withTenant(tenantId, async (tx) => {
+    const eligible = await tx.query.features.findMany({
+      where: and(isNull(features.deletedAt), isNull(features.renderSlot), sql`lower(trim(${features.name})) = 'piping'`),
+    });
+
+    for (const f of eligible) {
+      await tx.update(features).set({ renderSlot: "piping", updatedAt: new Date() }).where(eq(features.id, f.id));
+    }
+
+    return { domain: "features.render_slot backfill (piping)", found: eligible.length, migrated: eligible.length, skipped: [] };
+  });
+}
+
+/**
+ * The real user-reported layout bug this fixes: Fabric and Lining Code both default to
+ * `feature_products.sequence_order = 0` (Phase 7 ETL never assigned either a real value), so
+ * `listFeaturesInTx`'s `ORDER BY sequence_order` has a tie with no defined tiebreak — verified
+ * directly against the dev DB, it currently returns Lining Code before Fabric for jacket, the
+ * opposite of the requested "Fabric then Lining" order. This is a data-hygiene fix (give
+ * `sequence_order` its intended real values), not a client-side name-based sort — sorting by
+ * name in `FeatureSelector.tsx` would silently override whatever an admin sets here later,
+ * defeating the point of `sequence_order` being admin-configurable. Idempotent: only touches
+ * a (fabric, lining) pair still tied/misordered relative to each other.
+ */
+export async function backfillFabricLiningSequenceOrder(tenantId: string): Promise<EtlDomainResult> {
+  return withTenant(tenantId, async (tx) => {
+    const selectLinks = (nameSql: ReturnType<typeof sql>) =>
+      tx
+        .select({ id: featureProducts.id, productId: featureProducts.productId, sequenceOrder: featureProducts.sequenceOrder })
+        .from(featureProducts)
+        .innerJoin(features, eq(featureProducts.featureId, features.id))
+        .where(and(eq(features.tenantId, tenantId), isNull(features.deletedAt), nameSql));
+
+    const fabricLinks = await selectLinks(sql`lower(trim(${features.name})) = 'fabric'`);
+    const liningLinks = await selectLinks(sql`lower(trim(${features.name})) = 'lining code'`);
+    const liningByProduct = new Map(liningLinks.map((link) => [link.productId, link]));
+
+    let migrated = 0;
+    for (const fabricLink of fabricLinks) {
+      const liningLink = liningByProduct.get(fabricLink.productId);
+      if (!liningLink || fabricLink.sequenceOrder < liningLink.sequenceOrder) continue;
+      await tx.update(featureProducts).set({ sequenceOrder: 0 }).where(eq(featureProducts.id, fabricLink.id));
+      await tx.update(featureProducts).set({ sequenceOrder: 1 }).where(eq(featureProducts.id, liningLink.id));
+      migrated++;
+    }
+
+    return {
+      domain: "feature_products.sequence_order backfill (Fabric before Lining Code)",
+      found: fabricLinks.length,
+      migrated,
+      skipped: [],
+    };
+  });
+}

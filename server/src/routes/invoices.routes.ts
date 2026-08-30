@@ -7,6 +7,7 @@ import { HttpError } from "../utils/http-error";
 import { requireParam } from "../utils/params";
 import { paginationQuerySchema, paginatedResult } from "../utils/pagination";
 import * as invoicesService from "../services/invoices.service";
+import * as invoicePdfService from "../services/invoicePdf.service";
 
 const lineItemSchema = z.object({
   description: z.string().min(1),
@@ -14,11 +15,20 @@ const lineItemSchema = z.object({
   unitPrice: z.number().nonnegative(),
 });
 
+/**
+ * `lineItems` (the original freeform manual-entry path) and `orderIds` (legacy
+ * `CreateInvoice.jsx`'s real "pick orders" flow) are both optional here — `invoices.service.ts
+ * #buildInvoice` is what actually enforces "exactly one of the two", so the 422 there carries
+ * a specific, actionable message rather than zod's generic "required" on whichever one a
+ * caller happened to omit.
+ */
 const createInvoiceSchema = z.object({
   retailerId: z.string().uuid(),
-  lineItems: z.array(lineItemSchema).min(1),
+  lineItems: z.array(lineItemSchema).min(1).optional(),
+  orderIds: z.array(z.string().uuid()).min(1).optional(),
   discount: z.number().nonnegative().optional(),
   shippingCharge: z.number().nonnegative().optional(),
+  dueDate: z.string().min(1).optional(),
 });
 
 const updateInvoiceStatusSchema = z.object({
@@ -100,3 +110,48 @@ invoicesRouter.patch(
     }
   }
 );
+
+/** Legacy `CreateInvoice.jsx`'s order table (minus the client-side `invoiceSent === false` filter — the service already excludes those) — orders for this retailer with a saved per-order invoice, not yet bundled into any grouped invoice. Staff-only, same as invoice creation itself. */
+invoicesRouter.get(
+  "/retailers/:id/invoiceable-orders",
+  authenticate,
+  requirePermission("invoices.manage"),
+  async (req, res, next) => {
+    try {
+      const orders = await invoicesService.listInvoiceableOrders(req.actor!.tenantId, requireParam(req, "id"));
+      res.status(200).json({ data: orders });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/** Legacy `InvoiceHistory.jsx`'s "View" dialog's order list (S.No/Order No/View). */
+invoicesRouter.get("/invoices/:id/orders", authenticate, requirePermission("invoices.view"), async (req, res, next) => {
+  try {
+    const orders = await invoicesService.getInvoiceOrders(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    res.status(200).json({ data: orders });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Legacy `InvoiceHistory.jsx`'s "View Invoice Summary" — server-rendered, persisted PDF (per PHASE_10_TASKS.md's invoicing follow-up) rather than legacy's client-side `jsPDF`. */
+invoicesRouter.post("/invoices/:id/pdf", authenticate, requirePermission("invoices.view"), async (req, res, next) => {
+  try {
+    const path = await invoicePdfService.generateRetailerInvoicePdf(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    res.status(201).json({ data: { path } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Legacy `InvoiceHistory.jsx`'s admin-only "Resend" (`handleSendMail`) — regenerates the grouped PDF and emails it to the retailer's configured recipients. */
+invoicesRouter.post("/invoices/:id/send-email", authenticate, requirePermission("invoices.manage"), async (req, res, next) => {
+  try {
+    await invoicePdfService.sendRetailerInvoiceEmail(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    res.status(200).json({ data: { sent: true } });
+  } catch (err) {
+    next(err);
+  }
+});

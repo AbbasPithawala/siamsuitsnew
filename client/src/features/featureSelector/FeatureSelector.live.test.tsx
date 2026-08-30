@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { configureStore } from "@reduxjs/toolkit";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { baseApi } from "../../api/baseApi";
@@ -283,10 +283,13 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
     await screen.findByRole("tab", { name: /front button/i });
     expect(screen.getByRole("tab", { name: /vest back/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /vest pocket/i })).toBeInTheDocument();
-    // "Piping" is linked to 6 real products (jacket, overcoat, tuxedojacket,
-    // shirt, pant, vest) — rendering it correctly here proves multi-product
-    // linkage doesn't confuse a single product's feature list.
-    expect(screen.getByRole("tab", { name: /piping/i })).toBeInTheDocument();
+    // "Piping" is linked to 6 real products (jacket, overcoat, tuxedojacket, shirt, pant,
+    // vest) — rendering it correctly here proves multi-product linkage doesn't confuse a
+    // single product's feature list. It has `render_slot = 'piping'` (matches legacy's real
+    // always-visible swatch grid, never a tab — see `PipingFeatureField`'s doc comment), so
+    // it must NOT appear in the tab bar, only as its own inline heading/section.
+    expect(screen.queryByRole("tab", { name: /piping/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^piping$/i })).toBeInTheDocument();
     // No real "additional" feature exists on vest — the toggle section
     // shouldn't render at all when there's nothing to gate.
     expect(screen.queryByText(/show additional styles/i)).not.toBeInTheDocument();
@@ -300,7 +303,11 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
     await screen.findByRole("tab", { name: /front button/i });
     expect(screen.getByRole("tab", { name: /front button/i })).toHaveAttribute("aria-selected", "true");
 
-    const [firstStyleButton] = await screen.findAllByRole("button");
+    // Scoped to the active tab panel — Piping now also renders real `<button>` style tiles of
+    // its own (its own inline swatch-grid section, not a tab), so an unscoped button query
+    // would no longer reliably grab a front-button style first.
+    const tabPanel = screen.getByRole("tabpanel");
+    const [firstStyleButton] = await within(tabPanel).findAllByRole("button");
     await user.click(firstStyleButton as HTMLElement);
 
     await waitFor(() => expect(handleChange).toHaveBeenCalled());
@@ -311,8 +318,10 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
     expect(entry?.featureId).toEqual(expect.any(String));
     expect(entry?.styleId).toEqual(expect.any(String));
 
-    // Leaf style (no sub-options) → a "final" selection → advances to the next tab.
-    await waitFor(() => expect(screen.getByRole("tab", { name: /vest pocket/i })).toHaveAttribute("aria-selected", "true"));
+    // Leaf style (no sub-options) → a "final" selection → advances to the next tab. Tied
+    // `sequence_order` ties break on feature name (`features.service.ts`'s `listFeaturesInTx`)
+    // — "vest back" sorts before "vest pocket", so that's the real next tab, not "vest pocket".
+    await waitFor(() => expect(screen.getByRole("tab", { name: /vest back/i })).toHaveAttribute("aria-selected", "true"));
     expect(screen.queryByRole("tab", { name: /front button/i })).toHaveAttribute("aria-selected", "false");
   });
 
@@ -329,11 +338,35 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
 
     await screen.findByLabelText(/^fabric/i);
     expect(screen.getByRole("heading", { name: /^monogram\b/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/^tag$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/tag optional/i)).toBeInTheDocument();
+    // Tag/Tag Optional are placeholder-only (no MUI `label` prop — see
+    // `MonogramFeatureField.tsx`), so these are real placeholders, not accessible labels.
+    expect(screen.getByPlaceholderText(/^tag$/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/tag optional/i)).toBeInTheDocument();
     expect(screen.getByText(/monogram font style/i)).toBeInTheDocument();
     expect(screen.getByText(/monogram color/i)).toBeInTheDocument();
     await screen.findByRole("tab", { name: /^collar/i });
+  });
+
+  it("renders sections in the fixed order Fabric, Lining, Piping, Monogram, then Normal styles (jacket)", async () => {
+    renderSelector(JACKET_PRODUCT_ID);
+
+    await screen.findByRole("heading", { name: /^fabric$/i });
+    const headingNames = screen
+      .getAllByRole("heading")
+      .map((heading) => heading.textContent)
+      .filter((text): text is string => text !== null);
+
+    const fabricIndex = headingNames.findIndex((text) => /^fabric$/i.test(text));
+    const liningIndex = headingNames.findIndex((text) => /^lining code$/i.test(text));
+    const pipingIndex = headingNames.findIndex((text) => /^piping$/i.test(text));
+    const monogramIndex = headingNames.findIndex((text) => /^monogram$/i.test(text));
+    const normalStylesIndex = headingNames.findIndex((text) => /^normal styles$/i.test(text));
+
+    expect([fabricIndex, liningIndex, pipingIndex, monogramIndex, normalStylesIndex]).not.toContain(-1);
+    expect(fabricIndex).toBeLessThan(liningIndex);
+    expect(liningIndex).toBeLessThan(pipingIndex);
+    expect(pipingIndex).toBeLessThan(monogramIndex);
+    expect(monogramIndex).toBeLessThan(normalStylesIndex);
   });
 
   it("nests the real Monogram Position feature inside the Monogram block, not as a tab (shirt)", async () => {
@@ -347,12 +380,20 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
     expect(screen.queryByRole("tab", { name: /monogram position/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /monogram position/i })).not.toBeInTheDocument();
 
-    const leftSide = screen.getByRole("radio", { name: /left side/i });
-    const rightSide = screen.getByRole("radio", { name: /right side/i });
+    // The native radio is `display:none` (legacy's own hidden-radio-plus-styled-label CSS
+    // trick — the `<label>` is the visible/clickable surface). That makes its accessible
+    // name compute to empty even with `hidden: true` (the accname algorithm treats the
+    // hidden control itself as unnameable, not just untraversed), so locate it via its
+    // associated `<label>` instead of a role query, and click the label — exactly how a
+    // real user (or the browser's native label → control click-forwarding) interacts with it.
+    const leftSideLabel = screen.getByText(/^left side$/i).closest("label") as HTMLLabelElement;
+    const rightSideLabel = screen.getByText(/^right side$/i).closest("label") as HTMLLabelElement;
+    const leftSide = document.getElementById(leftSideLabel.htmlFor) as HTMLInputElement;
+    const rightSide = document.getElementById(rightSideLabel.htmlFor) as HTMLInputElement;
     expect(leftSide).toBeInTheDocument();
     expect(rightSide).toBeInTheDocument();
 
-    await user.click(rightSide);
+    await user.click(rightSideLabel);
     await waitFor(() => expect(rightSide).toBeChecked());
 
     const lastCall = handleChange.mock.calls.at(-1)?.[0] as FeatureValue[];
@@ -487,8 +528,8 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
       expect(screen.getByText(/fixture style/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/fixture fabric/i)).toBeInTheDocument();
       expect(getInlineFeatureSection(/fixture monogram/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/^tag$/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/tag optional/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/^tag$/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/tag optional/i)).toBeInTheDocument();
       // This fixture has no `render_slot = 'monogram_position'` feature linked — the
       // nested position block must not appear at all, not even empty.
       expect(screen.queryByText(/monogram position/i)).not.toBeInTheDocument();
@@ -513,7 +554,7 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
       renderSelector(fixture.productId, handleChange);
       const user = userEvent.setup();
 
-      const tagInput = await screen.findByLabelText(/^tag$/i);
+      const tagInput = await screen.findByPlaceholderText(/^tag$/i);
       await user.type(tagInput, "AB");
 
       await waitFor(() => expect(handleChange).toHaveBeenCalled());

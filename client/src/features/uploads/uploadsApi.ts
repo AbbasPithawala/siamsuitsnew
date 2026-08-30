@@ -47,12 +47,25 @@ export const { useUploadFileMutation } = uploadsApi;
  * `POST /api/uploads`'s `url` is served from the API origin itself (Express's
  * `/uploads` static route, mounted alongside `/api`, not under it — see
  * `server/src/app.ts`), not from `VITE_API_BASE_URL` (which already has
- * `/api` on the end) and not from Vite's own dev-server origin. Already
- * fully-qualified URLs (the S3 backend, or `PUBLIC_BASE_URL` set in
- * production) pass through unchanged.
+ * `/api` on the end) and not from Vite's own dev-server origin (a different
+ * origin from the API in dev — the real bug this scoping fixes: a bare
+ * `/uploads/...` `<img src>` resolves against the *page's* origin by default,
+ * i.e. the Vite dev server, which doesn't have the file, not the API server,
+ * which does). Already fully-qualified URLs (the S3 backend, or
+ * `PUBLIC_BASE_URL` set in production) pass through unchanged.
+ *
+ * Only rewrites paths under this server's own real upload prefix (mirrors
+ * `server/src/services/storage.service.ts`'s `resolveServerImageUrl` — same
+ * narrow scoping, same reasoning): `styles.image`/`style_options.image` (and
+ * `products.image`) can *also* legitimately hold a client-public-folder path
+ * (e.g. `/ImagesFabric/jacket/sloping.png`, seeded directly for Shoulder
+ * Type/Monogram Position — never uploaded) or a bare not-yet-migrated legacy
+ * filename (e.g. `download-1.jpg`) — neither should be rewritten against the
+ * API origin, so both pass through untouched.
  */
 export function resolveUploadUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
+  if (!url.startsWith("/uploads/")) return url;
   const apiBaseUrl: string = import.meta.env.VITE_API_BASE_URL;
   const origin = apiBaseUrl.replace(/\/api\/?$/, "");
   return `${origin}${url}`;

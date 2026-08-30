@@ -3,6 +3,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import Radio from "@mui/material/Radio";
 import type { FeatureStyle, FeatureStyleOption, FeatureValue, ProductFeature } from "./featuresApi";
 import { StyleOptionButton } from "./StyleOptionButton";
+import { resolveUploadUrl } from "../uploads/uploadsApi";
 
 interface ChoiceFeatureFieldProps {
   feature: ProductFeature;
@@ -149,7 +150,7 @@ function ImageDropdownSubOptions({ style, options, selectedOptionId, onSelect }:
     <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, pl: 2 }}>
       <Box
         component="img"
-        src={style.image ?? undefined}
+        src={style.image ? resolveUploadUrl(style.image) : undefined}
         alt=""
         sx={{ width: 100, height: 130, objectFit: "cover" }}
         onError={(event) => {

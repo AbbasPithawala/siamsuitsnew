@@ -42,6 +42,8 @@ export interface Me {
   /** Non-null only for a `retailer_users`-linked user (Workstream E Group 1) — null for staff and for `actorType: "tailor"`. */
   retailerId: string | null;
   permissions: string[];
+  /** Header branding (`AppShell.tsx`) — the retailer's own logo when `retailerId` is set, else the tenant's letterhead logo; a raw upload path, resolve with `resolveUploadUrl` before rendering. Always `null` for `actorType: "tailor"`. */
+  logo: string | null;
 }
 
 interface MeResponseEnvelope {
@@ -83,8 +85,12 @@ export const baseApi = createApi({
     "OrderGroup",
     "ManufacturingComponent",
     "ExtraPaymentCategory",
+    "ExtraPayment",
     "UnpaidJob",
+    "Settlement",
     "Invoice",
+    "OrderInvoice",
+    "InvoiceSettings",
     "ShippingBox",
     "CustomerMeasurementProfile",
   ],

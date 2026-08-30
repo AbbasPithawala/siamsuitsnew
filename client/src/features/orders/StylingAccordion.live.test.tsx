@@ -147,9 +147,12 @@ function renderAccordion(components: SuperProductComponent[], onDelete: (index: 
   );
 }
 
-/** MUI keeps a collapsed `AccordionDetails` mounted, so multiple units' "Jacket" headings
- * can coexist in the DOM at once — every query below is scoped to one unit's own content
- * region (`#unit-<index>-content`, `StylingAccordion.tsx`'s own id), never global. */
+/** A collapsed unit's `AccordionDetails` is unmounted (`StylingAccordion.tsx`'s own
+ * `TransitionProps={{ unmountOnExit: true }}` — a real perf fix: leaving every unit's
+ * full `<FeatureSelector>` tree mounted made every keystroke in one unit re-render all
+ * the others too), so `#unit-<index>-content` only exists in the DOM while that unit is
+ * the expanded one. Always re-query this fresh right after expanding the unit you need,
+ * never reuse a reference captured before switching to a different unit. */
 function getUnitContent(index: number): HTMLElement {
   return document.getElementById(`unit-${index}-content`) as HTMLElement;
 }
@@ -211,33 +214,54 @@ describe.skipIf(!seededToken)("StylingAccordion (live siam/server integration)",
     // Expand Item 2 — its own independent copy-previous checkbox appears (unit index > 0 only).
     await user.click(screen.getByRole("button", { name: /Item 2/ }));
     await screen.findByText("Summary — Item 2");
-    const unit1 = getUnitContent(1);
-    const copyCheckbox = within(unit1).getByRole("checkbox", { name: /copy styles of the previous item/i });
+    // `let`, not `const`: unit 1 gets re-expanded (and its DOM re-queried) later in this
+    // test after temporarily switching back to unit 0, per `TransitionProps={{
+    // unmountOnExit: true }}`'s doc comment on `StylingAccordion.tsx` — see below.
+    let unit1 = getUnitContent(1);
+    let copyCheckbox = within(unit1).getByRole("checkbox", { name: /copy styles of the previous item/i });
     expect(copyCheckbox).not.toBeChecked();
 
-    const item2Jacket = getComponentSection(unit1, "Jacket");
-    const item2Fabric = await within(item2Jacket).findByLabelText(/^fabric/i);
+    let item2Jacket = getComponentSection(unit1, "Jacket");
+    let item2Fabric = await within(item2Jacket).findByLabelText(/^fabric/i);
     expect(item2Fabric).toHaveValue("");
 
     // Checking it deep-copies unit 1's full draft into unit 2.
     await user.click(copyCheckbox);
     await waitFor(() => expect(item2Fabric).toHaveValue("ITEM1-FABRIC"));
-    const item2Note = within(item2Jacket).getByLabelText(/^note$/i);
-    expect(item2Note).toHaveValue("Item 1 note");
+    expect(within(item2Jacket).getByLabelText(/^note$/i)).toHaveValue("Item 1 note");
     // Unit 2's OWN summary panel (nested inside its own accordion, per the fix
     // to match legacy's real per-unit `fabric-left`/`fabric-right` structure)
-    // reflects the copy. Scoped to unit 1's content region — unit 0's summary
-    // also legitimately shows "ITEM1-FABRIC" now (it's unit 0's real value),
-    // so an unscoped `screen.getByText` would match both and throw.
+    // reflects the copy.
     expect(within(unit1).getByText("ITEM1-FABRIC")).toBeInTheDocument();
-    // Unit 1's own data is untouched by copying into unit 2 (independence proof).
-    expect(item1Fabric).toHaveValue("ITEM1-FABRIC");
-    expect(within(unit0).getByText("ITEM1-FABRIC")).toBeInTheDocument();
+
+    // Unit 1's own data is untouched by copying into unit 2 (independence proof) — this is
+    // `StylingAccordion`'s fully-controlled `value` prop, not local state, so it survives
+    // unit 0 being unmounted while collapsed (`TransitionProps={{ unmountOnExit: true }}`).
+    // Re-expand it and re-query fresh (unit 0's old DOM was torn down when unit 2 was
+    // expanded, per `getUnitContent`'s own doc comment) to prove the data round-trips through
+    // a real mount/unmount cycle, not just that a stale JS reference remembers its last value.
+    // Re-expanding unit 0 collapses (and unmounts) unit 1 in turn, so every unit-1 reference
+    // captured above (`unit1`/`copyCheckbox`/`item2Jacket`/`item2Fabric`) is now stale too —
+    // re-expand unit 2 and re-query them fresh afterward before continuing.
+    await user.click(screen.getByRole("button", { name: /Item 1/ }));
+    await screen.findByText("Summary — Item 1");
+    const reopenedUnit0 = getUnitContent(0);
+    const reopenedItem1Jacket = getComponentSection(reopenedUnit0, "Jacket");
+    expect(within(reopenedItem1Jacket).getByLabelText(/^fabric/i)).toHaveValue("ITEM1-FABRIC");
+
+    await user.click(screen.getByRole("button", { name: /Item 2/ }));
+    await screen.findByText("Summary — Item 2");
+    unit1 = getUnitContent(1);
+    copyCheckbox = within(unit1).getByRole("checkbox", { name: /copy styles of the previous item/i });
+    item2Jacket = getComponentSection(unit1, "Jacket");
+    item2Fabric = within(item2Jacket).getByLabelText(/^fabric/i);
+    expect(item2Fabric).toHaveValue("ITEM1-FABRIC");
+    expect(within(item2Jacket).getByLabelText(/^note$/i)).toHaveValue("Item 1 note");
 
     // Unchecking clears unit 2 back to empty.
     await user.click(copyCheckbox);
     await waitFor(() => expect(item2Fabric).toHaveValue(""));
-    expect(item2Note).toHaveValue("");
+    expect(within(item2Jacket).getByLabelText(/^note$/i)).toHaveValue("");
 
     // Reference-image upload: local preview first (no network), then a real upload.
     // Scoped to the reference-image `<label>` specifically — the jacket's own Monogram

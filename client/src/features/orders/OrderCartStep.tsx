@@ -207,7 +207,15 @@ export function OrderCartStep({
                 : {})}
             />
           ) : (
+            // `key={focusedItem.id}`: only one `<StylingAccordion>` is ever mounted at
+            // this position (switching "focused" line items just changes its props, not
+            // its position in the tree), so without a key React reuses the same instance
+            // and its local `copyChecked`/`expandedUnit` state leaks across line items —
+            // a real reported bug: checking "copy previous" on one line item's unit 2
+            // left the checkbox pre-checked when a *different* line item was focused
+            // next. The key forces a remount (fresh local state) on every focus switch.
             <StylingAccordion
+              key={focusedItem.id}
               components={focusedSuperProduct.components}
               quantity={focusedItem.stylingDrafts.length}
               value={focusedItem.stylingDrafts}

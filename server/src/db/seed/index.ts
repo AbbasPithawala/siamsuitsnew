@@ -3,7 +3,12 @@ import { permissions, roles, rolePermissions, tenants, users, userRoles } from "
 import { permissionCatalog } from "./permissions";
 import { hashPassword } from "../../services/auth.service";
 import { and, eq } from "drizzle-orm";
-import { seedRenderSlotFeatures, backfillFeatureRequiredFlags } from "./catalog-render-slots";
+import {
+  seedRenderSlotFeatures,
+  backfillFeatureRequiredFlags,
+  backfillPipingRenderSlot,
+  backfillFabricLiningSequenceOrder,
+} from "./catalog-render-slots";
 import { summarizeDomain } from "../etl/result";
 
 const SEED_ADMIN_PASSWORD = "ChangeMe123!";
@@ -185,6 +190,12 @@ async function seed() {
   // tenant once `etl:production` has populated real products.
   console.log("Backfilling features.is_required...");
   console.log(summarizeDomain(await backfillFeatureRequiredFlags(tenant.id)));
+
+  console.log("Backfilling features.render_slot (Piping)...");
+  console.log(summarizeDomain(await backfillPipingRenderSlot(tenant.id)));
+
+  console.log("Backfilling feature_products.sequence_order (Fabric before Lining Code)...");
+  console.log(summarizeDomain(await backfillFabricLiningSequenceOrder(tenant.id)));
 
   console.log("Seeding render-slot catalog features (Shoulder Type / Monogram Position)...");
   for (const result of await seedRenderSlotFeatures(tenant.id)) {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ChangeEvent } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -9,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import { useMeQuery } from "../../api/baseApi";
 import { getApiErrorMessage } from "../../api/errorUtils";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
+import { resolveUploadUrl, useUploadFileMutation } from "../uploads/uploadsApi";
 import { useGetRetailerQuery, useUpdateRetailerMutation } from "./retailersApi";
 import type { Retailer, RetailerInput } from "./retailersApi";
 
@@ -87,8 +89,21 @@ export function RetailerProfilePage() {
 
 function ProfileForm({ retailer, retailerId }: { retailer: Retailer; retailerId: string }) {
   const [updateRetailer, updateState] = useUpdateRetailerMutation();
+  const [uploadFile, uploadState] = useUploadFileMutation();
   const [form, setForm] = useState<ProfileFormState>(() => toFormState(retailer));
   const [saved, setSaved] = useState(false);
+
+  async function handleLogoFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setSaved(false);
+    try {
+      const result = await uploadFile(file).unwrap();
+      setForm((current) => ({ ...current, logo: result.url }));
+    } catch {
+      // surfaced below via uploadState.error
+    }
+  }
 
   async function handleSubmit() {
     setSaved(false);
@@ -144,15 +159,31 @@ function ProfileForm({ retailer, retailerId }: { retailer: Retailer; retailerId:
             value={form.phone}
             onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
           />
-          <TextField
-            label="Logo URL"
-            fullWidth
-            value={form.logo}
-            onChange={(event) => setForm((current) => ({ ...current, logo: event.target.value }))}
-          />
-          {form.logo && (
-            <Box component="img" src={form.logo} alt="Retailer logo preview" sx={{ height: 80, width: 80, objectFit: "contain" }} />
-          )}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Logo
+            </Typography>
+            {form.logo && (
+              <Box
+                component="img"
+                src={resolveUploadUrl(form.logo)}
+                alt="Retailer logo preview"
+                sx={{ height: 80, width: 80, objectFit: "contain", display: "block", mb: 1 }}
+                onError={(event) => {
+                  (event.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            )}
+            <Button component="label" variant="outlined" disabled={uploadState.isLoading}>
+              {uploadState.isLoading ? "Uploading…" : "Upload logo"}
+              <input type="file" accept="image/*" hidden onChange={handleLogoFileChange} />
+            </Button>
+            {uploadState.error && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                {getApiErrorMessage(uploadState.error, "Failed to upload logo.")}
+              </Alert>
+            )}
+          </Box>
           {updateState.error && <Alert severity="error">{getApiErrorMessage(updateState.error, "Failed to save profile.")}</Alert>}
           {saved && !updateState.error && <Alert severity="success">Profile updated.</Alert>}
           <Box>

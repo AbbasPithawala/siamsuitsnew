@@ -13,27 +13,48 @@ import IconButton from "@mui/material/IconButton";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
+import Checkbox from "@mui/material/Checkbox";
 import Select from "@mui/material/Select";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
+import Tab from "@mui/material/Tab";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
+import Tabs from "@mui/material/Tabs";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 // Named barrel import — see ProductsPage.tsx's comment on this project's
 // Vite dep optimizer mis-transforming `@mui/icons-material/X` deep imports.
-import { Add as AddIcon, CheckCircle as CheckCircleIcon, Delete as DeleteIcon, Visibility as VisibilityIcon } from "@mui/icons-material";
+import {
+  Add as AddIcon,
+  CheckCircle as CheckCircleIcon,
+  Delete as DeleteIcon,
+  Edit as EditIcon,
+  PictureAsPdf as PictureAsPdfIcon,
+  Send as SendIcon,
+  Visibility as VisibilityIcon,
+} from "@mui/icons-material";
 import { getApiErrorMessage } from "../../api/errorUtils";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { PaginationControls } from "../../components/PaginationControls";
 import { usePagination } from "../../hooks/usePagination";
 import { useHasPermission } from "../auth/useHasPermission";
 import { useListRetailersQuery } from "../retailers/retailersApi";
-import { useCreateInvoiceMutation, useListInvoicesPaginatedQuery, useUpdateInvoiceStatusMutation } from "./invoicesApi";
+import { resolveUploadUrl } from "../uploads/uploadsApi";
+import { OrderInvoiceEditorDialog } from "./OrderInvoiceEditorDialog";
+import {
+  useCreateInvoiceMutation,
+  useGenerateRetailerInvoicePdfMutation,
+  useGetInvoiceOrdersQuery,
+  useListInvoiceableOrdersQuery,
+  useListInvoicesPaginatedQuery,
+  useSendRetailerInvoiceEmailMutation,
+  useUpdateInvoiceStatusMutation,
+} from "./invoicesApi";
 import type { Invoice, LineItemInput } from "./invoicesApi";
 
 const ALL_RETAILERS = "";
@@ -105,26 +126,63 @@ export function InvoicesPage() {
   const [updateInvoiceStatus, updateState] = useUpdateInvoiceStatusMutation();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Defaults to "manual" (not "orders", even though the order-driven flow is the legacy-
+  // faithful primary one) — a page reload's very first Create Invoice click should land
+  // somewhere that doesn't require a retailer with real priced orders just to try the form.
+  const [createMode, setCreateMode] = useState<"manual" | "orders">("manual");
   const [formRetailerId, setFormRetailerId] = useState("");
   const [lineItems, setLineItems] = useState<LineItemFormRow[]>([{ ...EMPTY_LINE_ITEM }]);
   const [discount, setDiscount] = useState("");
   const [shippingCharge, setShippingCharge] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [priceOrderTarget, setPriceOrderTarget] = useState<{ id: string; orderNumber: string } | null>(null);
 
   const [viewTarget, setViewTarget] = useState<Invoice | null>(null);
   const [markPaidError, setMarkPaidError] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resentId, setResentId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const { data: invoiceableOrders, isFetching: invoiceableOrdersLoading } = useListInvoiceableOrdersQuery(formRetailerId, {
+    skip: !formRetailerId || createMode !== "orders",
+  });
+  const { data: viewTargetOrders } = useGetInvoiceOrdersQuery(viewTarget?.id ?? "", { skip: !viewTarget });
+  const [generateRetailerInvoicePdf, generatePdfState] = useGenerateRetailerInvoicePdfMutation();
+  const [sendRetailerInvoiceEmail, sendEmailState] = useSendRetailerInvoiceEmailMutation();
 
   const retailerNameById = new Map((retailers ?? []).map((retailer) => [retailer.id, retailer.name]));
   const activeRetailers = (retailers ?? []).filter((retailer) => retailer.isActive);
 
-  const isFormValid = formRetailerId.length > 0 && lineItems.length > 0 && lineItems.every(isValidLineItemRow);
+  const selectedOrdersSubtotal = (invoiceableOrders ?? [])
+    .filter((order) => selectedOrderIds.includes(order.id))
+    .reduce((sum, order) => sum + Number(order.total ?? 0), 0);
+
+  const isFormValid =
+    formRetailerId.length > 0 &&
+    (createMode === "manual" ? lineItems.length > 0 && lineItems.every(isValidLineItemRow) : selectedOrderIds.length > 0);
 
   function openCreateDialog() {
+    setCreateMode("manual");
     setFormRetailerId("");
     setLineItems([{ ...EMPTY_LINE_ITEM }]);
     setDiscount("");
     setShippingCharge("");
+    setDueDate("");
+    setSelectedOrderIds([]);
     setDialogOpen(true);
+  }
+
+  function handleModeChange(_event: React.SyntheticEvent, mode: "manual" | "orders") {
+    setCreateMode(mode);
+    setSelectedOrderIds([]);
+  }
+
+  function toggleOrderSelected(orderId: string, checked: boolean) {
+    setSelectedOrderIds((current) => (checked ? [...current, orderId] : current.filter((id) => id !== orderId)));
   }
 
   function updateLineItem(index: number, patch: Partial<LineItemFormRow>) {
@@ -143,9 +201,10 @@ export function InvoicesPage() {
     try {
       await createInvoice({
         retailerId: formRetailerId,
-        lineItems: toLineItemInputs(lineItems),
+        ...(createMode === "manual" ? { lineItems: toLineItemInputs(lineItems) } : { orderIds: selectedOrderIds }),
         ...(discount.trim() ? { discount: Number(discount) } : {}),
         ...(shippingCharge.trim() ? { shippingCharge: Number(shippingCharge) } : {}),
+        ...(dueDate.trim() ? { dueDate } : {}),
       }).unwrap();
       setDialogOpen(false);
     } catch {
@@ -162,6 +221,33 @@ export function InvoicesPage() {
       setMarkPaidError(getApiErrorMessage(err, "Failed to mark invoice as paid."));
     } finally {
       setPayingId(null);
+    }
+  }
+
+  async function handleViewPdf(invoice: Invoice) {
+    setPdfError(null);
+    setGeneratingPdfId(invoice.id);
+    try {
+      const { path } = await generateRetailerInvoicePdf(invoice.id).unwrap();
+      window.open(resolveUploadUrl(path), "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setPdfError(getApiErrorMessage(err, "Failed to generate PDF."));
+    } finally {
+      setGeneratingPdfId(null);
+    }
+  }
+
+  async function handleResend(invoice: Invoice) {
+    setResendError(null);
+    setResentId(null);
+    setResendingId(invoice.id);
+    try {
+      await sendRetailerInvoiceEmail(invoice.id).unwrap();
+      setResentId(invoice.id);
+    } catch (err) {
+      setResendError(getApiErrorMessage(err, "Failed to send invoice email."));
+    } finally {
+      setResendingId(null);
     }
   }
 
@@ -225,6 +311,24 @@ export function InvoicesPage() {
         </Alert>
       )}
 
+      {pdfError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPdfError(null)}>
+          {pdfError}
+        </Alert>
+      )}
+
+      {resendError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setResendError(null)}>
+          {resendError}
+        </Alert>
+      )}
+
+      {resentId && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setResentId(null)}>
+          Invoice email sent.
+        </Alert>
+      )}
+
       <TableContainer component={Paper} variant="outlined">
         <Table>
           <TableHead>
@@ -262,6 +366,22 @@ export function InvoicesPage() {
                   <IconButton aria-label={`View ${invoice.invoiceNumber}`} onClick={() => setViewTarget(invoice)}>
                     <VisibilityIcon fontSize="small" />
                   </IconButton>
+                  <IconButton
+                    aria-label={`View PDF for ${invoice.invoiceNumber}`}
+                    onClick={() => handleViewPdf(invoice)}
+                    disabled={generatePdfState.isLoading && generatingPdfId === invoice.id}
+                  >
+                    <PictureAsPdfIcon fontSize="small" />
+                  </IconButton>
+                  {canManage && (
+                    <IconButton
+                      aria-label={`Resend ${invoice.invoiceNumber}`}
+                      onClick={() => handleResend(invoice)}
+                      disabled={sendEmailState.isLoading && resendingId === invoice.id}
+                    >
+                      <SendIcon fontSize="small" />
+                    </IconButton>
+                  )}
                   {canManage && invoice.status === "Unpaid" && (
                     <IconButton
                       aria-label={`Mark ${invoice.invoiceNumber} paid`}
@@ -299,10 +419,73 @@ export function InvoicesPage() {
               </Select>
             </FormControl>
 
-            <Divider />
-            <Typography variant="subtitle1">Line items</Typography>
+            <Tabs value={createMode} onChange={handleModeChange}>
+              <Tab value="manual" label="Manual line items" />
+              <Tab value="orders" label="From orders" />
+            </Tabs>
 
-            {lineItems.map((row, index) => (
+            {createMode === "orders" ? (
+              <>
+                {!formRetailerId && <Typography color="text.secondary">Pick a retailer to see its open orders.</Typography>}
+                {formRetailerId && invoiceableOrdersLoading && <LoadingSpinner />}
+                {formRetailerId && !invoiceableOrdersLoading && (
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell padding="checkbox" />
+                        <TableCell>Order #</TableCell>
+                        <TableCell>Date</TableCell>
+                        <TableCell>Customer</TableCell>
+                        <TableCell align="right">Total</TableCell>
+                        <TableCell />
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {invoiceableOrders?.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6}>
+                            <Typography color="text.secondary">No open orders for this retailer.</Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {invoiceableOrders?.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={selectedOrderIds.includes(order.id)}
+                              disabled={order.total === null}
+                              onChange={(event) => toggleOrderSelected(order.id, event.target.checked)}
+                            />
+                          </TableCell>
+                          <TableCell>{order.orderNumber}</TableCell>
+                          <TableCell>{new Date(order.orderDate).toLocaleDateString()}</TableCell>
+                          <TableCell>{order.customerName}</TableCell>
+                          <TableCell align="right">{order.total === null ? "Not priced" : `THB ${order.total}`}</TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              aria-label={`Price order ${order.orderNumber}`}
+                              onClick={() => setPriceOrderTarget({ id: order.id, orderNumber: order.orderNumber })}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+                {selectedOrderIds.length > 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    Subtotal for {selectedOrderIds.length} selected order(s): THB {selectedOrdersSubtotal.toFixed(2)}
+                  </Typography>
+                )}
+              </>
+            ) : (
+              <>
+                <Typography variant="subtitle1">Line items</Typography>
+
+                {lineItems.map((row, index) => (
               <Stack direction="row" spacing={2} key={index} alignItems="flex-start">
                 <TextField
                   label="Description"
@@ -340,9 +523,11 @@ export function InvoicesPage() {
               </Stack>
             ))}
 
-            <Button onClick={addLineItem} sx={{ alignSelf: "flex-start" }}>
-              Add line item
-            </Button>
+                <Button onClick={addLineItem} sx={{ alignSelf: "flex-start" }}>
+                  Add line item
+                </Button>
+              </>
+            )}
 
             <Divider />
 
@@ -363,6 +548,14 @@ export function InvoicesPage() {
                 value={shippingCharge}
                 onChange={(event) => setShippingCharge(event.target.value)}
               />
+              <TextField
+                label="Due date"
+                type="date"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+              />
             </Stack>
 
             {createState.error && <Alert severity="error">{getApiErrorMessage(createState.error, "Failed to create invoice.")}</Alert>}
@@ -375,6 +568,16 @@ export function InvoicesPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {priceOrderTarget && (
+        <OrderInvoiceEditorDialog
+          key={priceOrderTarget.id}
+          orderId={priceOrderTarget.id}
+          orderNumber={priceOrderTarget.orderNumber}
+          open
+          onClose={() => setPriceOrderTarget(null)}
+        />
+      )}
 
       <Dialog open={viewTarget !== null} onClose={() => setViewTarget(null)} fullWidth maxWidth="sm">
         <DialogTitle>{viewTarget?.invoiceNumber}</DialogTitle>
@@ -426,6 +629,29 @@ export function InvoicesPage() {
                 label={viewTarget.status}
                 color={viewTarget.status === "Paid" ? "success" : "warning"}
               />
+
+              {viewTargetOrders && viewTargetOrders.length > 0 && (
+                <>
+                  <Divider />
+                  <Typography variant="subtitle2">Orders in this invoice</Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Order #</TableCell>
+                        <TableCell>Customer</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {viewTargetOrders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell>{order.orderNumber}</TableCell>
+                          <TableCell>{order.customerName}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
             </Stack>
           )}
         </DialogContent>

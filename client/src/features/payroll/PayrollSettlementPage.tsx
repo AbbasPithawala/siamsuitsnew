@@ -1,4 +1,7 @@
 import { useState } from "react";
+// Named barrel import — see JobAssignmentPage.tsx-adjacent screens' comment
+// on this project's Vite dep optimizer mis-transforming `@mui/icons-material/X` deep imports.
+import { Print as PrintIcon } from "@mui/icons-material";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -6,6 +9,7 @@ import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
 import FormControl from "@mui/material/FormControl";
+import IconButton from "@mui/material/IconButton";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
@@ -21,8 +25,29 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { getApiErrorMessage } from "../../api/errorUtils";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
+import { resolveUploadUrl } from "../uploads/uploadsApi";
 import { useListTailorsQuery } from "../tailors/tailorsApi";
-import { useCreateSettlementMutation, useGetSettlementQuery, useListUnpaidJobsQuery } from "./payrollApi";
+import {
+  useCreateSettlementMutation,
+  useGenerateJobSlipPdfMutation,
+  useGenerateSettlementPdfMutation,
+  useGetSettlementQuery,
+  useListUnpaidJobsQuery,
+} from "./payrollApi";
+import type { JobDisplayEntry, UnpaidJobEntry } from "./payrollApi";
+
+/** `entry.job.cost + entry.job.stylingPrice`, plus this job's approved-and-unpaid extra payments — a per-row display total only, mirroring `JobAssignmentPage.tsx`'s identical cost+stylingPrice sum. Never trusted for the actual settlement: `createSettlement` always recomputes `subTotal`/`totalPay` server-side (this page's own long-standing doc comment below), this is just what the operator sees before submitting. */
+function jobDisplayTotal(entry: UnpaidJobEntry): number {
+  const extraTotal = entry.approvedUnpaidExtraPayments.reduce((sum, ep) => sum + Number(ep.cost), 0);
+  return Number(entry.job.cost) + Number(entry.job.stylingPrice) + extraTotal;
+}
+
+function itemLabel(entry: JobDisplayEntry): string {
+  const productName = entry.product?.name ?? "—";
+  return entry.component && entry.component.slotLabel !== productName
+    ? `${productName} (${entry.component.slotLabel})`
+    : productName;
+}
 
 /**
  * Tailor payroll settlement screen — PHASE_6_TASKS.md Group 8. Pick a tailor,
@@ -32,12 +57,23 @@ import { useCreateSettlementMutation, useGetSettlementQuery, useListUnpaidJobsQu
  * this read didn't exist before), select which to settle, optionally deduct
  * rent/a manual bill/an outstanding advance, and submit through the existing
  * `createSettlement` (`payroll.service.ts`, Phase 3 Group 6). Every dollar
- * amount shown after submission — `subTotal`/`deductedAdvance`/`rent`/
+ * amount in the confirmation panel — `subTotal`/`deductedAdvance`/`rent`/
  * `manualBill`/`totalPay` — comes straight from the server response; this
- * screen deliberately never sums the selected jobs' costs itself, even as a
- * pre-submit preview, per this codebase's hard "financial totals are always
+ * screen never sums the *selected* jobs' costs itself as a submission
+ * preview, per this codebase's hard "financial totals are always
  * server-computed" rule (see e.g. `orders.service.ts`/`invoices.service.ts`
- * and every order/invoice screen built on them).
+ * and every order/invoice screen built on them) — `jobDisplayTotal` above is
+ * a narrower, lower-stakes per-row display sum of already-server-provided
+ * numbers, not a payroll total.
+ *
+ * Table columns (Group 8 follow-up) mirror legacy `ManageJobs.jsx`'s own
+ * settlement table — Tailor/Item/Order #/Date/Description/Type/Cost — rather
+ * than this rewrite's original narrower Product/Process/Cost/Styling split,
+ * so "which order is this for" and "did this job carry an extra payment"
+ * (`Type`: `Extra`/`Normal`) are visible without cross-referencing anything.
+ * The print icon per row is legacy's own per-job "Print" action
+ * (`generateJobSlipPdf`/`jobSlipPdf.service.ts`) — printable here, before
+ * the job is ever settled, exactly like legacy's equivalent button.
  *
  * Uses plain MUI (no legacy `factory.css`), matching the convention Groups
  * 4-7 of this phase already established for the rebuilt factory-floor/admin
@@ -54,6 +90,9 @@ export function PayrollSettlementPage() {
   const [deductedAdvance, setDeductedAdvance] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmedSettlementId, setConfirmedSettlementId] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [jobSlipError, setJobSlipError] = useState<string | null>(null);
+  const [jobSlipLoadingId, setJobSlipLoadingId] = useState<string | null>(null);
 
   const {
     data: unpaidJobs,
@@ -67,6 +106,8 @@ export function PayrollSettlementPage() {
     tailorId && confirmedSettlementId ? { tailorId, settlementId: confirmedSettlementId } : { tailorId: "", settlementId: "" },
     { skip: !tailorId || !confirmedSettlementId }
   );
+  const [generateSettlementPdf, pdfState] = useGenerateSettlementPdfMutation();
+  const [generateJobSlipPdf] = useGenerateJobSlipPdfMutation();
 
   const selectedTailor = (tailors ?? []).find((t) => t.id === tailorId);
   const activeTailors = (tailors ?? []).filter((t) => t.isActive);
@@ -79,6 +120,8 @@ export function PayrollSettlementPage() {
     setDeductedAdvance("");
     setSubmitError(null);
     setConfirmedSettlementId(null);
+    setPdfError(null);
+    setJobSlipError(null);
   }
 
   function toggleJob(jobId: string, checked: boolean) {
@@ -106,14 +149,38 @@ export function PayrollSettlementPage() {
     }
   }
 
+  async function handleViewPdf() {
+    if (!tailorId || !confirmedSettlementId) return;
+    setPdfError(null);
+    try {
+      const { path } = await generateSettlementPdf({ tailorId, settlementId: confirmedSettlementId }).unwrap();
+      window.open(resolveUploadUrl(path), "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setPdfError(getApiErrorMessage(err, "Failed to generate PDF."));
+    }
+  }
+
+  async function handlePrintJobSlip(jobId: string) {
+    setJobSlipError(null);
+    setJobSlipLoadingId(jobId);
+    try {
+      const { path } = await generateJobSlipPdf(jobId).unwrap();
+      window.open(resolveUploadUrl(path), "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setJobSlipError(getApiErrorMessage(err, "Failed to generate the job slip."));
+    } finally {
+      setJobSlipLoadingId(null);
+    }
+  }
+
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h5" gutterBottom>
         Payroll Settlement
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Pick a tailor to see their unpaid, completed jobs, select which ones to settle, and submit — every amount below
-        the selection table is computed by the server, not this page.
+        Pick a tailor to see their unpaid, completed jobs, select which ones to settle, and submit — every amount in
+        the confirmation panel below is computed by the server, not this page.
       </Typography>
 
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
@@ -152,6 +219,12 @@ export function PayrollSettlementPage() {
           <Typography variant="h6" gutterBottom>
             Unpaid completed jobs
           </Typography>
+          {jobSlipError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {jobSlipError}
+            </Alert>
+          )}
+
           {unpaidJobs?.length === 0 ? (
             <Typography color="text.secondary">This tailor has no unpaid completed jobs right now.</Typography>
           ) : (
@@ -160,11 +233,14 @@ export function PayrollSettlementPage() {
                 <TableHead>
                   <TableRow>
                     <TableCell padding="checkbox" />
-                    <TableCell>Product / piece</TableCell>
-                    <TableCell>Process</TableCell>
+                    <TableCell>Tailor</TableCell>
+                    <TableCell>Item</TableCell>
+                    <TableCell>Order #</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Description</TableCell>
+                    <TableCell>Type</TableCell>
                     <TableCell align="right">Cost</TableCell>
-                    <TableCell align="right">Styling</TableCell>
-                    <TableCell>Pending extra payments</TableCell>
+                    <TableCell align="right">Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -176,17 +252,21 @@ export function PayrollSettlementPage() {
                           onChange={(event) => toggleJob(entry.job.id, event.target.checked)}
                         />
                       </TableCell>
-                      <TableCell>
-                        {entry.product?.name ?? "—"}
-                        {entry.component ? ` (${entry.component.slotLabel})` : ""}
-                      </TableCell>
+                      <TableCell>{selectedTailor?.name ?? "—"}</TableCell>
+                      <TableCell>{itemLabel(entry)}</TableCell>
+                      <TableCell>{entry.order?.orderNumber ?? "—"}</TableCell>
+                      <TableCell>{new Date(entry.job.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell>{entry.process?.name ?? "—"}</TableCell>
-                      <TableCell align="right">THB {entry.job.cost}</TableCell>
-                      <TableCell align="right">THB {entry.job.stylingPrice}</TableCell>
-                      <TableCell>
-                        {entry.approvedUnpaidExtraPayments.length === 0
-                          ? "—"
-                          : entry.approvedUnpaidExtraPayments.map((ep) => `THB ${ep.cost}`).join(", ")}
+                      <TableCell>{entry.approvedUnpaidExtraPayments.length > 0 ? "Extra" : "Normal"}</TableCell>
+                      <TableCell align="right">THB {jobDisplayTotal(entry).toFixed(2)}</TableCell>
+                      <TableCell align="right">
+                        <IconButton
+                          aria-label={`Print slip for ${itemLabel(entry)}`}
+                          onClick={() => handlePrintJobSlip(entry.job.id)}
+                          disabled={jobSlipLoadingId === entry.job.id}
+                        >
+                          <PrintIcon fontSize="small" />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -237,12 +317,62 @@ export function PayrollSettlementPage() {
 
       {confirmedSettlementId && (
         <Paper variant="outlined" sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Settlement confirmed
-          </Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Typography variant="h6">Settlement confirmed</Typography>
+            <Button variant="outlined" onClick={handleViewPdf} disabled={pdfState.isLoading}>
+              {pdfState.isLoading ? "Generating…" : "Print / Download PDF"}
+            </Button>
+          </Stack>
+          {pdfError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {pdfError}
+            </Alert>
+          )}
           {isLoadingConfirmation && <LoadingSpinner />}
           {settlementDetail && (
             <Stack spacing={2}>
+              {settlementDetail.jobs.length > 0 && (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Order #</TableCell>
+                        <TableCell>Item</TableCell>
+                        <TableCell>Description</TableCell>
+                        <TableCell align="right">Amount</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {settlementDetail.jobs.map((entry) => (
+                        <TableRow key={entry.job.id}>
+                          <TableCell>{entry.order?.orderNumber ?? "—"}</TableCell>
+                          <TableCell>{itemLabel(entry)}</TableCell>
+                          <TableCell>{entry.process?.name ?? "—"}</TableCell>
+                          <TableCell align="right">
+                            THB {(Number(entry.job.cost) + Number(entry.job.stylingPrice)).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+
+              {settlementDetail.extraPayments.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Extra payments paid by this settlement
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    {settlementDetail.extraPayments.map((ep) => (
+                      <Typography key={ep.id} variant="body2">
+                        THB {ep.cost} added for {ep.category?.name ?? "extra payment"}
+                      </Typography>
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+
               <Table size="small" sx={{ maxWidth: 420 }}>
                 <TableBody>
                   <TableRow>
@@ -269,21 +399,6 @@ export function PayrollSettlementPage() {
                   </TableRow>
                 </TableBody>
               </Table>
-
-              <Typography color="text.secondary">{settlementDetail.jobs.length} job(s) settled and marked paid.</Typography>
-
-              {settlementDetail.extraPayments.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Extra payments paid by this settlement
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {settlementDetail.extraPayments.map((ep) => (
-                      <Chip key={ep.id} label={`THB ${ep.cost}`} color="success" size="small" />
-                    ))}
-                  </Stack>
-                </Box>
-              )}
 
               {settlementDetail.clearedAdvances.length > 0 && (
                 <Box>

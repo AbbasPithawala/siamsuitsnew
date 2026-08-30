@@ -418,23 +418,19 @@ describe.skipIf(!seededToken)("Group Orders (live siam/server integration)", () 
       await user.click(screen.getByRole("button", { name: /Item 2/ }));
       await completeAllStyleTabsLast(user, getUnitContent(1));
 
-      // Shirt gets 1 unit. `OrderCartStep`'s single `focused` state re-renders
-      // (never remounts, no `key`) the SAME `<StylingAccordion>` element
-      // position when the user switches which line item's styling panel is
-      // open — so its internal `expandedUnit` local state (left at `1` from
-      // clicking "Item 2" for vest above) carries over unchanged even though
-      // shirt only has 1 real unit, leaving shirt's own (only) unit collapsed
-      // by default rather than freshly-mounted-and-expanded. A real user
-      // would just click it open, same as vest's own unit 2 above — do the
-      // same here rather than relying on a fresh-mount default that doesn't
-      // hold across a same-page line-item switch (confirmed live: skipping
-      // this click left every one of shirt's real tabs outside the
-      // accessibility tree, `role="tab"` unfindable, despite their text
-      // genuinely being present in the DOM).
+      // Shirt gets 1 unit. `OrderCartStep`'s `<StylingAccordion>` is now `key={focusedItem.id}`'d
+      // (a real fixed bug: without it, switching which line item's styling panel is open
+      // reused the same component instance instead of remounting, so its internal
+      // `expandedUnit`/`copyChecked` local state leaked across line items — e.g. leaving a
+      // freshly-focused line item's unit 1 collapsed because a *previous* line item's user
+      // had expanded unit 2, or "copy previous" pre-checked for a line item nobody touched).
+      // With the key, switching to shirt remounts `<StylingAccordion>` fresh, so shirt's own
+      // (only) unit is already expanded by `expandedUnit`'s real default (`useState(0)`) —
+      // no compensating click needed, and clicking "Item 1" here now would just toggle it
+      // straight back closed.
       const shirtRow = getLineItemRow(shirtSuperProduct.id);
       await user.click(within(shirtRow).getByTestId("styling-status"));
       await screen.findByText(`${shirtSuperProduct.name} — Fabric & Styling`);
-      await user.click(screen.getByRole("button", { name: /Item 1/ }));
       await completeAllStyleTabsFirst(user, getUnitContent(0));
 
       await waitFor(() => expect(within(vestRow).getByTestId("styling-status").textContent).toBe("Complete"), NETWORK_WAIT);

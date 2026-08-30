@@ -36,7 +36,7 @@ import {
   paymentSettlements,
   paymentSettlementJobs,
 } from "./manufacturing";
-import { retailerInvoices, shippingBoxes, shippingBoxItems } from "./invoicing";
+import { retailerInvoices, retailerInvoiceOrders, orderInvoices, orderInvoiceLines, shippingBoxes, shippingBoxItems } from "./invoicing";
 
 /**
  * All cross-file relations live in this one module (rather than alongside each table) to
@@ -323,9 +323,28 @@ export const paymentSettlementJobsRelations = relations(paymentSettlementJobs, (
   job: one(jobs, { fields: [paymentSettlementJobs.jobId], references: [jobs.id] }),
 }));
 
-export const retailerInvoicesRelations = relations(retailerInvoices, ({ one }) => ({
+export const retailerInvoicesRelations = relations(retailerInvoices, ({ one, many }) => ({
   tenant: one(tenants, { fields: [retailerInvoices.tenantId], references: [tenants.id] }),
   retailer: one(retailers, { fields: [retailerInvoices.retailerId], references: [retailers.id] }),
+  orderLinks: many(retailerInvoiceOrders),
+}));
+
+export const retailerInvoiceOrdersRelations = relations(retailerInvoiceOrders, ({ one }) => ({
+  retailerInvoice: one(retailerInvoices, {
+    fields: [retailerInvoiceOrders.retailerInvoiceId],
+    references: [retailerInvoices.id],
+  }),
+  order: one(orders, { fields: [retailerInvoiceOrders.orderId], references: [orders.id] }),
+}));
+
+export const orderInvoicesRelations = relations(orderInvoices, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [orderInvoices.tenantId], references: [tenants.id] }),
+  order: one(orders, { fields: [orderInvoices.orderId], references: [orders.id] }),
+  lines: many(orderInvoiceLines),
+}));
+
+export const orderInvoiceLinesRelations = relations(orderInvoiceLines, ({ one }) => ({
+  orderInvoice: one(orderInvoices, { fields: [orderInvoiceLines.orderInvoiceId], references: [orderInvoices.id] }),
 }));
 
 export const shippingBoxesRelations = relations(shippingBoxes, ({ one, many }) => ({

@@ -319,13 +319,17 @@ describe.skipIf(!seededToken)("Order edit wizard + Manual Size (live siam/server
       // post-Group-5). Covering it here under the real `admin` token would
       // just reproduce that 403, not prove this flow's other steps.
 
-      // Edit unit 2's own (per-unit, non-shared) styling note.
+      // Edit unit 2's own (per-unit, non-shared) styling note. A collapsed unit's content is
+      // unmounted (`StylingAccordion.tsx`'s `TransitionProps={{ unmountOnExit: true }}` — a
+      // real perf fix so every unit's full `<FeatureSelector>` tree isn't re-rendering on
+      // every keystroke in some *other* unit), so only unit 2's own note field exists in the
+      // DOM once it's the expanded one, not unit 1's alongside it.
       await user.click(within(row).getByTestId("styling-status"));
-      await screen.findByRole("button", { name: /Item 2/ }, NETWORK_WAIT);
+      await user.click(await screen.findByRole("button", { name: /Item 2/ }, NETWORK_WAIT));
       const noteFields = await screen.findAllByPlaceholderText("Special note (if any)", {}, NETWORK_WAIT);
-      expect(noteFields).toHaveLength(2);
-      await user.clear(noteFields[1]!);
-      await user.type(noteFields[1]!, "unit 2 edited");
+      expect(noteFields).toHaveLength(1);
+      await user.clear(noteFields[0]!);
+      await user.type(noteFields[0]!, "unit 2 edited");
 
       // Add a brand-new third unit to this same line item.
       await user.click(within(row).getByRole("button", { name: "+" }));

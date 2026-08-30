@@ -37,11 +37,13 @@ import { getManufacturingErrorMessage } from "../manufacturing/manufacturingErro
 import { useGetComponentDetailQuery } from "../manufacturing/manufacturingApi";
 import type { ManufacturingStepStatus } from "../manufacturing/manufacturingApi";
 import { useListRetailersQuery } from "../retailers/retailersApi";
+import { resolveUploadUrl } from "../uploads/uploadsApi";
 import { getShippingErrorMessage } from "./shippingErrors";
 import {
   useAddShippingBoxItemMutation,
   useCloseShippingBoxMutation,
   useCreateShippingBoxMutation,
+  useGenerateItemSlipPdfMutation,
   useGetShippingBoxQuery,
   useListShippingBoxesPaginatedQuery,
   useRemoveShippingBoxItemMutation,
@@ -54,6 +56,38 @@ function stepChipColor(status: ManufacturingStepStatus): "default" | "warning" |
   if (status === "complete") return "success";
   if (status === "assigned") return "warning";
   return "default";
+}
+
+/**
+ * Same hidden-iframe + `contentWindow.print()` mechanism as legacy
+ * `OrderStatusBarcoding.jsx`'s `generateQR`, so the slip "opens exactly like
+ * it is opening in the legacy" (auto-print, not a new tab the user has to
+ * print from manually — the other PDF actions on this codebase's other
+ * pages all `window.open` instead, but this one feature was called out
+ * specifically to match legacy's own printer-dispatch behavior).
+ *
+ * Legacy generated the PDF client-side, so its `URL.createObjectURL` blob
+ * was always same-origin. This PDF is fetched from the API server — a
+ * different origin than the client dev server — and a cross-origin
+ * `<iframe>` can neither be framed past `helmet()`'s default
+ * `frame-ancestors 'self'` CSP nor have `.print()` called on it (`print` is
+ * not in the browser's small cross-origin-safe Window property allowlist,
+ * unlike `close`/`focus`/`postMessage`). Fetching the PDF bytes first and
+ * printing from a locally-created blob URL keeps the iframe same-origin,
+ * exactly reproducing legacy's approach instead of framing the remote URL
+ * directly.
+ */
+async function printPdfInHiddenIframe(url: string): Promise<void> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.onload = () => {
+    iframe.contentWindow?.print();
+  };
+  iframe.src = blobUrl;
+  document.body.appendChild(iframe);
 }
 
 /**
@@ -125,6 +159,10 @@ export function ShippingPage() {
   const [addError, setAddError] = useState<string | null>(null);
   const [addFlash, setAddFlash] = useState<string | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
+
+  const [slipComponentId, setSlipComponentId] = useState("");
+  const [generateItemSlipPdf, slipState] = useGenerateItemSlipPdfMutation();
+  const [slipError, setSlipError] = useState<string | null>(null);
 
   const retailerNameById = new Map((retailers ?? []).map((retailer) => [retailer.id, retailer.name]));
   const productNameById = new Map((products ?? []).map((product) => [product.id, product.name]));
@@ -199,6 +237,18 @@ export function ShippingPage() {
     }
   }
 
+  async function handlePrintSlip(event: FormEvent) {
+    event.preventDefault();
+    setSlipError(null);
+    try {
+      const path = await generateItemSlipPdf(slipComponentId.trim()).unwrap();
+      await printPdfInHiddenIframe(resolveUploadUrl(path));
+      setSlipComponentId("");
+    } catch (err) {
+      setSlipError(getShippingErrorMessage(err, "Failed to generate that item's shipping slip."));
+    }
+  }
+
   const previewIncompleteSteps = previewComponent
     ? previewComponent.manufacturingSteps.filter((step) => step.status !== "complete")
     : [];
@@ -255,6 +305,34 @@ export function ShippingPage() {
           {getApiErrorMessage(error, "Failed to load shipping boxes.")}
         </Alert>
       )}
+
+      <Paper variant="outlined" sx={{ p: 3, mb: 3 }} data-testid="print-item-slip-panel">
+        <Typography variant="subtitle1" gutterBottom>
+          Print Item Slip
+        </Typography>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>
+          Enter an order item component ID to print its shipping slip (order #, customer, and item) and mark the order as shipped —
+          independent of the shipping boxes below.
+        </Typography>
+        <Box component="form" onSubmit={handlePrintSlip}>
+          <Stack direction="row" spacing={2} alignItems="flex-start">
+            <TextField
+              label="Order item component ID"
+              fullWidth
+              value={slipComponentId}
+              onChange={(event) => setSlipComponentId(event.target.value)}
+            />
+            <Button type="submit" variant="contained" disabled={!slipComponentId.trim() || slipState.isLoading}>
+              {slipState.isLoading ? "Printing…" : "Print Slip"}
+            </Button>
+          </Stack>
+        </Box>
+        {slipError && (
+          <Alert severity="error" sx={{ mt: 2 }} onClose={() => setSlipError(null)}>
+            {slipError}
+          </Alert>
+        )}
+      </Paper>
 
       <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
         <Table>

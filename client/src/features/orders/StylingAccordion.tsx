@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -119,6 +119,39 @@ export function StylingAccordion({ components, quantity, value, onChange, onDele
   };
 
   /**
+   * Real reported perf bug: typing into one component's field (e.g. Suit's Jacket
+   * fabric input) visibly lagged 0.5-0.7s behind the keystroke. Root cause: every
+   * keystroke bubbles up to `OrderBuilderPage`'s top-level `setLineItems`, which
+   * re-renders this whole tree — and every OTHER component's `<ComponentStylingPanel>`
+   * (e.g. the Suit's Pant panel, with its own full `<FeatureSelector>` — fabric/
+   * lining/monogram/piping fields plus large style/color/font image grids) was
+   * re-rendering right along with it, purely because `onChange` below was a fresh
+   * inline closure every render, defeating any memoization. `value`/`onChange` are
+   * mirrored into refs so this callback's own identity stays stable across every
+   * keystroke (deps are only `quantity`/`components`, which don't change while
+   * typing) — that stability is what lets `React.memo` on `ComponentStylingPanel`/
+   * `ComponentSummaryCard` below actually skip re-rendering a sibling component/unit
+   * whose own draft didn't change.
+   */
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    valueRef.current = value;
+    onChangeRef.current = onChange;
+  });
+
+  const handleComponentChange = useCallback(
+    (unitIndex: number, componentId: string, patch: Partial<ComponentStylingDraft>) => {
+      const current = valueRef.current;
+      const unitDraft = current[unitIndex] ?? emptyUnitStylingDraft(components);
+      const currentDraft = unitDraft[componentId] ?? emptyComponentStylingDraft();
+      const nextUnit = { ...unitDraft, [componentId]: { ...currentDraft, ...patch } };
+      onChangeRef.current(withUnitAt(current, quantity, components, unitIndex, nextUnit));
+    },
+    [quantity, components]
+  );
+
+  /**
    * `withOwnIdsPreserved` re-attaches `index`'s own `id`/`orderItemId` (its real,
    * already-persisted `order_item_components.id`/`order_items.id`, edit-mode only —
    * see `ComponentStylingDraft`'s doc comment) onto whichever content is about to
@@ -172,6 +205,14 @@ export function StylingAccordion({ components, quantity, value, onChange, onDele
               className="Accrodian-main"
               expanded={expandedUnit === index}
               onChange={(_event, isExpanded) => setExpandedUnit(isExpanded ? index : null)}
+              // A collapsed unit's content stays mounted by MUI's own default (`Collapse`
+              // just animates it to zero height) — with several units, that's several full
+              // `<FeatureSelector>` trees (image grids and all) re-rendering on every single
+              // keystroke in any one of them, the other real driver of the typing-lag bug
+              // documented on `handleComponentChange` above. `unmountOnExit` removes a
+              // collapsed unit's content from the tree entirely, so only the one unit
+              // actually being edited pays any render cost.
+              TransitionProps={{ unmountOnExit: true }}
             >
               <AccordionSummary
                 className="fabric_infoNM"
@@ -210,10 +251,7 @@ export function StylingAccordion({ components, quantity, value, onChange, onDele
                         component={component}
                         showHeading={components.length > 1}
                         draft={unitDraft[component.id] ?? emptyComponentStylingDraft()}
-                        onChange={(patch) => {
-                          const currentDraft = unitDraft[component.id] ?? emptyComponentStylingDraft();
-                          updateUnit(index, { ...unitDraft, [component.id]: { ...currentDraft, ...patch } });
-                        }}
+                        onComponentChange={handleComponentChange}
                       />
                     ))}
                   </Box>
@@ -249,7 +287,8 @@ interface ComponentStylingPanelProps {
   component: SuperProductComponent;
   showHeading: boolean;
   draft: ComponentStylingDraft;
-  onChange: (patch: Partial<ComponentStylingDraft>) => void;
+  /** Stable across every keystroke (see `handleComponentChange`'s own doc comment) — what makes `React.memo` below actually effective. */
+  onComponentChange: (unitIndex: number, componentId: string, patch: Partial<ComponentStylingDraft>) => void;
 }
 
 /**
@@ -259,12 +298,30 @@ interface ComponentStylingPanelProps {
  * upload (legacy `MissingFabric.jsx`'s `handleImageUpload`'s real two-step
  * shape — pick a file locally, preview it immediately via
  * `URL.createObjectURL`, only actually upload on a separate button click).
+ *
+ * `React.memo`'d: a super product can have several components (e.g. Suit's
+ * Jacket + Pant) mounted side by side inside the same expanded unit — without
+ * this, typing into Jacket's fabric field re-rendered Pant's entire panel too
+ * (a full `<FeatureSelector>`, image grids and all) on every keystroke, part
+ * of the reported typing-lag bug. Effective only because `onComponentChange`
+ * is now a stable reference and `draft` keeps its old identity for any
+ * component whose own key wasn't the one just patched.
  */
-function ComponentStylingPanel({ unitIndex, component, showHeading, draft, onChange }: ComponentStylingPanelProps) {
+const ComponentStylingPanel = memo(function ComponentStylingPanel({
+  unitIndex,
+  component,
+  showHeading,
+  draft,
+  onComponentChange,
+}: ComponentStylingPanelProps) {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploadFile, { isLoading: isUploading }] = useUploadFileMutation();
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputId = `reference-image-${unitIndex}-${component.id}`;
+  const onChange = useCallback(
+    (patch: Partial<ComponentStylingDraft>) => onComponentChange(unitIndex, component.id, patch),
+    [onComponentChange, unitIndex, component.id]
+  );
 
   const previewUrl = useMemo(() => (pendingFile ? URL.createObjectURL(pendingFile) : null), [pendingFile]);
   useEffect(() => {
@@ -366,7 +423,7 @@ function ComponentStylingPanel({ unitIndex, component, showHeading, draft, onCha
       </div>
     </Box>
   );
-}
+});
 
 interface SummaryField {
   label: string;
@@ -410,8 +467,12 @@ interface ComponentSummaryCardProps {
  * cache key `<FeatureSelector>` already populates for this component, no
  * extra request) instead of legacy's hardcoded `fabric_code`/`lining_code`/
  * `piping`/`monogram` keys.
+ *
+ * `React.memo`'d for the same reason as `ComponentStylingPanel` above — one of
+ * these renders per component per unit, and `draft` keeps its old identity for
+ * any component that wasn't the one just edited.
  */
-function ComponentSummaryCard({ component, draft }: ComponentSummaryCardProps) {
+const ComponentSummaryCard = memo(function ComponentSummaryCard({ component, draft }: ComponentSummaryCardProps) {
   const { data: features } = useProductFeaturesQuery(component.productId);
   const visible = (features ?? []).filter((feature) => feature.renderSlot === null);
   const monogramPositionFeature = (features ?? []).find((feature) => feature.renderSlot === "monogram_position");
@@ -503,4 +564,4 @@ function ComponentSummaryCard({ component, draft }: ComponentSummaryCardProps) {
       </div>
     </>
   );
-}
+});

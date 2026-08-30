@@ -40,7 +40,7 @@ import type { LineItemComponentMeasurementDraft, LineItemMeasurementsDraft } fro
 import type { ProductMeasurementLink } from "../measurements/measurementsApi";
 import { emptyUnitStylingDraft } from "./StylingAccordion";
 import type { UnitStylingDraft } from "./StylingAccordion";
-import { buildOrderItemsFromLineItems } from "./orderItemBuilder";
+import { buildOrderItemsFromLineItems, seedSharedMeasurementsForNewLineItem, withSharedMeasurementsSynced } from "./orderItemBuilder";
 import { useCreateOrderGroupMutation } from "./orderGroupsApi";
 import type { CreateOrderGroupInput, CreateOrderGroupOrderInput, OrderGroupDetail } from "./orderGroupsApi";
 
@@ -173,6 +173,13 @@ export function NewGroupOrderPage() {
 
   const selectedRetailer = retailers?.find((retailer) => retailer.id === retailerId) ?? null;
 
+  // A retailer-linked session never sees the Retailer step's content (the auto-select block
+  // below jumps straight to `CART_STEP`) — same fix, same reasoning, as `OrderBuilderPage.tsx`'s
+  // identical block. Purely a rendering concern: `activeStep`/`RETAILER_STEP`/etc. stay the real,
+  // unshifted indices everywhere else in this file.
+  const stepLabels = me?.retailerId ? STEP_LABELS.slice(1) : STEP_LABELS;
+  const displayActiveStep = me?.retailerId ? Math.max(0, activeStep - 1) : activeStep;
+
   function handleSelectRetailer(event: SelectChangeEvent) {
     setRetailerId(event.target.value);
     setLineItems([]);
@@ -207,9 +214,20 @@ export function NewGroupOrderPage() {
     setCustomers((current) =>
       current.map((customer) => ({
         ...customer,
+        // Seed from this same customer's *own* other line items that already embed
+        // the same underlying product — see `withSharedMeasurementsSynced`'s doc
+        // comment for the real cross-line-item measurement bug this (and its
+        // edit-time counterpart in `handleChangeCustomerMeasurements` below) fixes.
+        // Deliberately per-customer, not cross-customer: different customers have
+        // different bodies.
         measurementsByLineItem: {
           ...customer.measurementsByLineItem,
-          [newLineItem.id]: createEmptyLineItemMeasurementsDraft(superProduct.components),
+          [newLineItem.id]: seedSharedMeasurementsForNewLineItem(
+            superProduct.components,
+            lineItems,
+            customer.measurementsByLineItem,
+            superProducts ?? []
+          ),
         },
       }))
     );
@@ -294,13 +312,16 @@ export function NewGroupOrderPage() {
     setCustomers((current) =>
       current.map((customer) => {
         if (customer.key !== key) return customer;
-        const lineItemDraft = customer.measurementsByLineItem[lineItemId] ?? {};
         return {
           ...customer,
-          measurementsByLineItem: {
-            ...customer.measurementsByLineItem,
-            [lineItemId]: { ...lineItemDraft, [componentId]: next },
-          },
+          measurementsByLineItem: withSharedMeasurementsSynced(
+            customer.measurementsByLineItem,
+            lineItems,
+            superProducts ?? [],
+            lineItemId,
+            componentId,
+            next
+          ),
         };
       })
     );
@@ -407,8 +428,8 @@ export function NewGroupOrderPage() {
         New Group Order
       </Typography>
 
-      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-        {STEP_LABELS.map((label) => (
+      <Stepper activeStep={displayActiveStep} sx={{ mb: 4 }}>
+        {stepLabels.map((label) => (
           <Step key={label}>
             <StepLabel>{label}</StepLabel>
           </Step>

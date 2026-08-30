@@ -88,7 +88,9 @@ export const navGroups: NavGroup[] = [
       { label: "Tailors", path: "/factory/tailors", permission: "factory.tailors.manage" },
       { label: "Assign / Complete Job", path: "/factory/assign", permission: "factory.jobs.assign" },
       { label: "Extra Payment Categories", path: "/factory/extra-payment-categories", permission: "factory.extra_payments.manage" },
+      { label: "Extra Payments Approval", path: "/factory/extra-payments", permission: "factory.extra_payments.approve" },
       { label: "Payroll Settlement", path: "/factory/payroll", permission: "factory.payroll.settle" },
+      { label: "Worker Payment History", path: "/factory/payment-history", permission: "factory.payroll.settle" },
     ],
   },
   {
@@ -107,7 +109,10 @@ export const navGroups: NavGroup[] = [
     key: "invoice",
     label: "Invoice",
     icon: InvoiceIcon,
-    entries: [{ label: "Invoices", path: "/invoices", permission: "invoices.view" }],
+    entries: [
+      { label: "Invoices", path: "/invoices", permission: "invoices.view" },
+      { label: "Invoice Settings", path: "/invoice-settings", permission: "invoices.view" },
+    ],
   },
   {
     key: "shipping",

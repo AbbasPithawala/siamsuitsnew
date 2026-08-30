@@ -56,6 +56,10 @@ interface ShippingBoxListResponseEnvelope {
   data: ShippingBox[];
 }
 
+interface ItemSlipPdfResponseEnvelope {
+  data: { path: string };
+}
+
 function listShippingBoxesQuery(filter: ListShippingBoxesFilter | void): string {
   const params = new URLSearchParams();
   if (filter?.retailerId) params.set("retailerId", filter.retailerId);
@@ -142,6 +146,18 @@ export const shippingApi = baseApi.injectEndpoints({
         { type: "ShippingBox", id: "LIST" },
       ],
     }),
+    /**
+     * Legacy `OrderStatusBarcoding.jsx`'s "Generate QR" mode — independent of the
+     * shipping-box workflow above (see `shipping.routes.ts`'s doc comment on the
+     * matching route). Also flips the order's status to "Shipment" server-side; the
+     * response carries only the PDF path (no order id), so invalidate the whole
+     * `Order` list rather than a specific entry.
+     */
+    generateItemSlipPdf: builder.mutation<string, string>({
+      query: (componentId) => ({ url: `/shipping/components/${componentId}/slip-pdf`, method: "POST" }),
+      transformResponse: (response: ItemSlipPdfResponseEnvelope) => response.data.path,
+      invalidatesTags: [{ type: "Order", id: "LIST" }],
+    }),
   }),
 });
 
@@ -153,4 +169,5 @@ export const {
   useAddShippingBoxItemMutation,
   useRemoveShippingBoxItemMutation,
   useCloseShippingBoxMutation,
+  useGenerateItemSlipPdfMutation,
 } = shippingApi;

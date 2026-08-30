@@ -26,8 +26,14 @@ import {
 } from "../db/schema/index";
 import { hashPassword } from "./auth.service";
 import { createOrder } from "./orders.service";
-import { assignNextStep } from "./manufacturing.service";
-import { createExtraPayment, approveExtraPayment } from "./extra-payments.service";
+import { assignNextStep, completeStep } from "./manufacturing.service";
+import {
+  createExtraPayment,
+  approveExtraPayment,
+  rejectExtraPayment,
+  removeExtraPayment,
+  listExtraPayments,
+} from "./extra-payments.service";
 import { HttpError } from "../utils/http-error";
 
 const suffix = randomUUID();
@@ -46,6 +52,7 @@ describe("extra-payments.service", () => {
   let styleId: string;
   let otherStyleId: string;
   let tailorId: string;
+  let otherTailorId: string;
 
   let categoryMatchingId: string;
   let categoryWrongProcessId: string;
@@ -123,6 +130,13 @@ describe("extra-payments.service", () => {
     if (!tailor) throw new Error("Failed to create test tailor");
     tailorId = tailor.id;
 
+    const [otherTailor] = await db
+      .insert(tailors)
+      .values({ tenantId, name: "EP Other Test Tailor", username: `ep-other-tailor-${suffix}`, passwordHash })
+      .returning();
+    if (!otherTailor) throw new Error("Failed to create other test tailor");
+    otherTailorId = otherTailor.id;
+
     await db.insert(tailorProcesses).values([
       { tailorId, processId: processAId },
       { tailorId, processId: processBId },
@@ -184,7 +198,7 @@ describe("extra-payments.service", () => {
 
     if (categoryIds.length) await db.delete(extraPaymentCategories).where(inArray(extraPaymentCategories.id, categoryIds));
     await db.delete(tailorProcesses).where(eq(tailorProcesses.tailorId, tailorId));
-    await db.delete(tailors).where(eq(tailors.id, tailorId));
+    await db.delete(tailors).where(inArray(tailors.id, [tailorId, otherTailorId]));
     await db.delete(styles).where(inArray(styles.id, [styleId, otherStyleId]));
     await db.delete(features).where(eq(features.id, featureId));
     await db.delete(superProductComponents).where(eq(superProductComponents.id, superProductComponentId));
@@ -318,6 +332,151 @@ describe("extra-payments.service", () => {
       status: 409,
       code: "ALREADY_APPROVED",
     });
+  });
+
+  it("rejectExtraPayment flips rejected to true, and rejects rejecting an already-approved or already-rejected record", async () => {
+    const job = await createAssignedJob();
+    const created = await createExtraPayment(tenantId, job.id, categoryMatchingId);
+
+    const rejected = await rejectExtraPayment(tenantId, created.id);
+    expect(rejected.rejected).toBe(true);
+    expect(rejected.rejectedAt).not.toBeNull();
+    expect(rejected.approved).toBe(false);
+
+    await expect(rejectExtraPayment(tenantId, created.id)).rejects.toMatchObject({
+      status: 409,
+      code: "ALREADY_REJECTED",
+    });
+
+    const job2 = await createAssignedJob();
+    const approved = await createExtraPayment(tenantId, job2.id, categoryMatchingId);
+    await approveExtraPayment(tenantId, approved.id);
+    await expect(rejectExtraPayment(tenantId, approved.id)).rejects.toMatchObject({
+      status: 409,
+      code: "ALREADY_APPROVED",
+    });
+  });
+
+  it("approveExtraPayment refuses an already-rejected record", async () => {
+    const job = await createAssignedJob();
+    const created = await createExtraPayment(tenantId, job.id, categoryMatchingId);
+    await rejectExtraPayment(tenantId, created.id);
+
+    await expect(approveExtraPayment(tenantId, created.id)).rejects.toMatchObject({
+      status: 409,
+      code: "ALREADY_REJECTED",
+    });
+  });
+
+  it("removeExtraPayment hard-deletes an unapproved extra payment while its job is still assigned", async () => {
+    const job = await createAssignedJob();
+    await createExtraPayment(tenantId, job.id, categoryMatchingId);
+
+    const removed = await removeExtraPayment(tenantId, job.id, categoryMatchingId);
+    expect(removed.categoryId).toBe(categoryMatchingId);
+
+    // Gone for good — re-attaching the same category to the same job succeeds again,
+    // proving it was a real delete and not a soft state flip.
+    const recreated = await createExtraPayment(tenantId, job.id, categoryMatchingId);
+    expect(recreated.id).not.toBe(removed.id);
+  });
+
+  it("removeExtraPayment refuses an already-approved extra payment", async () => {
+    const job = await createAssignedJob();
+    const created = await createExtraPayment(tenantId, job.id, categoryMatchingId);
+    await approveExtraPayment(tenantId, created.id);
+
+    await expect(removeExtraPayment(tenantId, job.id, categoryMatchingId)).rejects.toMatchObject({
+      status: 409,
+      code: "EXTRA_PAYMENT_ALREADY_APPROVED",
+    });
+  });
+
+  it("removeExtraPayment refuses once the job's step is complete", async () => {
+    const job = await createAssignedJob();
+    await createExtraPayment(tenantId, job.id, categoryMatchingId);
+    await completeStep(tenantId, job.id);
+
+    await expect(removeExtraPayment(tenantId, job.id, categoryMatchingId)).rejects.toMatchObject({
+      status: 409,
+      code: "STEP_ALREADY_COMPLETE",
+    });
+  });
+
+  it("removeExtraPayment 404s cleanly when no extra payment exists for that job+category", async () => {
+    const job = await createAssignedJob();
+    await expect(removeExtraPayment(tenantId, job.id, categoryMatchingId)).rejects.toMatchObject({
+      status: 404,
+      code: "EXTRA_PAYMENT_NOT_FOUND",
+    });
+  });
+
+  it("createExtraPayment's actorTailorId (tailor-portal self-service): 404s a job assigned to a different tailor, succeeds for the actual assignee, and is a no-op when omitted", async () => {
+    const job = await createAssignedJob();
+
+    await expect(createExtraPayment(tenantId, job.id, categoryMatchingId, otherTailorId)).rejects.toMatchObject({
+      status: 404,
+      code: "JOB_NOT_FOUND",
+    });
+
+    const extraPayment = await createExtraPayment(tenantId, job.id, categoryMatchingId, tailorId);
+    expect(extraPayment.jobId).toBe(job.id);
+
+    const job2 = await createAssignedJob();
+    const viaOmitted = await createExtraPayment(tenantId, job2.id, categoryMatchingId);
+    expect(viaOmitted.jobId).toBe(job2.id);
+  });
+
+  it("removeExtraPayment's actorTailorId (tailor-portal self-service): 404s a job assigned to a different tailor, succeeds for the actual assignee, and is a no-op when omitted", async () => {
+    const job = await createAssignedJob();
+    await createExtraPayment(tenantId, job.id, categoryMatchingId);
+
+    await expect(removeExtraPayment(tenantId, job.id, categoryMatchingId, otherTailorId)).rejects.toMatchObject({
+      status: 404,
+      code: "JOB_NOT_FOUND",
+    });
+
+    const removed = await removeExtraPayment(tenantId, job.id, categoryMatchingId, tailorId);
+    expect(removed.categoryId).toBe(categoryMatchingId);
+
+    const job2 = await createAssignedJob();
+    await createExtraPayment(tenantId, job2.id, categoryMatchingId);
+    const removedViaOmitted = await removeExtraPayment(tenantId, job2.id, categoryMatchingId);
+    expect(removedViaOmitted.categoryId).toBe(categoryMatchingId);
+  });
+
+  it("listExtraPayments defaults to the pending queue and enriches tailor/category/order", async () => {
+    const job = await createAssignedJob();
+    const pending = await createExtraPayment(tenantId, job.id, categoryMatchingId);
+
+    const job2 = await createAssignedJob();
+    const toApprove = await createExtraPayment(tenantId, job2.id, categoryNoFeatureId);
+    await approveExtraPayment(tenantId, toApprove.id);
+
+    const pendingList = await listExtraPayments(tenantId);
+    const pendingIds = pendingList.map((ep) => ep.id);
+    expect(pendingIds).toContain(pending.id);
+    expect(pendingIds).not.toContain(toApprove.id);
+
+    const found = pendingList.find((ep) => ep.id === pending.id)!;
+    expect(found.tailor?.name).toBe("EP Test Tailor");
+    expect(found.category?.id).toBe(categoryMatchingId);
+    expect(found.order?.id).toBeTruthy();
+
+    const approvedList = await listExtraPayments(tenantId, { status: "approved" });
+    expect(approvedList.map((ep) => ep.id)).toContain(toApprove.id);
+    expect(approvedList.map((ep) => ep.id)).not.toContain(pending.id);
+  });
+
+  it("listExtraPayments filters by tailorId", async () => {
+    const job = await createAssignedJob();
+    const created = await createExtraPayment(tenantId, job.id, categoryMatchingId);
+
+    const matching = await listExtraPayments(tenantId, { status: "pending", tailorId });
+    expect(matching.map((ep) => ep.id)).toContain(created.id);
+
+    const nonMatching = await listExtraPayments(tenantId, { status: "pending", tailorId: randomUUID() });
+    expect(nonMatching.map((ep) => ep.id)).not.toContain(created.id);
   });
 
   it("HttpError is the rejection type used throughout", async () => {

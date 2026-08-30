@@ -23,6 +23,10 @@ const MANUFACTURING_ERROR_MESSAGES: Record<string, string> = {
   CATEGORY_PRODUCT_MISMATCH: "That extra payment category doesn't apply to this component's product.",
   STYLE_NOT_SELECTED: "That extra payment category's feature/style wasn't actually selected on this order.",
   DUPLICATE_EXTRA_PAYMENT: "This job already has an extra payment for that category.",
+  EXTRA_PAYMENT_NOT_FOUND: "That extra payment no longer exists.",
+  EXTRA_PAYMENT_ALREADY_APPROVED: "That extra payment was already approved and can't be removed here.",
+  ALREADY_APPROVED: "That extra payment was already approved.",
+  ALREADY_REJECTED: "That extra payment was already rejected.",
 };
 
 export function getManufacturingErrorMessage(error: unknown, fallback: string): string {

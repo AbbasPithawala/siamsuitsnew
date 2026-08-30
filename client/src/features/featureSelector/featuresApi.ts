@@ -5,10 +5,12 @@ export type FeatureType = "choice" | "text" | "structured";
 /**
  * A small, closed, system-defined set of "well-known roles" a feature can be assigned to
  * (PHASE_9_TASKS.md Decision 4) — Shoulder Type renders fixed on `<MeasurementForm>`,
- * Monogram Position nests inside `<MonogramFeatureField>`, instead of either appearing as
- * an ordinary styling tab. Mirrors the server's `feature_render_slot` Postgres enum.
+ * Monogram Position nests inside `<MonogramFeatureField>`, Piping renders as its own
+ * always-visible swatch grid instead of a tab in the styling picker (matches legacy — see
+ * `catalog.ts`'s `featureRenderSlotEnum` doc comment). Mirrors the server's
+ * `feature_render_slot` Postgres enum.
  */
-export type FeatureRenderSlot = "shoulder_type" | "monogram_position";
+export type FeatureRenderSlot = "shoulder_type" | "monogram_position" | "piping";
 
 export interface FeatureProductLink {
   id: string;

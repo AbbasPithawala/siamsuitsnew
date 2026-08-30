@@ -7,6 +7,19 @@ export const tenants = pgTable("tenants", {
   slug: text("slug").notNull(),
   plan: text("plan").notNull().default("standard"),
   isActive: boolean("is_active").notNull().default(true),
+  /**
+   * Invoice letterhead (logo/address/footer text) — legacy hardcoded this company info
+   * directly into every PDF template, which only worked because legacy served exactly one
+   * company. This rewrite is multi-tenant, so the same letterhead has to be tenant data, not
+   * template code — set once by each tenant, read by `invoicePdf.service.ts` for both the
+   * single-order and grouped-retailer-invoice PDFs. `logo` follows the same upload-URL
+   * convention as `retailers.logo` (resolved via `resolveServerImageUrl`), not a raw file
+   * path. All nullable: a tenant that hasn't configured its letterhead yet still gets a
+   * usable (just blank-lettered) invoice PDF rather than a failure.
+   */
+  logo: text("logo"),
+  address: text("address"),
+  invoiceFooterText: text("invoice_footer_text"),
   ...timestampColumns,
   ...softDeleteColumn,
 }, (table) => ({

@@ -1,5 +1,4 @@
 import { eq, inArray } from "drizzle-orm";
-import puppeteer, { type Browser } from "puppeteer";
 import QRCode from "qrcode";
 import { withTenant } from "../db/withTenant";
 import type { Transaction } from "../db/withTenant";
@@ -7,7 +6,11 @@ import { orders, orderGroups, customers, products, superProducts, measurementDef
 import { HttpError } from "../utils/http-error";
 import { requireOrder, assembleOrderDetail } from "./orders.service";
 import { requireRetailer } from "./customers.service";
-import { storageBackend } from "./storage.service";
+import { storageBackend, resolveServerImageUrl } from "./storage.service";
+import { PDF_FONT_FACE_CSS } from "./pdfFonts";
+import { closePdfBrowser, escapeHtml, renderHtmlToPdfBuffer, titleCase } from "./pdfRenderer";
+
+export { closePdfBrowser };
 
 type OrderDetail = Awaited<ReturnType<typeof assembleOrderDetail>>;
 type DetailItem = OrderDetail["items"][number];
@@ -70,10 +73,6 @@ async function loadDisplayData(tx: Transaction, detail: OrderDetail) {
 }
 
 type DisplayData = Awaited<ReturnType<typeof loadDisplayData>>;
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
-}
 
 /**
  * Shared choice-feature resolution: a style/style-option pair (or just a style) resolves
@@ -163,8 +162,8 @@ function renderMeasurements(component: DetailComponent, display: DisplayData): s
   const rows = component.measurements
     .map((m) => {
       const def = display.measurementDefinitionById.get(m.measurementDefinitionId);
-      const name = def?.name ?? m.measurementDefinitionId;
-      const label = def?.thaiName ? `${name}[${def.thaiName}]` : name;
+      const name = titleCase(def?.name ?? m.measurementDefinitionId);
+      const label = def?.thaiName ? `${name} [${def.thaiName}]` : name;
       const changed = m.changedFromProfile === true ? '<span class="changed-check" title="Changed from customer profile">&#10003;</span>' : "";
       return `<tr><td>${escapeHtml(label)}</td><td>${m.value ?? "-"}</td><td>${m.adjustmentValue ?? "-"}</td><td class="ttl-value">${m.totalValue ?? "-"}</td><td class="changed-col">${changed}</td></tr>`;
     })
@@ -195,7 +194,7 @@ function renderManualSizeSection(component: DetailComponent, product: ProductRow
   return `
     <div class="manual-size-image">
       <h4>Manual Size</h4>
-      <img src="${escapeHtml(image)}" alt="Manual Size" />
+      <img src="${escapeHtml(resolveServerImageUrl(image))}" alt="Manual Size" />
     </div>`;
 }
 
@@ -212,31 +211,57 @@ function renderMeasurementNoteTable(
   display: DisplayData
 ): string {
   const shoulderEntry = renderSlotEntries.find((e) => e.feature.renderSlot === "shoulder_type");
-  const rows = [`<tr><td>Measurement Note:</td><td>${escapeHtml(component.measurementNote ?? "N/A")}</td><td></td></tr>`];
+  const rows = [`<tr><td>Measurement Note:</td><td>${escapeHtml(component.measurementNote ?? "N/A")}</td></tr>`];
   if (shoulderEntry) {
-    const { label, image } = describeChoiceSelection(shoulderEntry.link, display);
-    rows.push(
-      `<tr><td>${escapeHtml(shoulderEntry.feature.name)}:</td><td>${escapeHtml(label)}</td><td>${
-        image ? `<img class="render-slot-image" src="${escapeHtml(image)}" alt="${escapeHtml(shoulderEntry.feature.name)}" />` : ""
-      }</td></tr>`
-    );
+    // Value only (audit item: the image column added visual noise for no benefit — the shoulder
+    // type's own selected image is a picker aid on the order-builder side, not something a
+    // production ticket needs repeated here).
+    const { label } = describeChoiceSelection(shoulderEntry.link, display);
+    rows.push(`<tr><td>${escapeHtml(shoulderEntry.feature.name)}:</td><td>${escapeHtml(label)}</td></tr>`);
   }
   return `<table class="measurement-note-table"><tbody>${rows.join("")}</tbody></table>`;
 }
 
-/** Fabric/Lining/Piping (audit item 4) — one bordered card per `text`-type feature actually linked to the component, labeled generically off the feature's own name, never a hardcoded field name. Rendered identically on both of a unit's detail pages (legacy literally repeats this section on its second page too). */
-function renderTextFeatureCards(textEntries: { link: DetailFeature; feature: FeatureRow }[]): string {
-  if (textEntries.length === 0) return "";
-  const cards = textEntries
-    .map(
-      ({ link, feature }) => `
+/**
+ * Fabric/Lining/Piping (audit item 4) — one bordered card per `text`-type feature actually
+ * linked to the component, PLUS the `renderSlot === "piping"` feature if one's linked (a real
+ * reported gap: Piping is a `choice` feature, not `text`, so it needs its selected style's
+ * name, not a `textValue`, to land in this same row — the real user-facing requirement is
+ * "Piping belongs in this exact box with Fabric/Lining, not off on its own"). Labeled
+ * generically off each feature's own name/Thai name (legacy's real "FABRIC ผ้า"/"LINING
+ * ซับใน" labels are exactly this: an uppercase English name plus the feature's own Thai name,
+ * not a hardcoded field), never a hardcoded field name. Rendered identically on both of a
+ * unit's detail pages (legacy literally repeats this section on its second page too).
+ */
+function renderFabricLiningPipingCards(
+  textEntries: { link: DetailFeature; feature: FeatureRow }[],
+  pipingEntry: { link: DetailFeature; feature: FeatureRow } | undefined,
+  display: DisplayData
+): string {
+  const entries: { feature: FeatureRow; value: string }[] = textEntries.map(({ link, feature }) => ({
+    feature,
+    value: link.textValue ?? "-",
+  }));
+  if (pipingEntry) {
+    entries.push({ feature: pipingEntry.feature, value: describeChoiceSelection(pipingEntry.link, display).label });
+  }
+  if (entries.length === 0) return "";
+
+  const cards = entries
+    .map(({ feature, value }) => {
+      const label = feature.thaiName ? `${feature.name.toUpperCase()} ${feature.thaiName}` : feature.name.toUpperCase();
+      return `
       <div class="detail-card">
-        <h5>${escapeHtml(feature.name)}</h5>
-        <p>${escapeHtml(link.textValue ?? "-")}</p>
-      </div>`
-    )
+        <h5>${escapeHtml(label)}</h5>
+        <p>${escapeHtml(value)}</p>
+      </div>`;
+    })
     .join("");
-  return `<div class="detail-cards">${cards}</div>`;
+  // Column count matches the real entry count, not a fixed 3 — so this box always spans the
+  // same full width as the Measurement Note table above it (a real reported mismatch: with
+  // Piping now folded in here too, a 2-entry order previously left a fixed 3rd grid column
+  // empty, visibly narrowing the box relative to its neighbor).
+  return `<div class="detail-cards" style="grid-template-columns: repeat(${entries.length}, 1fr);">${cards}</div>`;
 }
 
 /**
@@ -258,7 +283,7 @@ function renderStylingIconGrid(iconFeatures: { link: DetailFeature; feature: Fea
       return `
         <div class="icon-card">
           <h6>${escapeHtml(feature.name)}</h6>
-          ${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(label)}" />` : ""}
+          ${image ? `<img src="${escapeHtml(resolveServerImageUrl(image))}" alt="${escapeHtml(label)}" />` : ""}
           <p>${escapeHtml(label)}</p>
           ${thaiName ? `<p class="thai-name">${escapeHtml(thaiName)}</p>` : ""}
         </div>`;
@@ -267,17 +292,26 @@ function renderStylingIconGrid(iconFeatures: { link: DetailFeature; feature: Fea
   return `<div class="styling-icon-grid">${cards}</div>`;
 }
 
-/** Legacy's smaller text-only "additional details" row (page 3) — every `is_additional` choice feature, value + Thai name, no image (legacy never shows one here either). */
+/**
+ * Its own separate, distinctly-boxed "Additional styles" section on the second unit-detail
+ * page — never merged into the normal styling icon grid on the first page, matching the
+ * order builder's own real "Show Additional styles" split (`FeatureSelector.tsx`'s
+ * `AdditionalStylesSection`), just always-visible here since a PDF has no checkbox to
+ * gate it behind. Same real picture-card look as the normal grid (a real reported gap —
+ * this used to be text-only, no image, unlike the order builder's own additional-styles
+ * tiles, which are the exact same `StyleOptionButton` picture cards as normal styles).
+ */
 function renderAdditionalFeatureCards(additionalFeatures: { link: DetailFeature; feature: FeatureRow }[], display: DisplayData): string {
   if (additionalFeatures.length === 0) return "";
   const cards = additionalFeatures
     .map(({ link, feature }) => {
-      const { label, thaiName } = describeChoiceSelection(link, display);
-      const value = thaiName ? `${thaiName} / ${label}` : label;
+      const { label, thaiName, image } = describeChoiceSelection(link, display);
       return `
         <div class="additional-card">
           <h6>${escapeHtml(feature.name)}</h6>
-          <p>${escapeHtml(value)}</p>
+          ${image ? `<img src="${escapeHtml(resolveServerImageUrl(image))}" alt="${escapeHtml(label)}" />` : ""}
+          <p>${escapeHtml(label)}</p>
+          ${thaiName ? `<p class="thai-name">${escapeHtml(thaiName)}</p>` : ""}
         </div>`;
     })
     .join("");
@@ -310,10 +344,13 @@ function renderMonogramBlock(
   const positionEntry = renderSlotEntries.find((e) => e.feature.renderSlot === "monogram_position");
   const position = positionEntry ? describeChoiceSelection(positionEntry.link, display).label : "-";
   const value = (structuredEntry.link.structuredValue ?? {}) as MonogramStructuredValueShape;
+  const heading = structuredEntry.feature.thaiName
+    ? `${structuredEntry.feature.name} / ${structuredEntry.feature.thaiName}`
+    : structuredEntry.feature.name;
 
   return `
     <div class="monogram-block">
-      <h4>${escapeHtml(structuredEntry.feature.name)}</h4>
+      <h4>${escapeHtml(heading)}</h4>
       <table class="monogram-fields">
         <tbody>
           <tr><td>Position</td><td>${escapeHtml(position)}</td></tr>
@@ -335,39 +372,35 @@ function renderStylingNoteBox(component: DetailComponent): string {
     </div>`;
 }
 
-function renderManufacturingSteps(component: DetailComponent, display: DisplayData): string {
-  if (component.manufacturingSteps.length === 0) return "";
-  const items = component.manufacturingSteps
-    .map((s) => `<span class="step step-${s.status}">${escapeHtml(display.processById.get(s.processId)?.name ?? s.processId)}: ${s.status}</span>`)
-    .join(" &rarr; ");
-  return `<p class="steps">${items}</p>`;
-}
-
 function renderCustomerName(customer: Customer): string {
   return [customer.firstName, customer.lastName].filter((v): v is string => Boolean(v)).join(" ");
 }
 
 /**
- * Old Order / Rush / Repeat / Modified banners (audit item 8), styled with legacy's
- * red/green color-coding *intent* rather than byte-identical markup. The "Modified"
+ * Rush / Repeat / Modified banners (audit item 8) — matches legacy's real presentation
+ * exactly: plain bold colored text rows in the header-left column (`Modified on :`/`Rush
+ * Order :` in red, `Repeat Order` in green), not colored "pill" badges. The "Modified"
  * banner reads `orders.last_modified_at`, stamped by PHASE_10_TASKS.md Workstream E
- * Group 6.2's status-transition action (`setOrderStatus`) — `lastModifiedAt` alone,
- * not `status === "Modified"`, since `reassignOrderRetailer`/`editOrderItems` also
- * stamp it on any real edit, and a re-generated PDF should always show the true
- * last-touched date regardless of which specific status the order currently holds.
- * Now rendered once per page (inside `renderPageHeader`), not once for the whole document.
+ * Group 6.2's status-transition action (`setOrderStatus`) — `lastModifiedAt` alone, not
+ * `status === "Modified"`, since `reassignOrderRetailer`/`editOrderItems` also stamp it on
+ * any real edit, and a re-generated PDF should always show the true last-touched date
+ * regardless of which specific status the order currently holds.
+ *
+ * Old Order # and Group Order # are deliberately NOT repeated here — `renderPageHeader`'s
+ * own `left`/`middle` columns already show both exactly once (legacy shows each exactly
+ * once too — a prior version of this function duplicated them a second time as banners,
+ * which legacy never does). Class names (`badge-rush`/`badge-repeat`/`banner-modified`)
+ * kept as-is even though the visual is now plain text, not a pill — existing callers/tests
+ * key off them.
  */
-function renderBanners(detail: OrderDetail, oldOrderNumber: string | null, groupOrderNumber: string | null): string {
-  const badges: string[] = [];
-  if (detail.isRush) badges.push('<span class="badge badge-rush">RUSH</span>');
-  if (detail.isRepeat) badges.push('<span class="badge badge-repeat">REPEAT</span>');
-
+function renderBanners(detail: OrderDetail): string {
   const rows: string[] = [];
-  if (badges.length > 0) rows.push(`<div class="badges">${badges.join(" ")}</div>`);
-  if (oldOrderNumber) rows.push(`<div class="banner banner-old-order">Old Order #: ${escapeHtml(oldOrderNumber)}</div>`);
-  if (groupOrderNumber) rows.push(`<div class="banner banner-group-order">Group Order #: ${escapeHtml(groupOrderNumber)}</div>`);
+  if (detail.isRush) rows.push('<div class="badge badge-rush">Rush Order :</div>');
+  if (detail.isRepeat) rows.push('<div class="badge badge-repeat">Repeat Order</div>');
   if (detail.lastModifiedAt) {
-    rows.push(`<div class="banner banner-modified">Modified on: ${escapeHtml(new Date(detail.lastModifiedAt).toLocaleDateString())}</div>`);
+    rows.push(
+      `<div class="banner banner-modified">Modified on : ${escapeHtml(new Date(detail.lastModifiedAt).toLocaleDateString())}</div>`
+    );
   }
   if (rows.length === 0) return "";
   return `<div class="order-banners">${rows.join("")}</div>`;
@@ -393,6 +426,8 @@ interface HeaderUnitContext {
   unitIndex: number;
   totalUnits: number;
   superProductName: string;
+  /** The real component's own product — distinct from `superProductName` (audit item: "1 Suit" alone didn't say *which* of the Suit's components this particular page was for). */
+  productName: string;
 }
 
 interface PageHeaderParams {
@@ -404,7 +439,6 @@ interface PageHeaderParams {
   orderTypeLabel: string;
   qrDataUrl: string;
   qrCaption: string;
-  quantitySummaryHtml: string;
   unit?: HeaderUnitContext;
 }
 
@@ -416,7 +450,7 @@ interface PageHeaderParams {
  * {super product name}", the per-unit QR).
  */
 function renderPageHeader(params: PageHeaderParams): string {
-  const { detail, retailer, customer, oldOrderNumber, groupOrderNumber, orderTypeLabel, qrDataUrl, qrCaption, quantitySummaryHtml, unit } = params;
+  const { detail, retailer, customer, oldOrderNumber, groupOrderNumber, orderTypeLabel, qrDataUrl, qrCaption, unit } = params;
   const genderLabel = customer.gender ?? "-";
 
   const left = `
@@ -427,25 +461,27 @@ function renderPageHeader(params: PageHeaderParams): string {
       }</div>
       ${unit ? `<div class="header-row"><span class="label">Quantity</span><span>${unit.unitIndex} OF ${unit.totalUnits}</span></div>` : ""}
       <div class="header-row"><span class="label">Old Order:</span><span>${escapeHtml(oldOrderNumber ?? "None")}</span></div>
-      ${renderBanners(detail, oldOrderNumber, groupOrderNumber)}
+      ${renderBanners(detail)}
     </div>`;
 
+  // The unit-level box's own `unit-label` ("1 Jacket") already says which item this page is
+  // for — the whole-order `quantity-list` repeated the exact same text for a single-item
+  // order (a real, reported redundancy), so it's summary-page-only now, in the footer bar.
   const middle = `
     <div class="header-middle">
       ${unit ? `<div class="gender-label">${escapeHtml(genderLabel)}</div>` : ""}
-      <div class="order-info-box">
+      <div class="order-info-box${unit ? " order-info-box-unit" : ""}">
         <div class="order-number">${escapeHtml(detail.orderNumber)}</div>
         <div>${escapeHtml(orderTypeLabel)}</div>
         ${groupOrderNumber ? `<div>${escapeHtml(groupOrderNumber)}</div>` : ""}
-        ${unit ? `<div class="unit-label">${unit.unitIndex} ${escapeHtml(unit.superProductName)}</div>` : ""}
+        ${unit ? `<div class="unit-label">${unit.unitIndex} ${escapeHtml(titleCase(unit.superProductName))} (${escapeHtml(titleCase(unit.productName))})</div>` : ""}
       </div>
-      ${unit ? `<div class="quantity-list">${quantitySummaryHtml}</div>` : ""}
     </div>`;
 
   const right = `
     <div class="header-right">
       <div class="header-qr"><img src="${qrDataUrl}" alt="QR code" /><span>${escapeHtml(qrCaption)}</span></div>
-      ${retailer.logo ? `<img class="retailer-logo" src="${escapeHtml(retailer.logo)}" alt="${escapeHtml(retailer.name)}" />` : ""}
+      ${retailer.logo ? `<img class="retailer-logo" src="${escapeHtml(resolveServerImageUrl(retailer.logo))}" alt="${escapeHtml(retailer.name)}" />` : ""}
     </div>`;
 
   return `<div class="page-header">${left}${middle}${right}</div>`;
@@ -457,19 +493,23 @@ function renderPageHeader(params: PageHeaderParams): string {
  * suit/tuxedo `rowspan=2` trick (PHASE_10_TASKS.md Workstream B's disclosed intentional
  * deviation) — every component gets its own row regardless of how many siblings it has.
  */
-async function renderSummaryRow(component: DetailComponent, display: DisplayData, unitLabel: string): Promise<string> {
+async function renderSummaryRow(
+  component: DetailComponent,
+  display: DisplayData,
+  unitLabel: string
+): Promise<{ html: string; primaryFeatureName: string | null }> {
   const product = display.productById.get(component.productId);
   const qrDataUrl = await QRCode.toDataURL(component.id, { margin: 1, width: 90 });
   const primary = findInlineTextFeatures(component, display)[0];
-  const primaryLabel = primary ? `${escapeHtml(primary.feature.name)}: ${escapeHtml(primary.link.textValue ?? "-")}` : "-";
 
-  return `
+  const html = `
     <tr class="summary-row" data-component-id="${escapeHtml(component.id)}">
-      <td>${escapeHtml(product?.name ?? component.slotLabel)}</td>
-      <td>${escapeHtml(unitLabel)}</td>
-      <td class="primary-detail">${primaryLabel}</td>
+      <td>${escapeHtml(titleCase(product?.name ?? component.slotLabel))}</td>
+      <td>${escapeHtml(titleCase(unitLabel))}</td>
+      <td class="primary-detail">${escapeHtml(titleCase(primary?.link.textValue ?? "-"))}</td>
       <td class="qr-cell"><img src="${qrDataUrl}" alt="QR code for ${escapeHtml(component.id)}" /><br /><span>${escapeHtml(component.id)}</span></td>
     </tr>`;
+  return { html, primaryFeatureName: primary?.feature.name ?? null };
 }
 
 async function renderSummaryPage(
@@ -484,12 +524,26 @@ async function renderSummaryPage(
       item.components.map((component) => renderSummaryRow(component, display, unitLabelById.get(component.id) ?? component.slotLabel))
     )
   );
+  // The column header names itself off whichever real text feature actually supplied the
+  // "primary detail" values below it (first row that has one) — generic, not a hardcoded
+  // "Fabric" literal, but in practice that's exactly what it resolves to for garments that
+  // have one, since it's `findInlineTextFeatures`' alphabetically-first pick.
+  const primaryColumnLabel = rows.find((r) => r.primaryFeatureName)?.primaryFeatureName ?? "Detail";
+  // `headerHtml` lives inside the table's own `<thead>` (as a full-width row, not a sibling
+  // element before the table) specifically so it repeats on every printed page this table
+  // naturally overflows onto — a real reported bug: an order with enough line items to spill
+  // onto a second page showed that continuation page with no header at all, since a plain
+  // preceding `<div>` has no browser-native "repeat across page breaks" behavior the way a
+  // `<thead>` row does. Chromium's print engine (`page.pdf()`) repeats `<thead>` content on
+  // every page a `<table>` spans, so this needs no manual row-chunking/page-height guessing.
   return `
     <section class="summary-page">
-      ${headerHtml}
       <table class="summary-table">
-        <thead><tr><th>Product</th><th>Unit</th><th>Primary Detail</th><th>QR</th></tr></thead>
-        <tbody>${rows.join("")}</tbody>
+        <thead>
+          <tr class="summary-page-header-row"><td colspan="4">${headerHtml}</td></tr>
+          <tr><th>Product</th><th>Unit</th><th>${escapeHtml(titleCase(primaryColumnLabel))}</th><th>QR</th></tr>
+        </thead>
+        <tbody>${rows.map((r) => r.html).join("")}</tbody>
       </table>
       <div class="quantity-footer-bar">${quantityFooterHtml}</div>
     </section>`;
@@ -511,23 +565,22 @@ function renderComponentDetailPages(
   headerHtml: string
 ): string {
   const { textEntries, structuredEntry, renderSlotEntries, iconFeatures, additionalFeatures } = partitionFeatures(component, display);
-  const fabricCards = renderTextFeatureCards(textEntries);
+  const pipingEntry = renderSlotEntries.find((e) => e.feature.renderSlot === "piping");
+  const fabricCards = renderFabricLiningPipingCards(textEntries, pipingEntry, display);
 
   const measurementsPage = `
     <section class="detail-page measurements-page" data-component-id="${escapeHtml(component.id)}">
       ${headerHtml}
-      ${renderManufacturingSteps(component, display)}
       <div class="measurements-layout">
         <div class="measurements-column">
-          <h4>Measurements</h4>
           ${renderMeasurements(component, display)}
         </div>
         <div class="manual-size-column">
           ${renderManualSizeSection(component, product)}
           ${renderMeasurementNoteTable(component, renderSlotEntries, display)}
+          ${fabricCards}
         </div>
       </div>
-      ${fabricCards}
       ${renderStylingIconGrid(iconFeatures, display)}
     </section>`;
 
@@ -548,7 +601,7 @@ function renderComponentDetailPages(
     ? `
     <section class="detail-page reference-image-page" data-component-id="${escapeHtml(component.id)}">
       <h3>${escapeHtml(`${product?.name ?? component.slotLabel} (${orderNumber})`)}</h3>
-      <img src="${escapeHtml(component.referenceImage)}" alt="Reference" />
+      <img src="${escapeHtml(resolveServerImageUrl(component.referenceImage))}" alt="Reference" />
     </section>`
     : "";
 
@@ -561,84 +614,115 @@ function renderCustomerImagePage(customer: Customer): string {
   return `
     <section class="customer-image-page">
       <h2>Customer Image</h2>
-      <img class="customer-image" src="${escapeHtml(customer.image)}" alt="Customer" />
+      <img class="customer-image" src="${escapeHtml(resolveServerImageUrl(customer.image))}" alt="Customer" />
     </section>`;
 }
 
+/**
+ * Values below are taken directly from legacy `routes.order.js`'s `createPdf` handler's own
+ * inline styles (its module comment/audit references its exact literal `font-size`/`color`/
+ * `border` values), not approximated — this is the "same fonts, same font sizes, boxes,
+ * tables, colors" fidelity pass. Applied to this file's existing generic, semantic class
+ * names (`.detail-card`, `.icon-card`, etc.) rather than reintroducing legacy's own
+ * inline-style-per-element/per-product-name-branch approach — the visual result matches,
+ * the markup stays maintainable and product-agnostic.
+ */
 const STYLES = `
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1a1a1a; }
-  h1, h2, h3, h4, h5, h6 { font-family: inherit; }
-  table { width: 100%; border-collapse: collapse; margin: 4px 0 10px; }
-  th, td { border: 1px solid #ddd; padding: 3px 5px; text-align: left; font-size: 11px; }
-  .empty { color: #999; font-style: italic; }
-  .thai { display: block; font-size: 9px; color: #777; }
+  ${PDF_FONT_FACE_CSS}
 
-  .page-header { display: flex; justify-content: space-between; gap: 16px; border: 1px solid #1a1a1a; padding: 8px; margin-bottom: 8px; }
+  /* Real reported bug: table borders rendered inconsistently dark/light across the same page —
+     Chromium's print pipeline applies its own "economy" color adjustment to printed output by
+     default, which can subtly vary border/text darkness page to page unless told not to. */
+  body { font-family: 'Montserrat', 'Noto Sans Thai', sans-serif; font-size: 12px; font-weight: 400; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1, h2, h3, h4, h5, h6 { font-family: inherit; font-weight: 400; margin: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 4px 0 10px; }
+  th, td { border: 1px solid #000; padding: 3px 5px; text-align: left; font-size: 12px; }
+  .empty { color: #999; font-style: italic; }
+  .thai { display: block; font-size: 10px; color: #444; }
+
+  .page-header { display: flex; justify-content: space-between; gap: 20px; border: 1px solid #000; padding: 10px 1rem; margin-bottom: 8px; }
   .header-left, .header-middle, .header-right { flex: 1; }
-  .header-row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; position: relative; }
-  .header-row .label { color: #444; }
-  .gender-inline { position: absolute; right: 0; text-transform: uppercase; font-size: 10px; }
+  .header-row { display: flex; gap: 8px; align-items: center; margin-bottom: .5rem; position: relative; }
+  .header-row .label { color: #000; }
+  .gender-inline { position: absolute; right: 0; text-transform: uppercase; font-size: 12px; }
   .header-middle { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
-  .gender-label { font-weight: bold; }
-  .order-info-box { border: 1px solid #1a1a1a; padding: 4px 10px; display: flex; flex-direction: column; align-items: center; }
+  .gender-label { font-size: 15px; }
+  .order-info-box { border: 1px solid #000; padding: 4px 10px; display: flex; flex-direction: column; align-items: center; font-size: 15px; }
+  .order-info-box-unit { font-size: 12px; }
   .order-number { text-decoration: underline; }
   .unit-label { text-transform: capitalize; }
-  .quantity-list { display: flex; flex-direction: column; gap: 2px; font-size: 10px; }
   .header-right { display: flex; gap: 12px; justify-content: flex-end; align-items: flex-start; }
   .header-qr { text-align: center; }
-  .header-qr img { width: 70px; height: 70px; }
-  .header-qr span { display: block; font-size: 8px; word-break: break-all; max-width: 90px; }
-  .retailer-logo { max-height: 60px; max-width: 140px; object-fit: contain; }
+  .header-qr img { width: 80px; height: 80px; object-fit: contain; }
+  .header-qr span { display: block; font-size: .6rem; word-break: break-all; max-width: 100px; }
+  .retailer-logo { max-height: 80px; max-width: 140px; object-fit: contain; }
 
   .order-banners { margin-top: 4px; }
-  .badges { margin-bottom: 4px; }
-  .badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-right: 6px; color: #fff; }
-  .badge-rush { background: #c0392b; }
-  .badge-repeat { background: #27ae60; }
-  .banner { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; margin: 0 6px 4px 0; }
-  .banner-old-order { background: #fdecea; color: #c0392b; border: 1px solid #c0392b; }
-  .banner-group-order { background: #eafaf1; color: #1e8449; border: 1px solid #1e8449; }
-  .banner-modified { background: #fff8e1; color: #b7791f; border: 1px solid #b7791f; }
+  .badge, .banner { display: block; font-size: 15px; font-weight: 600; margin-bottom: .5rem; }
+  .badge-rush, .banner-modified { color: #ff0000; }
+  .badge-repeat { color: #008000; }
 
   .summary-page { margin-bottom: 12px; }
-  .summary-table th, .summary-table td { text-align: center; }
+  .summary-page-header-row > td { border: none; padding: 0; }
+  .summary-table th, .summary-table td { text-align: center; padding: 5px; }
+  .summary-table td { font-weight: 600; }
   .summary-table .primary-detail { text-align: left; }
-  .qr-cell img { width: 60px; height: 60px; }
-  .quantity-footer-bar { display: flex; justify-content: space-evenly; border: 1px solid #1a1a1a; padding: 6px; margin-top: 8px; }
-  .quantity-line { text-transform: capitalize; }
+  .qr-cell img { width: 80px; height: 80px; }
+  .qr-cell span { font-size: .6rem; font-weight: 400; }
+  .quantity-footer-bar { display: flex; justify-content: space-evenly; border: 1px solid #000; padding: 6px; margin-top: 8px; }
+  .quantity-line { text-transform: capitalize; font-size: 1rem; }
 
   .detail-page { page-break-before: always; padding-top: 4px; }
-  .steps { font-size: 10px; color: #444; }
 
   .measurements-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
-  .measurements td.ttl-value { font-weight: bold; color: #c0392b; }
-  .changed-col { text-align: center; width: 30px; }
-  .changed-check { color: #1e8449; font-weight: bold; font-size: 13px; }
-  .manual-size-image img { width: 100%; max-width: 420px; max-height: 220px; object-fit: contain; }
+  /* Fixed column widths (real reported bug: with table-layout: auto's default sizing, a long
+     combined "Name [Thai Name]" label squeezed against the narrow value columns overflowed its
+     own cell, visibly breaking the row borders next to it). The label column gets the bulk of
+     the width and wraps normally; the numeric/checkmark columns stay narrow and fixed. */
+  .measurements { table-layout: fixed; }
+  .measurements th:first-child, .measurements td:first-child { width: 40%; word-break: break-word; }
+  .measurements th:nth-child(2), .measurements td:nth-child(2),
+  .measurements th:nth-child(3), .measurements td:nth-child(3),
+  .measurements th:nth-child(4), .measurements td:nth-child(4) { width: 16%; }
+  .measurements th:last-child, .measurements td:last-child { width: 12%; }
+  /* box-shadow, not border-bottom: this table uses border-collapse: collapse, and a red
+     border here would sit directly against this cell's own neighbors' plain black borders at
+     the exact same shared edge — collapsed-border conflict resolution between differently
+     colored borders on adjacent cells is what actually caused the reported "some lines render
+     darker/lighter, not symmetric" defect (Chromium's real conflict-resolution behavior when
+     collapsing differently-colored borders, not a fixed/predictable choice). box-shadow draws
+     entirely outside the table border model, so it can never conflict with a neighbor's border. */
+  .measurements th:nth-child(4) { box-shadow: inset 0 -2px 0 0 #ff0000; }
+  .measurements td.ttl-value { font-weight: bold; color: #ff0000; }
+  .changed-col { text-align: center; }
+  .changed-check { color: #1f513a; font-weight: bold; font-size: 14px; }
+  .manual-size-image img { width: 100%; max-width: 480px; max-height: 320px; object-fit: contain; }
   .measurement-note-table td { vertical-align: middle; }
-  .render-slot-image { width: 50px; height: 50px; object-fit: contain; }
 
-  .detail-cards { display: flex; gap: 10px; margin: 8px 0; }
-  .detail-card { border: 1px solid #1a1a1a; border-radius: 4px; padding: 6px 10px; flex: 1; text-align: center; }
-  .detail-card h5 { margin: 0 0 4px; font-size: 11px; }
+  .detail-cards { display: grid; gap: 0; margin: 8px 0; }
+  .detail-card { border: 1px solid #000; padding: 5px; text-align: center; }
+  .detail-card h5 { font-size: 12px; padding-bottom: 5px; margin-bottom: 2px; border-bottom: 1px solid #000; }
 
-  .styling-icon-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
-  .icon-card { border: 1px solid #ccc; border-radius: 4px; padding: 6px; width: 110px; text-align: center; }
-  .icon-card img { width: 90px; height: 90px; object-fit: contain; display: block; margin: 4px auto; }
-  .icon-card h6 { margin: 0; font-size: 10px; text-transform: capitalize; }
-  .icon-card p { margin: 2px 0; font-size: 10px; text-transform: capitalize; }
-  .thai-name { color: #666; }
+  .styling-icon-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; align-items: stretch; }
+  .icon-card { text-align: center; min-width: 110px; max-width: 150px; border: 1px solid #ccc; border-radius: 8px; padding: 6px; }
+  .icon-card img { width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto; }
+  .icon-card h6 { margin: 2px; font-size: 12px; text-transform: capitalize; }
+  .icon-card p { margin: 2px; font-size: 12px; text-transform: capitalize; }
+  .thai-name { color: #333; }
 
-  .additional-feature-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-  .additional-card { border: 1px solid #1a1a1a; border-radius: 4px; padding: 4px 8px; text-align: center; min-width: 90px; }
-  .additional-card h6 { margin: 0 0 4px; font-size: 10px; text-transform: capitalize; }
+  .additional-feature-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; align-items: stretch; }
+  .additional-card { text-align: center; min-width: 110px; max-width: 150px; border: 1px solid #ccc; border-radius: 8px; padding: 6px; }
+  .additional-card img { width: 90px; height: 90px; object-fit: contain; display: block; margin: 0 auto; }
+  .additional-card h6 { margin: 2px; font-size: 12px; text-transform: capitalize; }
+  .additional-card p { margin: 2px; font-size: 12px; text-transform: capitalize; }
 
   .monogram-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
-  .monogram-block { border: 1px solid #1a1a1a; border-radius: 4px; padding: 8px; }
-  .monogram-block h4 { margin: 0 0 6px; font-size: 13px; text-align: center; }
-  .monogram-fields td { border: none; padding: 2px 6px; font-size: 11px; }
-  .styling-note-box { border: 1px solid #1a1a1a; padding: 6px; margin-top: 8px; text-align: center; }
-  .styling-note-box h5 { margin: 0 0 4px; }
+  .monogram-block { border: 1px solid #000; }
+  .monogram-block h4 { font-size: 14px; text-align: center; border-bottom: 1px solid #000; padding: 10px 0; }
+  .monogram-fields td { padding: 8px 5px; }
+  .styling-note-box { border: 1px solid #000; padding: 5px; margin-top: 8px; width: 98%; }
+  .styling-note-box h5 { font-size: 12px; text-align: center; }
+  .styling-note-box p { text-align: center; padding-top: 5px; margin-top: 10px; border-top: 1px solid #000; }
 
   .reference-image-page { text-align: center; }
   .reference-image-page img { max-width: 100%; max-height: 70vh; object-fit: contain; }
@@ -686,7 +770,6 @@ async function renderOrderHtml(
     orderTypeLabel,
     qrDataUrl: orderQrDataUrl,
     qrCaption: detail.orderNumber,
-    quantitySummaryHtml,
   });
   const summaryPage = await renderSummaryPage(detail, display, summaryHeader, quantitySummaryHtml, unitLabelById);
 
@@ -703,11 +786,11 @@ async function renderOrderHtml(
         orderTypeLabel,
         qrDataUrl,
         qrCaption: component.id,
-        quantitySummaryHtml,
         unit: {
           unitIndex: unitIndexById.get(component.id) ?? 0,
           totalUnits,
           superProductName: unitSuperProductNameById.get(component.id) ?? "Item",
+          productName: product?.name ?? component.slotLabel,
         },
       });
       return renderComponentDetailPages(detail.orderNumber, item, component, product, display, unitHeader);
@@ -728,75 +811,6 @@ async function renderOrderHtml(
     ${customerImagePage}
   </body>
 </html>`;
-}
-
-/** A single reused Chromium instance across calls, launched lazily on first use — cheaper than the legacy's launch-per-request, and closed explicitly by `closePdfBrowser` (tests, graceful shutdown). */
-let browserPromise: Promise<Browser> | null = null;
-
-// Puppeteer's own child-process cleanup only fires on a graceful Node exit; a Vitest
-// worker or dev-server restart that gets torn down without one leaves the spawned
-// chrome.exe orphaned (confirmed repeatedly this project — see PHASE_6_TASKS.md Group 6/7
-// notes). Killing the tracked pid directly on `exit` catches those cases too.
-function registerExitCleanup(browser: Browser): void {
-  const pid = browser.process()?.pid;
-  if (!pid) return;
-  process.once("exit", () => {
-    try {
-      process.kill(pid);
-    } catch {
-      // already exited
-    }
-  });
-}
-
-async function getBrowser(): Promise<Browser> {
-  if (browserPromise) {
-    const existing = await browserPromise;
-    if (existing.connected) return existing;
-    browserPromise = null;
-  }
-  browserPromise = puppeteer
-    .launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] })
-    .then((browser) => {
-      registerExitCleanup(browser);
-      return browser;
-    });
-  return browserPromise;
-}
-
-export async function closePdfBrowser(): Promise<void> {
-  if (browserPromise) {
-    const browser = await browserPromise;
-    await browser.close();
-    browserPromise = null;
-  }
-}
-
-async function renderHtmlToPdfBuffer(html: string): Promise<Buffer> {
-  const browser = await getBrowser();
-  const page = await browser.newPage();
-  try {
-    // `domcontentloaded`, not `networkidle0`: the page has no external resources (QR
-    // codes are inline data URIs) other than possible retailer-logo/reference-image/
-    // customer-image URLs, and we don't want PDF generation to hang or fail on a slow/
-    // unreachable image host.
-    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30000 });
-    const buffer = await page.pdf({
-      format: "A4",
-      landscape: true,
-      printBackground: true,
-      margin: { top: "10mm", bottom: "16mm", left: "10mm", right: "10mm" },
-      displayHeaderFooter: true,
-      headerTemplate: "<span></span>",
-      // Puppeteer's own page-number interpolation convention: these two class names,
-      // not literal "X"/"Y" text — populated by Chromium itself at render time.
-      footerTemplate:
-        '<div style="width:100%; font-size:9px; text-align:center; color:#666;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>',
-    });
-    return Buffer.from(buffer);
-  } finally {
-    await page.close();
-  }
 }
 
 /**

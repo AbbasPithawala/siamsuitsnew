@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node -e \"require('fs').cpSync('src/assets','dist/assets',{recursive:true})\"",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -31,6 +31,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.10.0",
     "multer": "^2.2.0",
+    "nodemailer": "^9.0.6",
     "postgres": "^3.4.4",
     "puppeteer": "^25.5.0",
     "qrcode": "^1.5.4",
@@ -44,6 +45,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^2.2.0",
     "@types/node": "^22.7.9",
+    "@types/nodemailer": "^8.0.1",
     "@types/pngjs": "^6.0.5",
     "@types/qrcode": "^1.5.6",
     "drizzle-kit": "^0.28.0",

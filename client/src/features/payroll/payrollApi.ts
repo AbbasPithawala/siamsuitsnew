@@ -25,30 +25,43 @@ export interface UnpaidJob {
   stylingPrice: string;
   paid: boolean;
   paidDate: string | null;
+  createdAt: string;
 }
 
 export interface ExtraPaymentRef {
   id: string;
+  jobId: string;
   categoryId: string;
   cost: string;
   approved: boolean;
   paid: boolean;
+  category: { id: string; name: string; thaiName: string | null } | null;
+}
+
+/**
+ * `payroll.service.ts`'s shared job→step→component→product→order enrichment
+ * (`buildJobDisplayEntries`) — used by both `listUnpaidCompletedJobs` (with
+ * `approvedUnpaidExtraPayments` folded in below) and `getSettlement`'s
+ * already-settled `jobs`.
+ */
+export interface JobDisplayEntry {
+  job: UnpaidJob;
+  process: { id: string; name: string; thaiName: string | null } | null;
+  component: { id: string; slotLabel: string; orderItemId: string } | null;
+  product: { id: string; name: string } | null;
+  order: { id: string; orderNumber: string } | null;
 }
 
 /**
  * `payroll.service.ts`'s `listUnpaidCompletedJobs` return shape — the small
  * backend read PHASE_6_TASKS.md Group 8 confirmed was missing and added
  * (`GET /tailors/:tailorId/unpaid-jobs`). Enriched with just enough of the
- * job's component/process/product to render a settlement-selection row, plus
- * a preview of the extra payments `createSettlement` will fold into
- * `subTotal` — a preview only; the real settlement total always comes back
- * from `createSettlement`/`getSettlement` itself, never computed here.
+ * job's component/process/product/order to render a settlement-selection
+ * row, plus a preview of the extra payments `createSettlement` will fold
+ * into `subTotal` — a preview only; the real settlement total always comes
+ * back from `createSettlement`/`getSettlement` itself, never computed here.
  */
-export interface UnpaidJobEntry {
-  job: UnpaidJob;
-  process: { id: string; name: string; thaiName: string | null } | null;
-  component: { id: string; slotLabel: string; orderItemId: string } | null;
-  product: { id: string; name: string } | null;
+export interface UnpaidJobEntry extends JobDisplayEntry {
   approvedUnpaidExtraPayments: ExtraPaymentRef[];
 }
 
@@ -77,11 +90,15 @@ export interface CreateSettlementInput {
  * endpoint — PHASE_6_TASKS.md Group 8's UI requirement that a settlement
  * visibly reflect the `worker_advance_payments.cleared`/`extra_payments.paid`
  * flags it flips) with the specific advance/extra-payment rows this
- * settlement actually cleared/paid, for the settlement confirmation view.
+ * settlement actually cleared/paid, for the settlement confirmation view —
+ * and (Group 8 follow-up) the same job/order/category display info
+ * `listUnpaidCompletedJobs` has, so the confirmation panel and the printable
+ * PDF slip (`generateSettlementPdf`) can show real order numbers and
+ * "which category" instead of bare amounts.
  */
 export interface SettlementDetail {
   settlement: Settlement;
-  jobs: UnpaidJob[];
+  jobs: JobDisplayEntry[];
   extraPayments: ExtraPaymentRef[];
   clearedAdvances: AdvancePayment[];
 }
@@ -98,8 +115,16 @@ interface SettlementResponseEnvelope {
   data: Settlement;
 }
 
+interface SettlementListResponseEnvelope {
+  data: Settlement[];
+}
+
 interface SettlementDetailResponseEnvelope {
   data: SettlementDetail;
+}
+
+interface SettlementPdfResponseEnvelope {
+  data: { path: string };
 }
 
 /**
@@ -107,8 +132,9 @@ interface SettlementDetailResponseEnvelope {
  * `createSettlement` both invalidate the `Tailor` tag (list + the specific
  * tailor) so `advanceBalance` shown on `TailorsPage` updates immediately,
  * without that page needing to know anything about payroll. `createSettlement`
- * also invalidates `UnpaidJob` for the settled tailor, since every job it
- * just settled must drop out of that list on the next read.
+ * also invalidates `UnpaidJob` for the settled tailor (those jobs must drop
+ * out of that list) and `Settlement` for the settled tailor (the new
+ * settlement must show up in `WorkerPaymentHistoryPage.tsx`'s list).
  */
 export const payrollApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -130,6 +156,7 @@ export const payrollApi = baseApi.injectEndpoints({
       transformResponse: (response: SettlementResponseEnvelope) => response.data,
       invalidatesTags: (_result, _error, { tailorId }) => [
         { type: "UnpaidJob", id: tailorId },
+        { type: "Settlement", id: tailorId },
         { type: "Tailor", id: tailorId },
         { type: "Tailor", id: "LIST" },
       ],
@@ -138,7 +165,31 @@ export const payrollApi = baseApi.injectEndpoints({
       query: ({ tailorId, settlementId }) => `/tailors/${tailorId}/settlements/${settlementId}`,
       transformResponse: (response: SettlementDetailResponseEnvelope) => response.data,
     }),
+    /** `WorkerPaymentHistoryPage.tsx` — legacy `WorkPaymentHistory.jsx`'s equivalent list. */
+    listSettlements: builder.query<Settlement[], string>({
+      query: (tailorId) => `/tailors/${tailorId}/settlements`,
+      transformResponse: (response: SettlementListResponseEnvelope) => response.data,
+      providesTags: (_result, _error, tailorId) => [{ type: "Settlement", id: tailorId }],
+    }),
+    /** Not persisted server-side (see `settlementPdf.service.ts`'s doc comment) — every call re-renders, so nothing to invalidate/cache here. */
+    generateSettlementPdf: builder.mutation<{ path: string }, { tailorId: string; settlementId: string }>({
+      query: ({ tailorId, settlementId }) => ({ url: `/tailors/${tailorId}/settlements/${settlementId}/pdf`, method: "POST" }),
+      transformResponse: (response: SettlementPdfResponseEnvelope) => response.data,
+    }),
+    /** Legacy `ManageJobs.jsx`'s per-job "Print" action (`jobSlipPdf.service.ts`'s doc comment) — printable before the job is ever settled. Not persisted, same as `generateSettlementPdf`. */
+    generateJobSlipPdf: builder.mutation<{ path: string }, string>({
+      query: (jobId) => ({ url: `/jobs/${jobId}/slip-pdf`, method: "POST" }),
+      transformResponse: (response: SettlementPdfResponseEnvelope) => response.data,
+    }),
   }),
 });
 
-export const { useCreateAdvancePaymentMutation, useListUnpaidJobsQuery, useCreateSettlementMutation, useGetSettlementQuery } = payrollApi;
+export const {
+  useCreateAdvancePaymentMutation,
+  useListUnpaidJobsQuery,
+  useCreateSettlementMutation,
+  useGetSettlementQuery,
+  useListSettlementsQuery,
+  useGenerateSettlementPdfMutation,
+  useGenerateJobSlipPdfMutation,
+} = payrollApi;

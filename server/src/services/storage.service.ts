@@ -75,6 +75,29 @@ export class S3StorageBackend implements StorageBackend {
   }
 }
 
+/**
+ * `LocalDiskStorageBackend.upload` returns a path-only URL (`/uploads/<key>`) whenever
+ * `PUBLIC_BASE_URL` isn't set (dev/test/CI — see its own doc comment). The client resolves
+ * that the same way (`resolveUploadUrl` in `client/src/features/uploads/uploadsApi.ts`) by
+ * prefixing the browser's own known origin — but `orderPdf.service.ts` renders images
+ * server-side, inside HTML handed to Puppeteer via `page.setContent`, which has no origin
+ * (`about:blank`) to resolve a relative path against at all. A bare `/uploads/...` path
+ * there doesn't fail loudly — it just silently doesn't load, which is exactly what made a
+ * real Manual Size / reference / customer image "just not show up" in a generated PDF.
+ * Only rewrites paths under this server's own real upload prefix (`LOCAL_STATIC_URL_PREFIX`,
+ * `/uploads`) — deliberately narrower than "any leading `/`": catalog-seeded style/style-
+ * option images (e.g. `/ImagesFabric/...`) are relative to the *client's* static assets, a
+ * different origin this function has no way to know, and a bare filename (e.g. a legacy-
+ * migrated retailer logo hosted elsewhere) is a different, unrelated convention too — both
+ * are left untouched rather than guessed at.
+ */
+export function resolveServerImageUrl(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (!url.startsWith(`${LOCAL_STATIC_URL_PREFIX}/`)) return url;
+  const base = env.PUBLIC_BASE_URL ?? `http://127.0.0.1:${env.PORT}`;
+  return `${base}${url}`;
+}
+
 function hasS3Config(): boolean {
   return Boolean(env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY && env.AWS_REGION && env.AWS_S3_BUCKET);
 }

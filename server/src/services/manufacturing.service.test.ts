@@ -22,11 +22,14 @@ import {
   orderItemComponentFeatures,
   manufacturingSteps,
   jobs,
+  extraPaymentCategories,
+  extraPayments,
 } from "../db/schema/index";
 import { hashPassword } from "./auth.service";
 import { createOrder } from "./orders.service";
 import { createOrderGroup } from "./order-groups.service";
 import { assignNextStep, completeStep, getComponentDetail } from "./manufacturing.service";
+import { createExtraPayment } from "./extra-payments.service";
 import { HttpError } from "../utils/http-error";
 
 const suffix = randomUUID();
@@ -50,6 +53,7 @@ describe("manufacturing.service", () => {
   const orderIds: string[] = [];
   const orderGroupIds: string[] = [];
   const componentIds: string[] = [];
+  const categoryIds: string[] = [];
 
   beforeAll(async () => {
     const tenant = await db.query.tenants.findFirst({ where: eq(tenants.slug, "siam-suits") });
@@ -143,7 +147,11 @@ describe("manufacturing.service", () => {
       ? await db.query.manufacturingSteps.findMany({ where: inArray(manufacturingSteps.orderItemComponentId, componentIds) })
       : [];
     const stepIds = stepRows.map((s) => s.id);
+    const jobRows = stepIds.length ? await db.query.jobs.findMany({ where: inArray(jobs.manufacturingStepId, stepIds) }) : [];
+    const jobIds = jobRows.map((j) => j.id);
 
+    if (jobIds.length) await db.delete(extraPayments).where(inArray(extraPayments.jobId, jobIds));
+    if (categoryIds.length) await db.delete(extraPaymentCategories).where(inArray(extraPaymentCategories.id, categoryIds));
     if (stepIds.length) await db.delete(jobs).where(inArray(jobs.manufacturingStepId, stepIds));
     if (componentIds.length) await db.delete(manufacturingSteps).where(inArray(manufacturingSteps.orderItemComponentId, componentIds));
     if (componentIds.length) {
@@ -240,6 +248,30 @@ describe("manufacturing.service", () => {
     await expect(completeStep(tenantId, job.id)).rejects.toMatchObject({ status: 409, code: "STEP_ALREADY_COMPLETE" });
   });
 
+  it("completeStep's actorTailorId (tailor-portal self-complete): 404s a job assigned to a different tailor, succeeds for the actual assignee, and is a no-op when omitted", async () => {
+    const componentId = await createTestOrder(customerId);
+    const { job } = await assignNextStep(tenantId, componentId, tailorCertifiedId);
+
+    // A different tailor (not this job's assignee) gets JOB_NOT_FOUND, not a 403 — same
+    // indistinguishable-from-not-found convention as a bogus job id.
+    await expect(completeStep(tenantId, job.id, tailorForBId)).rejects.toMatchObject({
+      status: 404,
+      code: "JOB_NOT_FOUND",
+    });
+
+    // The job is untouched by the rejected attempt above — the actual assignee can still complete it.
+    const completed = await completeStep(tenantId, job.id, tailorCertifiedId);
+    expect(completed.status).toBe("complete");
+  });
+
+  it("completeStep's actorTailorId is a no-op when omitted — existing staff callers are unaffected", async () => {
+    const componentId = await createTestOrder(customerId);
+    const { job } = await assignNextStep(tenantId, componentId, tailorCertifiedId);
+
+    const completed = await completeStep(tenantId, job.id);
+    expect(completed.status).toBe("complete");
+  });
+
   it("rejects completing a step that was never assigned (still pending)", async () => {
     const componentId = await createTestOrder(customerId);
     const pendingStep = await db.query.manufacturingSteps.findFirst({
@@ -330,6 +362,39 @@ describe("manufacturing.service", () => {
     const done = await getComponentDetail(tenantId, componentId);
     expect(done.nextStep).toBeNull();
     expect(done.blockedReason).toBe("NO_STEP_AVAILABLE");
+  });
+
+  it("getComponentDetail resolves the in-progress job and its attached extra payment categories", async () => {
+    const componentId = await createTestOrder(customerId);
+
+    const beforeAssign = await getComponentDetail(tenantId, componentId);
+    expect(beforeAssign.activeJob).toBeNull();
+    expect(beforeAssign.activeJobExtraPayments).toEqual([]);
+
+    const { job, step } = await assignNextStep(tenantId, componentId, tailorCertifiedId);
+
+    const afterAssign = await getComponentDetail(tenantId, componentId);
+    expect(afterAssign.activeJob?.id).toBe(job.id);
+    expect(afterAssign.activeJob?.manufacturingStepId).toBe(step.id);
+    expect(afterAssign.activeJobExtraPayments).toEqual([]);
+
+    const [category] = await db
+      .insert(extraPaymentCategories)
+      .values({ tenantId, productId, processId: processAId, name: `MfgTestCategory-${suffix}`, cost: "20.00" })
+      .returning();
+    if (!category) throw new Error("Failed to create test extra payment category");
+    categoryIds.push(category.id);
+
+    await createExtraPayment(tenantId, job.id, category.id);
+
+    const afterAttach = await getComponentDetail(tenantId, componentId);
+    expect(afterAttach.activeJobExtraPayments).toEqual([{ categoryId: category.id, approved: false, rejected: false }]);
+
+    await completeStep(tenantId, job.id);
+
+    const afterComplete = await getComponentDetail(tenantId, componentId);
+    expect(afterComplete.activeJob).toBeNull();
+    expect(afterComplete.activeJobExtraPayments).toEqual([]);
   });
 
   it("getComponentDetail 404s cleanly for a bogus componentId", async () => {

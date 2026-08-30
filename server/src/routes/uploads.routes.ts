@@ -1,8 +1,9 @@
+import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import multer, { MulterError } from "multer";
 import { authenticate } from "../middleware/authenticate";
-import { requirePermission } from "../middleware/requirePermission";
 import { HttpError } from "../utils/http-error";
+import { resolveUserPermissions } from "../services/permissions.service";
 import { storageBackend } from "../services/storage.service";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -22,21 +23,39 @@ const upload = multer({
 export const uploadsRouter = Router();
 
 /**
- * Generic, order-agnostic file upload — not `/api/orders/uploads` on purpose, so any
- * future consumer (e.g. Phase 8 Group 4's feature/style-image upload) can reuse it.
- * Gated on `orders.create` OR `orders.edit` — its two real callers today:
- * `StylingAccordion.tsx`'s reference-image upload (order creation, Retailer-held
- * permission) and `ManualSizeEditor.tsx`'s Manual Size annotation upload (order
- * editing, Owner-held permission per PHASE_10_TASKS.md Workstream E Group 5/6 — Owner
- * lost `orders.create` but needs this endpoint for edits). Was `orders.create` only
- * until Group 6 surfaced the gap: an uploaded-but-unattached file is harmless on its
- * own, the real write into an order is separately gated by each order route itself,
- * so this stays a plain OR rather than special-casing per caller.
+ * `orders.create`/`orders.edit` OR a retailer-linked actor uploading for itself — the
+ * same self-service-identity-is-its-own-allowance convention `retailers.routes.ts`'s
+ * `assertCanUpdateRetailer` already uses for `PATCH /retailers/:id`, added when
+ * `RetailerProfilePage.tsx`'s logo upload became this endpoint's third real caller: a
+ * retailer role customized without `orders.create`/`orders.edit` (both currently
+ * default-seeded on the "Retailer" role, but tenant-editable) would otherwise be
+ * blocked from uploading their own profile logo for reasons that have nothing to do
+ * with orders. An uploaded-but-unattached file is harmless on its own regardless of
+ * who uploaded it — the real write into a specific record (an order, `retailers.logo`
+ * via `PATCH /retailers/:id`, etc.) is separately permission/identity-gated by that
+ * record's own route.
  */
+async function assertCanUpload(actor: { id: string; actorType: string; retailerId: string | null }): Promise<void> {
+  if (actor.retailerId) return;
+  if (actor.actorType !== "user") throw new HttpError(403, "FORBIDDEN", "This actor type has no permissions");
+  const granted = await resolveUserPermissions(actor.id);
+  if (!granted.has("orders.create") && !granted.has("orders.edit")) {
+    throw new HttpError(403, "FORBIDDEN", "Missing required permission: orders.create or orders.edit");
+  }
+}
+
+/** Generic, order-agnostic file upload — not `/api/orders/uploads` on purpose, so any consumer (order flows, `RetailerProfilePage.tsx`'s logo, future ones) can reuse it. See `assertCanUpload`'s doc comment for the access rule. */
 uploadsRouter.post(
   "/uploads",
   authenticate,
-  requirePermission(["orders.create", "orders.edit"]),
+  async (req: Request, _res: Response, next: NextFunction) => {
+    try {
+      await assertCanUpload(req.actor!);
+      next();
+    } catch (err) {
+      next(err);
+    }
+  },
   (req, res, next) => {
     upload.single("file")(req, res, (err: unknown) => {
       if (!err) {

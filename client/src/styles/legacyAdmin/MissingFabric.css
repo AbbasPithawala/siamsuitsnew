@@ -112,13 +112,6 @@ div.fabric_infoNM {
 .form-group {
     position: relative;
 }
-.form-group svg {
-    position: absolute;
-    left: 0;
-    width: 50%;
-    top: 31px;
-    color: #888;
-}
 .title-fabrics h3 {
     color: #051a2d;
     font-weight: 600;

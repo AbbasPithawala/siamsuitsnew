@@ -1,0 +1,1 @@
+ALTER TYPE "public"."feature_render_slot" ADD VALUE 'piping';

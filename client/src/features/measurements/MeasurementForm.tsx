@@ -15,6 +15,7 @@ import type { ProductMeasurementLink } from "./measurementsApi";
 import { useLazyGetFittingQuery, useListFittingsForProductQuery } from "../catalog/fittingsApi";
 import { useProductFeaturesQuery } from "../featureSelector/featuresApi";
 import type { FeatureValue } from "../featureSelector/featuresApi";
+import { resolveUploadUrl } from "../uploads/uploadsApi";
 import "../../styles/legacyAdmin/App.css";
 import "../../styles/legacyAdmin/admin.css";
 import "../../styles/legacyAdmin/Measurements.css";
@@ -423,7 +424,7 @@ export function MeasurementForm({
                     onChange={() => handleShoulderTypeSelect(shoulderTypeFeature.id, style.id)}
                   />
                   <label htmlFor={inputId}>
-                    {style.image && <img src={style.image} alt="" />}
+                    {style.image && <img src={resolveUploadUrl(style.image)} alt="" />}
                     <p>{style.name}</p>
                   </label>
                 </li>

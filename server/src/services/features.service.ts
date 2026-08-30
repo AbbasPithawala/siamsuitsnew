@@ -136,11 +136,19 @@ export function createFeature(tenantId: string, input: CreateFeatureInput) {
 async function listFeaturesInTx(tx: Transaction, filter: { productId?: string | undefined } = {}, pagination?: PaginationParams) {
   if (filter.productId) {
     await requireProduct(tx, filter.productId);
+    // `sequence_order` ties (most existing rows default to 0 — nothing has assigned most
+    // features a real, distinct order yet) previously had no defined tiebreak, so Postgres
+    // could return a *different* order across query plans/table churn with no code change at
+    // all — verified directly: this flipped "front button" from first to last for a real
+    // product between two live runs today with zero relevant data change. Tiebreak on the
+    // feature's own name (stable and at least human-explainable, unlike an id-based tiebreak)
+    // rather than leaving it unspecified.
     const links = await tx
       .select({ featureId: featureProducts.featureId })
       .from(featureProducts)
+      .innerJoin(features, eq(featureProducts.featureId, features.id))
       .where(eq(featureProducts.productId, filter.productId))
-      .orderBy(featureProducts.sequenceOrder);
+      .orderBy(featureProducts.sequenceOrder, features.name);
     const orderedIds = links.map((l) => l.featureId);
     if (orderedIds.length === 0) return [];
 

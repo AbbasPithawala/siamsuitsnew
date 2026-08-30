@@ -7,6 +7,8 @@ import { HttpError } from "../utils/http-error";
 import { requireParam } from "../utils/params";
 import { paginationQuerySchema, paginatedResult } from "../utils/pagination";
 import * as shippingService from "../services/shipping.service";
+import { generateItemSlipPdf } from "../services/itemSlipPdf.service";
+import { setOrderStatus } from "../services/orders.service";
 
 const createShippingBoxSchema = z.object({
   retailerId: z.string().uuid(),
@@ -116,3 +118,25 @@ shippingRouter.post("/shipping-boxes/:id/close", authenticate, requirePermission
     next(err);
   }
 });
+
+/**
+ * Legacy `OrderStatusBarcoding.jsx`'s "Generate QR" mode (`itemSlipPdf.service.ts`'s doc
+ * comment) — independent of any shipping box, so not nested under `/shipping-boxes`. Same
+ * `shipping.manage` gate as every other write above (retailers hold only `shipping.view`):
+ * this both generates a real PDF and flips the order's status, matching legacy's exact
+ * `updateOrderStatus(orderDetails._id, "Shipment")` side effect right after printing.
+ */
+shippingRouter.post(
+  "/shipping/components/:componentId/slip-pdf",
+  authenticate,
+  requirePermission("shipping.manage"),
+  async (req, res, next) => {
+    try {
+      const { url, orderId } = await generateItemSlipPdf(req.actor!.tenantId, requireParam(req, "componentId"));
+      await setOrderStatus(req.actor!.tenantId, orderId, "Shipment", req.actor!.retailerId);
+      res.status(201).json({ data: { path: url } });
+    } catch (err) {
+      next(err);
+    }
+  }
+);

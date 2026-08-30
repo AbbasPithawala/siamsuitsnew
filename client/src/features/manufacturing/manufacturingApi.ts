@@ -31,6 +31,16 @@ export interface ComponentDetail {
   manufacturingSteps: ManufacturingStep[];
   nextStep: ManufacturingStep | null;
   blockedReason: BlockedReason;
+  /** The `jobs` row for whichever step is currently `assigned`, if any — lets a fresh lookup (reload included) recover an in-progress job. */
+  activeJob: Job | null;
+  /** Extra payments already attached to `activeJob`, with the approved/rejected flags needed to decide whether "Remove" still applies. */
+  activeJobExtraPayments: ActiveJobExtraPayment[];
+}
+
+export interface ActiveJobExtraPayment {
+  categoryId: string;
+  approved: boolean;
+  rejected: boolean;
 }
 
 /** Mirrors `server/src/db/schema/manufacturing.ts`'s `jobs` table. */

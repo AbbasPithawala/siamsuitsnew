@@ -11,6 +11,7 @@ import {
   manufacturingSteps,
   tailorProcesses,
   jobs,
+  extraPayments,
 } from "../db/schema/index";
 import { HttpError } from "../utils/http-error";
 import { requireTailor } from "./manufacturing-helpers";
@@ -163,6 +164,18 @@ function previewAssignableStep(steps: ManufacturingStepRow[]): AssignabilityPrev
  * assignment. Small, additive read endpoint reusing the exact ownership walk
  * and step query `assignNextStep` already performs, per this codebase's
  * "add a genuinely small missing read endpoint" allowance.
+ *
+ * Also resolves the `jobs` row for whichever step is currently `assigned`
+ * (a step can only ever have one job — nothing reassigns a step once its job
+ * exists), plus that job's already-attached extra payments (category id and
+ * approved/rejected status, not just the id — the assign/complete screen
+ * needs those flags to know whether "Remove" is still allowed, per
+ * `removeExtraPayment`'s own approved/step-complete guards). This is what
+ * lets the assign/complete screen recover an in-progress job on any fresh
+ * lookup — a page reload included — instead of only while the assigning
+ * browser tab stays open: there is still no generic `GET /jobs/:id`, but the
+ * one case the factory-floor screen actually needs (the single in-progress
+ * job for *this* component) is cheap to resolve here.
  */
 export async function getComponentDetail(tenantId: string, orderItemComponentId: string) {
   return withTenant(tenantId, async (tx) => {
@@ -175,7 +188,22 @@ export async function getComponentDetail(tenantId: string, orderItemComponentId:
 
     const { step, blockedReason } = previewAssignableStep(steps);
 
-    return { ...component, manufacturingSteps: steps, nextStep: step, blockedReason };
+    const inProgressStep = steps.find((s) => s.status === "assigned");
+    let activeJob: typeof jobs.$inferSelect | null = null;
+    let activeJobExtraPayments: { categoryId: string; approved: boolean; rejected: boolean }[] = [];
+    if (inProgressStep) {
+      activeJob = (await tx.query.jobs.findFirst({ where: eq(jobs.manufacturingStepId, inProgressStep.id) })) ?? null;
+      if (activeJob) {
+        const attachedPayments = await tx.query.extraPayments.findMany({ where: eq(extraPayments.jobId, activeJob.id) });
+        activeJobExtraPayments = attachedPayments.map((payment) => ({
+          categoryId: payment.categoryId,
+          approved: payment.approved,
+          rejected: payment.rejected,
+        }));
+      }
+    }
+
+    return { ...component, manufacturingSteps: steps, nextStep: step, blockedReason, activeJob, activeJobExtraPayments };
   });
 }
 
@@ -237,11 +265,20 @@ export async function assignNextStep(tenantId: string, orderItemComponentId: str
  * Marks a step's job complete. Rejects a step that's still `pending` (never assigned) and
  * a step that's already `complete` (no silent no-op) with distinct error codes, same
  * component-ownership walk as `assignNextStep` for consistency.
+ *
+ * `actorTailorId` (tailor-portal self-complete) — when present, a job belonging to a
+ * *different* tailor 404s exactly like a bogus id would, rather than 403ing: same
+ * indistinguishable-from-not-found convention `orders.service.ts`'s retailer scoping uses
+ * for a foreign owner's record. `undefined` (every existing staff caller) is a no-op —
+ * staff can still complete any tenant's job regardless of which tailor it's assigned to.
  */
-export async function completeStep(tenantId: string, jobId: string) {
+export async function completeStep(tenantId: string, jobId: string, actorTailorId?: string | null) {
   return withTenant(tenantId, async (tx) => {
     const job = await tx.query.jobs.findFirst({ where: eq(jobs.id, jobId) });
     if (!job) throw new HttpError(404, "JOB_NOT_FOUND", `Job ${jobId} not found`);
+    if (actorTailorId != null && job.tailorId !== actorTailorId) {
+      throw new HttpError(404, "JOB_NOT_FOUND", `Job ${jobId} not found`);
+    }
 
     const step = await tx.query.manufacturingSteps.findFirst({ where: eq(manufacturingSteps.id, job.manufacturingStepId) });
     if (!step) throw new HttpError(404, "JOB_NOT_FOUND", `Job ${jobId} not found`);

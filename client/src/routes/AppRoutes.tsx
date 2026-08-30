@@ -1,8 +1,14 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./RequireAuth";
 import { RequirePermission } from "./RequirePermission";
+import { RequireTailorAuth } from "./RequireTailorAuth";
 import { LoginRoute } from "./LoginRoute";
+import { TailorLoginRoute } from "./TailorLoginRoute";
 import { AppShell } from "../components/shell/AppShell";
+import { TailorPortalShell } from "../components/tailorShell/TailorPortalShell";
+import { TailorJobsPage } from "../features/tailorPortal/TailorJobsPage";
+import { TailorPaymentHistoryPage } from "../features/tailorPortal/TailorPaymentHistoryPage";
+import { TailorExtraPaymentsPage } from "../features/tailorPortal/TailorExtraPaymentsPage";
 import { DashboardPage } from "./placeholders/DashboardPage";
 import { FeaturesPage } from "../features/catalog/FeaturesPage";
 import { FittingsPage } from "../features/catalog/FittingsPage";
@@ -13,8 +19,10 @@ import { ProductsPage } from "../features/catalog/ProductsPage";
 import { SuperProductsPage } from "../features/catalog/SuperProductsPage";
 import { CustomersPage } from "../features/customers/CustomersPage";
 import { ExtraPaymentCategoriesPage } from "../features/extraPayments/ExtraPaymentCategoriesPage";
+import { ExtraPaymentsApprovalPage } from "../features/extraPayments/ExtraPaymentsApprovalPage";
 import { InvoicesPage } from "../features/invoices/InvoicesPage";
 import { JobAssignmentPage } from "../features/manufacturing/JobAssignmentPage";
+import { InvoiceSettingsPage } from "../features/settings/InvoiceSettingsPage";
 import { GroupOrderDetailPage } from "../features/orders/GroupOrderDetailPage";
 import { GroupOrdersPage } from "../features/orders/GroupOrdersPage";
 import { NewGroupOrderPage } from "../features/orders/NewGroupOrderPage";
@@ -22,6 +30,7 @@ import { OrderBuilderPage } from "../features/orders/OrderBuilderPage";
 import { OrderDetailPage } from "../features/orders/OrderDetailPage";
 import { OrderListPage } from "../features/orders/OrderListPage";
 import { PayrollSettlementPage } from "../features/payroll/PayrollSettlementPage";
+import { WorkerPaymentHistoryPage } from "../features/payroll/WorkerPaymentHistoryPage";
 import { RetailerProfilePage } from "../features/retailers/RetailerProfilePage";
 import { RetailersPage } from "../features/retailers/RetailersPage";
 import { ShippingPage } from "../features/shipping/ShippingPage";
@@ -39,6 +48,24 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
+      <Route path="/tailor/login" element={<TailorLoginRoute />} />
+      {/*
+        Tailor self-service portal (see MEMORY/plan doc "Tailor Portal") — a deliberately
+        separate guard/shell pair from the staff `RequireAuth`/`AppShell` block below, not
+        `RequirePermission`-gated: tailors have no role/permission system in this codebase
+        (`requirePermission.ts`'s own rule), so there's nothing to check beyond "is this
+        actually a tailor session" (`RequireTailorAuth`). Every page here talks only to
+        `tailorPortal.routes.ts`'s self-scoped endpoints (or the two existing
+        `authenticate`-only reads, `GET /manufacturing/components/:id` and
+        `GET /extra-payment-categories`, that already work unmodified for a tailor token).
+      */}
+      <Route element={<RequireTailorAuth />}>
+        <Route element={<TailorPortalShell />}>
+          <Route path="/tailor/jobs" element={<TailorJobsPage />} />
+          <Route path="/tailor/payment-history" element={<TailorPaymentHistoryPage />} />
+          <Route path="/tailor/extra-payments" element={<TailorExtraPaymentsPage />} />
+        </Route>
+      </Route>
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -321,6 +348,21 @@ export function AppRoutes() {
             }
           />
           {/*
+            Group 7 follow-up: the admin approval queue `ManageExtraPayments.jsx`
+            had a legacy equivalent for but this rewrite never built — page-level
+            RequirePermission on `factory.extra_payments.approve`, the same key
+            `extra-payments.routes.ts`'s `GET /extra-payments` and the approve/
+            reject PATCH routes gate.
+          */}
+          <Route
+            path="/factory/extra-payments"
+            element={
+              <RequirePermission permission="factory.extra_payments.approve">
+                <ExtraPaymentsApprovalPage />
+              </RequirePermission>
+            }
+          />
+          {/*
             Group 8 (PHASE_6_TASKS.md) payroll settlement: page-level
             RequirePermission on `factory.payroll.settle` — confirmed in
             `payroll.routes.ts`, both the new `GET .../unpaid-jobs` read and
@@ -335,6 +377,21 @@ export function AppRoutes() {
             element={
               <RequirePermission permission="factory.payroll.settle">
                 <PayrollSettlementPage />
+              </RequirePermission>
+            }
+          />
+          {/*
+            Group 8 follow-up: worker payment history — legacy
+            `WorkPaymentHistory.jsx`'s equivalent, gated on the same
+            `factory.payroll.settle` key as the settlement screen above
+            (`payroll.routes.ts`'s `GET .../settlements` and `POST
+            .../settlements/:id/pdf` both require it).
+          */}
+          <Route
+            path="/factory/payment-history"
+            element={
+              <RequirePermission permission="factory.payroll.settle">
+                <WorkerPaymentHistoryPage />
               </RequirePermission>
             }
           />
@@ -354,6 +411,20 @@ export function AppRoutes() {
             element={
               <RequirePermission permission="invoices.view">
                 <InvoicesPage />
+              </RequirePermission>
+            }
+          />
+          {/*
+            PHASE_10_TASKS.md invoicing follow-up: the tenant's invoice letterhead
+            (logo/address/footer text) — same `invoices.view` page-level gate as
+            `/invoices` above (`GET /invoice-settings` requires it too), with saving
+            further gated at the button level by `invoices.manage` inside the form.
+          */}
+          <Route
+            path="/invoice-settings"
+            element={
+              <RequirePermission permission="invoices.view">
+                <InvoiceSettingsPage />
               </RequirePermission>
             }
           />

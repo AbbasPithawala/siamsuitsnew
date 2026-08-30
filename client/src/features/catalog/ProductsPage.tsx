@@ -32,6 +32,7 @@ import {
   useUpdateProductMutation,
 } from "./productsApi";
 import type { Product, ProductInput } from "./productsApi";
+import { resolveUploadUrl } from "../uploads/uploadsApi";
 import "../../styles/legacyAdmin/App.css";
 import "../../styles/legacyAdmin/admin.css";
 
@@ -286,7 +287,7 @@ export function ProductsPage() {
                 <td>
                   {product.image ? (
                     <img
-                      src={product.image}
+                      src={resolveUploadUrl(product.image)}
                       alt={product.name}
                       style={{ width: "50px", height: "50px", borderRadius: "50%", margin: "4px", objectFit: "cover" }}
                     />

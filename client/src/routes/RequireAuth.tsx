@@ -12,6 +12,12 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
  * can't wait on that side effect to land: it treats a `me` error as
  * unauthenticated immediately, so a stale token never flashes a protected
  * page before the redirect happens.
+ *
+ * A `me.actorType === "tailor"` session is redirected to the separate
+ * tailor portal instead of rendering staff pages — tailors have no
+ * permissions here (`requirePermission.ts`'s own rule) and would just hit
+ * `RequirePermission` walls everywhere; `RequireTailorAuth` is the mirror
+ * of this check for `/tailor/...` routes.
  */
 export function RequireAuth() {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -24,6 +30,9 @@ export function RequireAuth() {
 
   if (!token) {
     return <Navigate to="/login" replace />;
+  }
+  if (me?.actorType === "tailor") {
+    return <Navigate to="/tailor/jobs" replace />;
   }
   if (me) {
     return <Outlet />;

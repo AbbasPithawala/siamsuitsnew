@@ -1,6 +1,7 @@
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import Typography from "@mui/material/Typography";
+import { resolveUploadUrl } from "../uploads/uploadsApi";
 
 interface StyleOptionButtonProps {
   selected: boolean;
@@ -16,12 +17,16 @@ interface StyleOptionButtonProps {
  * input + an `<img>`-containing `<label>`), now a real button so it's
  * keyboard/screen-reader accessible without the hidden-input trick.
  *
- * `image` is whatever raw value the backend stores on the style/option row
- * (currently just a bare filename — `siam/server` has no image storage/CDN
- * mechanism yet, a known gap noted in REWRITE_ARCHITECTURE.md). Rather than
- * inventing an unconfirmed base-URL convention, this renders it as-is and
- * relies on `onError` to hide a broken image gracefully instead of showing
- * a broken-image icon.
+ * `image` is whatever raw value the backend stores on the style/option row —
+ * a real uploaded `/uploads/...` path (`resolveUploadUrl` expands this to
+ * the API origin; rendered as-is otherwise, a `<img src="/uploads/...">`
+ * resolves against the *page's* origin by default, the Vite dev server in
+ * dev, which doesn't have the file — a real reported bug), a client-public-
+ * folder path (Shoulder Type/Monogram Position's seeded `/ImagesFabric/...`
+ * images), or a bare not-yet-migrated legacy filename — the latter two are
+ * left untouched by `resolveUploadUrl`'s own narrow scoping. `onError` still
+ * hides a genuinely broken image gracefully instead of showing a broken-
+ * image icon.
  */
 export function StyleOptionButton({ selected, label, secondaryLabel, image, onClick }: StyleOptionButtonProps) {
   return (
@@ -47,7 +52,7 @@ export function StyleOptionButton({ selected, label, secondaryLabel, image, onCl
       {image ? (
         <Box
           component="img"
-          src={image}
+          src={resolveUploadUrl(image)}
           alt=""
           sx={{ width: 80, height: 80, objectFit: "cover", borderRadius: "8px" }}
           onError={(event) => {

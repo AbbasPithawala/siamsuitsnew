@@ -1,13 +1,17 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { withTenant } from "../db/withTenant";
+import type { Transaction } from "../db/withTenant";
 import {
   tailors,
   jobs,
   manufacturingSteps,
   orderItemComponents,
+  orderItems,
+  orders,
   processes,
   products,
   extraPayments,
+  extraPaymentCategories,
   workerAdvancePayments,
   paymentSettlements,
   paymentSettlementJobs,
@@ -15,6 +19,77 @@ import {
 import { HttpError } from "../utils/http-error";
 import { requireTailor } from "./manufacturing-helpers";
 import { requireOwnedJob } from "./extra-payments.service";
+
+type JobRow = typeof jobs.$inferSelect;
+type ExtraPaymentRow = typeof extraPayments.$inferSelect;
+
+/**
+ * Shared by `listUnpaidCompletedJobs` and `getSettlement` (and — exported —
+ * `jobSlipPdf.service.ts`'s single-job receipt slip) — all three need the
+ * same job → step → component → product → order walk to render a meaningful
+ * row, just for a different set of `jobRows`. `stepById` is passed in rather
+ * than looked up here since every caller already needs their own copy of it
+ * for other filtering first.
+ */
+export async function buildJobDisplayEntries(
+  tx: Transaction,
+  jobRows: JobRow[],
+  stepById: Map<string, typeof manufacturingSteps.$inferSelect>
+) {
+  const componentIds = [...new Set(jobRows.map((j) => stepById.get(j.manufacturingStepId)!.orderItemComponentId))];
+  const componentRows = componentIds.length
+    ? await tx.query.orderItemComponents.findMany({ where: inArray(orderItemComponents.id, componentIds) })
+    : [];
+  const componentById = new Map(componentRows.map((c) => [c.id, c]));
+
+  const processIds = [...new Set(jobRows.map((j) => stepById.get(j.manufacturingStepId)!.processId))];
+  const processRows = processIds.length ? await tx.query.processes.findMany({ where: inArray(processes.id, processIds) }) : [];
+  const processById = new Map(processRows.map((p) => [p.id, p]));
+
+  const productIds = [...new Set(componentRows.map((c) => c.productId))];
+  const productRows = productIds.length ? await tx.query.products.findMany({ where: inArray(products.id, productIds) }) : [];
+  const productById = new Map(productRows.map((p) => [p.id, p]));
+
+  const orderItemIds = [...new Set(componentRows.map((c) => c.orderItemId))];
+  const orderItemRows = orderItemIds.length ? await tx.query.orderItems.findMany({ where: inArray(orderItems.id, orderItemIds) }) : [];
+  const orderItemById = new Map(orderItemRows.map((oi) => [oi.id, oi]));
+
+  const orderIds = [...new Set(orderItemRows.map((oi) => oi.orderId))];
+  const orderRows = orderIds.length ? await tx.query.orders.findMany({ where: inArray(orders.id, orderIds) }) : [];
+  const orderById = new Map(orderRows.map((o) => [o.id, o]));
+
+  return jobRows.map((job) => {
+    const step = stepById.get(job.manufacturingStepId)!;
+    const component = componentById.get(step.orderItemComponentId) ?? null;
+    const process = processById.get(step.processId) ?? null;
+    const product = component ? (productById.get(component.productId) ?? null) : null;
+    const orderItem = component ? (orderItemById.get(component.orderItemId) ?? null) : null;
+    const order = orderItem ? (orderById.get(orderItem.orderId) ?? null) : null;
+
+    return {
+      job,
+      step,
+      process: process ? { id: process.id, name: process.name, thaiName: process.thaiName } : null,
+      component: component ? { id: component.id, slotLabel: component.slotLabel, orderItemId: component.orderItemId } : null,
+      product: product ? { id: product.id, name: product.name } : null,
+      order: order ? { id: order.id, orderNumber: order.orderNumber } : null,
+    };
+  });
+}
+
+/** Shared (exported) — attaches each extra payment's category (name/Thai name) so a UI can show *what* THB 20 was for, not just the bare amount. */
+export async function enrichExtraPaymentsWithCategory(tx: Transaction, extraPaymentRows: ExtraPaymentRow[]) {
+  const categoryIds = [...new Set(extraPaymentRows.map((ep) => ep.categoryId))];
+  const categoryRows = categoryIds.length
+    ? await tx.query.extraPaymentCategories.findMany({ where: inArray(extraPaymentCategories.id, categoryIds) })
+    : [];
+  const categoryById = new Map(categoryRows.map((c) => [c.id, c]));
+
+  return extraPaymentRows.map((extraPayment) => {
+    const category = categoryById.get(extraPayment.categoryId) ?? null;
+    return { ...extraPayment, category: category ? { id: category.id, name: category.name, thaiName: category.thaiName } : null };
+  });
+}
 
 /**
  * The read Group 8 (PHASE_6_TASKS.md) found missing while scoping the
@@ -25,7 +100,7 @@ import { requireOwnedJob } from "./extra-payments.service";
  * is settleable once its underlying `manufacturing_steps` row is `complete`
  * (unlike `paid`, "complete" isn't a column on `jobs` itself — it lives on
  * the step the job points at) and `jobs.paid` is still `false`. Enriches each
- * job with just enough of its component/process/product to render a
+ * job with just enough of its component/process/product/order to render a
  * meaningful settlement-selection row, plus the same approved-and-unpaid
  * `extraPayments` `createSettlement` will fold into `subTotal` — shown here
  * only as a preview; the actual settlement total is still always
@@ -48,45 +123,21 @@ export async function listUnpaidCompletedJobs(tenantId: string, tailorId: string
     const completeJobs = jobRows.filter((j) => stepById.get(j.manufacturingStepId)?.status === "complete");
     if (completeJobs.length === 0) return [];
 
-    const componentIds = [...new Set(completeJobs.map((j) => stepById.get(j.manufacturingStepId)!.orderItemComponentId))];
-    const componentRows = await tx.query.orderItemComponents.findMany({ where: inArray(orderItemComponents.id, componentIds) });
-    const componentById = new Map(componentRows.map((c) => [c.id, c]));
-
-    const processIds = [...new Set(completeJobs.map((j) => stepById.get(j.manufacturingStepId)!.processId))];
-    const processRows = processIds.length ? await tx.query.processes.findMany({ where: inArray(processes.id, processIds) }) : [];
-    const processById = new Map(processRows.map((p) => [p.id, p]));
-
-    const productIds = [...new Set(componentRows.map((c) => c.productId))];
-    const productRows = productIds.length ? await tx.query.products.findMany({ where: inArray(products.id, productIds) }) : [];
-    const productById = new Map(productRows.map((p) => [p.id, p]));
+    const entries = await buildJobDisplayEntries(tx, completeJobs, stepById);
 
     const jobIds = completeJobs.map((j) => j.id);
     const settleableExtraPayments = await tx.query.extraPayments.findMany({
       where: and(inArray(extraPayments.jobId, jobIds), eq(extraPayments.approved, true), eq(extraPayments.paid, false)),
     });
-    const extraPaymentsByJobId = new Map<string, typeof settleableExtraPayments>();
-    for (const extraPayment of settleableExtraPayments) {
+    const enrichedExtraPayments = await enrichExtraPaymentsWithCategory(tx, settleableExtraPayments);
+    const extraPaymentsByJobId = new Map<string, typeof enrichedExtraPayments>();
+    for (const extraPayment of enrichedExtraPayments) {
       const existing = extraPaymentsByJobId.get(extraPayment.jobId) ?? [];
       existing.push(extraPayment);
       extraPaymentsByJobId.set(extraPayment.jobId, existing);
     }
 
-    return completeJobs.map((job) => {
-      const step = stepById.get(job.manufacturingStepId)!;
-      const component = componentById.get(step.orderItemComponentId) ?? null;
-      const process = processById.get(step.processId) ?? null;
-      const product = component ? (productById.get(component.productId) ?? null) : null;
-      const jobExtraPayments = extraPaymentsByJobId.get(job.id) ?? [];
-
-      return {
-        job,
-        step,
-        process: process ? { id: process.id, name: process.name, thaiName: process.thaiName } : null,
-        component: component ? { id: component.id, slotLabel: component.slotLabel, orderItemId: component.orderItemId } : null,
-        product: product ? { id: product.id, name: product.name } : null,
-        approvedUnpaidExtraPayments: jobExtraPayments,
-      };
-    });
+    return entries.map((entry) => ({ ...entry, approvedUnpaidExtraPayments: extraPaymentsByJobId.get(entry.job.id) ?? [] }));
   });
 }
 
@@ -264,14 +315,36 @@ export async function getSettlement(tenantId: string, tailorId: string, settleme
     const jobIds = settlementJobs.map((sj) => sj.jobId);
     const jobRows = jobIds.length ? await tx.query.jobs.findMany({ where: inArray(jobs.id, jobIds) }) : [];
 
+    const stepIds = [...new Set(jobRows.map((j) => j.manufacturingStepId))];
+    const stepRows = stepIds.length ? await tx.query.manufacturingSteps.findMany({ where: inArray(manufacturingSteps.id, stepIds) }) : [];
+    const stepById = new Map(stepRows.map((s) => [s.id, s]));
+    const jobEntries = jobRows.length ? await buildJobDisplayEntries(tx, jobRows, stepById) : [];
+
     const paidExtraPayments = jobIds.length
       ? await tx.query.extraPayments.findMany({ where: and(inArray(extraPayments.jobId, jobIds), eq(extraPayments.paid, true)) })
       : [];
+    const enrichedExtraPayments = await enrichExtraPaymentsWithCategory(tx, paidExtraPayments);
 
     const clearedAdvances = await tx.query.workerAdvancePayments.findMany({
       where: eq(workerAdvancePayments.paymentSettlementId, settlement.id),
     });
 
-    return { settlement, jobs: jobRows, extraPayments: paidExtraPayments, clearedAdvances };
+    return { settlement, jobs: jobEntries, extraPayments: enrichedExtraPayments, clearedAdvances };
+  });
+}
+
+/**
+ * Lists a tailor's past settlements, newest first — the read
+ * `WorkerPaymentHistoryPage.tsx` needs (legacy `WorkPaymentHistory.jsx`'s
+ * equivalent) and the API never had; `getSettlement` above only ever fetched
+ * one settlement at a time, by an id the caller already had to already know.
+ */
+export async function listSettlements(tenantId: string, tailorId: string) {
+  return withTenant(tenantId, async (tx) => {
+    const tailor = await requireTailor(tx, tailorId);
+    return tx.query.paymentSettlements.findMany({
+      where: eq(paymentSettlements.tailorId, tailor.id),
+      orderBy: (s, { desc }) => desc(s.createdAt),
+    });
   });
 }

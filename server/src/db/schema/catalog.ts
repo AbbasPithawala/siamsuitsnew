@@ -138,8 +138,16 @@ export const featureTypeEnum = pgEnum("feature_type", ["choice", "text", "struct
  * roles" a feature can be assigned to (PHASE_9_TASKS.md Decision 4), same reasoning as
  * `manufacturingStepStatusEnum` in manufacturing.ts: fixed by the system, not by tenant
  * configuration, so a hard enum rather than free text.
+ *
+ * `piping` — legacy never modeled Piping as a `Feature`/`Style` pair at all; it was its own
+ * Mongo collection, rendered as an always-visible scrollable swatch grid (verified in
+ * `MissingFabric.jsx` — same `colored-style-boX` CSS class Monogram Color uses), never as a
+ * tab in the `Styles`/`AdditionalStyles` picker. The Phase 7 ETL folded it into an ordinary
+ * `type: "choice"` feature row, which made the order builder route it into the generic tabbed
+ * style picker (`ChoiceTabBar`) — visually wrong relative to legacy. This slot value tells
+ * `FeatureSelector.tsx` to render it in its own inline swatch-grid section instead.
  */
-export const featureRenderSlotEnum = pgEnum("feature_render_slot", ["shoulder_type", "monogram_position"]);
+export const featureRenderSlotEnum = pgEnum("feature_render_slot", ["shoulder_type", "monogram_position", "piping"]);
 
 /**
  * One unified model for every customizable garment attribute — lapel, pocket, fabric,

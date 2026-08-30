@@ -14,6 +14,7 @@ import { useProductFeaturesQuery } from "./featuresApi";
 import type { FeatureValue, ProductFeature } from "./featuresApi";
 import { MonogramFeatureField } from "./MonogramFeatureField";
 import type { MonogramStructuredValue } from "./MonogramFeatureField";
+import { PipingFeatureField } from "./PipingFeatureField";
 import "../../styles/legacyAdmin/MissingFabric.css";
 
 export interface FeatureSelectorProps {
@@ -35,7 +36,10 @@ type UpdateFeature = (featureId: string, patch: Omit<FeatureValue, "featureId">)
  * PHASE_9_TASKS.md Group 4 / Decision 4: any feature with a non-null
  * `renderSlot` is excluded from every zone here. Shoulder Type renders
  * elsewhere entirely (on `<MeasurementForm>`, Group 3); Monogram Position is
- * composed into `<MonogramFeatureField>` instead of getting its own tab.
+ * composed into `<MonogramFeatureField>` instead of getting its own tab;
+ * Piping renders as its own always-visible swatch-grid section instead of a
+ * tab in the "Normal styles" picker (matches legacy — see `PipingFeatureField`'s
+ * own doc comment).
  *
  * Fully controlled: `value`/`onChange` own the state, shaped exactly like
  * `POST /api/orders`'s per-component `features[]` array (see
@@ -62,18 +66,28 @@ export function FeatureSelector({ productId, value, onChange }: FeatureSelectorP
   }
 
   const monogramPositionFeature = features.find((feature) => feature.renderSlot === "monogram_position");
+  const pipingFeature = features.find((feature) => feature.renderSlot === "piping");
   // `features` already arrives in `feature_products.sequence_order` from the server
   // (`listFeaturesInTx`, PHASE_8_TASKS.md Group 1) when filtered to one product, as it
   // always is here — no client-side re-sort needed.
   const visible = features.filter((feature) => feature.renderSlot === null);
   const inlineFeatures = visible.filter((feature) => feature.type !== "choice");
+  // Fixed section order (Fabric/Lining, then Piping, then Monogram, then the "Normal
+  // styles" tab bar) — the real requested layout. `textFeatures` covers Fabric/Lining/any
+  // other plain `type: "text"` field (their own mutual order still comes from
+  // `sequence_order`, never hardcoded by name); Monogram (`type: "structured"`, the only
+  // other inline-zone type) is pulled out of that same loop and rendered in its own fixed
+  // slot after Piping instead of wherever it happened to fall in `sequence_order`.
+  const textFeatures = inlineFeatures.filter((feature) => feature.type === "text");
+  const monogramFeature = inlineFeatures.find((feature) => feature.type === "structured");
   const choiceFeatures = visible.filter((feature) => feature.type === "choice");
   const primaryChoiceFeatures = choiceFeatures.filter((feature) => !feature.isAdditional);
   const additionalChoiceFeatures = choiceFeatures.filter((feature) => feature.isAdditional);
+  const pipingValue = pipingFeature ? value.find((entry) => entry.featureId === pipingFeature.id) : undefined;
 
   return (
     <Box className="fabric-left" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      {inlineFeatures.map((feature) => (
+      {textFeatures.map((feature) => (
         <Box key={feature.id}>
           <Typography variant="h6" className="title-fabrics" gutterBottom>
             {feature.thaiName ? `${feature.name} (${feature.thaiName})` : feature.name}
@@ -86,6 +100,33 @@ export function FeatureSelector({ productId, value, onChange }: FeatureSelectorP
           />
         </Box>
       ))}
+
+      {pipingFeature && (
+        <Box>
+          <Typography variant="h6" className="title-fabrics" gutterBottom>
+            {pipingFeature.thaiName ? `${pipingFeature.name} (${pipingFeature.thaiName})` : pipingFeature.name}
+          </Typography>
+          <PipingFeatureField
+            feature={pipingFeature}
+            styleId={pipingValue?.styleId}
+            onSelect={(styleId) => updateFeature(pipingFeature.id, { styleId, styleOptionId: undefined })}
+          />
+        </Box>
+      )}
+
+      {monogramFeature && (
+        <Box>
+          <Typography variant="h6" className="title-fabrics" gutterBottom>
+            {monogramFeature.thaiName ? `${monogramFeature.name} (${monogramFeature.thaiName})` : monogramFeature.name}
+          </Typography>
+          <InlineFeatureField
+            feature={monogramFeature}
+            value={value}
+            updateFeature={updateFeature}
+            monogramPositionFeature={monogramPositionFeature}
+          />
+        </Box>
+      )}
 
       {primaryChoiceFeatures.length > 0 && (
         <Box>

@@ -93,7 +93,16 @@ export const extraPaymentCategories = pgTable("extra_payment_categories", {
  * it's the conservative one. A separate `PATCH .../approve` call is required either way.
  * `extraPaymentJobCategoryUnique` prevents the same category being applied twice to the
  * same job (also enforced in the service, but a unique index closes the race window an
- * application-level `SELECT`-then-`INSERT` check can't).
+ * application-level `SELECT`-then-`INSERT` check can't) — this holds even for a `rejected`
+ * row: rejection is a final decision recorded in place, not a delete, so the category stays
+ * blocked for this job rather than silently becoming re-attachable.
+ *
+ * `rejected`/`rejectedAt` (PHASE_6_TASKS.md Group 7 follow-up) is the admin-queue's
+ * counterpart to `approved`/no-timestamp-column-because-it-never-had-one — mutually
+ * exclusive with `approved` at the service layer (`extra-payments.service.ts`), never both
+ * `true`. This is deliberately a second boolean pair, not a single `status` enum replacing
+ * `approved`/`paid` — matches this table's existing convention of independent boolean
+ * flags for independent lifecycle facts, rather than collapsing them into one state machine.
  */
 export const extraPayments = pgTable("extra_payments", {
   ...idColumn,
@@ -102,6 +111,8 @@ export const extraPayments = pgTable("extra_payments", {
   tailorId: uuid("tailor_id").notNull().references(() => tailors.id),
   cost: numeric("cost", { precision: 12, scale: 2 }).notNull().default("0"),
   approved: boolean("approved").notNull().default(false),
+  rejected: boolean("rejected").notNull().default(false),
+  rejectedAt: timestamp("rejected_at", { withTimezone: true }),
   paid: boolean("paid").notNull().default(false),
   paidDate: timestamp("paid_date", { withTimezone: true }),
   description: text("description"),

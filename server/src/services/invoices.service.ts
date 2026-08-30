@@ -1,10 +1,11 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { withTenant } from "../db/withTenant";
 import type { Transaction } from "../db/withTenant";
-import { retailerInvoices } from "../db/schema/index";
+import { retailerInvoices, retailerInvoiceOrders, orderInvoices, orders, customers } from "../db/schema/index";
 import { HttpError } from "../utils/http-error";
 import { requireRetailer } from "./customers.service";
-import { isUniqueConstraintConflict } from "./orders.service";
+import { requireOrder, isUniqueConstraintConflict } from "./orders.service";
+import { findSavedOrderInvoice } from "./orderInvoices.service";
 import { DEFAULT_PAGINATION, toLimitOffset } from "../utils/pagination";
 import type { PaginationParams } from "../utils/pagination";
 
@@ -19,11 +20,21 @@ export interface LineItemInput {
   unitPrice: number;
 }
 
+/**
+ * Exactly one of `lineItems` (the original, still-supported freeform manual entry path) or
+ * `orderIds` (legacy `CreateInvoice.jsx`'s real "pick orders" flow, PHASE_10_TASKS.md
+ * invoicing follow-up) must be provided — `buildInvoice` rejects both-or-neither. Providing
+ * `orderIds` auto-builds one `lineItems` row per order (description = order number + customer,
+ * quantity 1, unitPrice = that order's own saved `order_invoices.total`) rather than requiring
+ * the client to already know each order's total.
+ */
 export interface CreateInvoiceInput {
   retailerId: string;
-  lineItems: LineItemInput[];
+  lineItems?: LineItemInput[];
+  orderIds?: string[];
   discount?: number;
   shippingCharge?: number;
+  dueDate?: string;
 }
 
 export interface ListInvoicesFilter {
@@ -95,10 +106,56 @@ function resolveLineItems(lineItems: LineItemInput[]): { resolved: ResolvedLineI
   return { resolved, subTotal };
 }
 
+/**
+ * One `LineItemInput` per order, sourced from that order's own saved invoice total rather
+ * than anything the client sends — legacy's real grouped-invoice PDF renders exactly this
+ * shape, one row per order (Order No/Customer/Products/Amount). Validates each order belongs
+ * to this retailer, has a saved per-order invoice at all (legacy's "checkbox only enabled once
+ * `invoice.total_amount` is truthy" gate, enforced here server-side instead of merely in the
+ * client), and isn't already bundled into a different retailer invoice (`retailer_invoice_orders`'
+ * own `orderIdUnique` would catch this at insert time regardless, but failing fast here with a
+ * specific order id in the message is far more useful than a generic constraint-violation 500).
+ */
+async function resolveLineItemsFromOrders(tx: Transaction, retailerId: string, orderIds: string[]): Promise<LineItemInput[]> {
+  const lineItems: LineItemInput[] = [];
+  for (const orderId of orderIds) {
+    const order = await requireOrder(tx, orderId);
+    if (order.retailerId !== retailerId) {
+      throw new HttpError(422, "ORDER_RETAILER_MISMATCH", `Order ${orderId} does not belong to this retailer`);
+    }
+
+    const orderInvoice = await findSavedOrderInvoice(tx, orderId);
+    if (!orderInvoice) {
+      throw new HttpError(422, "ORDER_INVOICE_MISSING", `Order ${order.orderNumber} has no saved invoice yet`);
+    }
+
+    const alreadyIncluded = await tx.query.retailerInvoiceOrders.findFirst({ where: eq(retailerInvoiceOrders.orderId, orderId) });
+    if (alreadyIncluded) {
+      throw new HttpError(409, "ORDER_ALREADY_INVOICED", `Order ${order.orderNumber} is already included in another invoice`);
+    }
+
+    const customer = await tx.query.customers.findFirst({ where: eq(customers.id, order.customerId) });
+    const customerName = customer ? [customer.firstName, customer.lastName].filter(Boolean).join(" ") : "";
+    lineItems.push({
+      description: `${order.orderNumber} — ${customerName}`,
+      quantity: 1,
+      unitPrice: Number(orderInvoice.total),
+    });
+  }
+  return lineItems;
+}
+
 async function buildInvoice(tx: Transaction, tenantId: string, input: CreateInvoiceInput) {
   const retailer = await requireRetailer(tx, input.retailerId);
 
-  const { resolved, subTotal } = resolveLineItems(input.lineItems);
+  if (Boolean(input.lineItems?.length) === Boolean(input.orderIds?.length)) {
+    throw new HttpError(400, "VALIDATION_ERROR", "Provide exactly one of lineItems or orderIds");
+  }
+  const lineItemInputs = input.orderIds?.length
+    ? await resolveLineItemsFromOrders(tx, retailer.id, input.orderIds)
+    : input.lineItems!;
+
+  const { resolved, subTotal } = resolveLineItems(lineItemInputs);
   const discount = input.discount ?? 0;
   const shippingCharge = input.shippingCharge ?? 0;
   const total = subTotal - discount + shippingCharge;
@@ -119,9 +176,15 @@ async function buildInvoice(tx: Transaction, tenantId: string, input: CreateInvo
       shippingCharge: shippingCharge.toFixed(2),
       total: total.toFixed(2),
       status: "Unpaid",
+      dueDate: input.dueDate ?? null,
     })
     .returning();
   if (!invoice) throw new HttpError(500, "INTERNAL_ERROR", "Failed to create invoice");
+
+  if (input.orderIds?.length) {
+    await tx.insert(retailerInvoiceOrders).values(input.orderIds.map((orderId) => ({ retailerInvoiceId: invoice.id, orderId })));
+  }
+
   return invoice;
 }
 
@@ -199,5 +262,88 @@ export async function updateInvoiceStatus(tenantId: string, id: string, status: 
       .returning();
     if (!updated) throw new HttpError(500, "INTERNAL_ERROR", "Failed to update invoice status");
     return updated;
+  });
+}
+
+export interface InvoiceableOrder {
+  id: string;
+  orderNumber: string;
+  orderDate: Date;
+  customerName: string;
+  /** `null` when this order has no saved per-order invoice yet — legacy's own gate ("checkbox only enabled once `total_amount` is truthy") is enforced client-side off this, and again server-side by `resolveLineItemsFromOrders` if it's ever bypassed. */
+  total: string | null;
+}
+
+/**
+ * A retailer's orders not yet bundled into a grouped invoice — legacy `CreateInvoice.jsx`'s
+ * own order table, filtered the same way it filters to `invoiceSent === false`
+ * (`LEFT JOIN ... IS NULL` against `retailerInvoiceOrders`). Deliberately includes orders with
+ * no saved per-order invoice yet (`LEFT JOIN orderInvoices`, `total: null`) rather than hiding
+ * them outright — legacy shows every one of a retailer's open orders here and merely disables
+ * the checkbox until that order's own invoice has been priced; hiding them entirely would give
+ * staff no way to discover which orders still need pricing before they can be grouped.
+ */
+export function listInvoiceableOrders(tenantId: string, retailerId: string): Promise<InvoiceableOrder[]> {
+  return withTenant(tenantId, async (tx) => {
+    await requireRetailer(tx, retailerId);
+
+    const rows = await tx
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        orderDate: orders.orderDate,
+        firstName: customers.firstName,
+        lastName: customers.lastName,
+        total: orderInvoices.total,
+      })
+      .from(orders)
+      .leftJoin(orderInvoices, eq(orderInvoices.orderId, orders.id))
+      .innerJoin(customers, eq(customers.id, orders.customerId))
+      .leftJoin(retailerInvoiceOrders, eq(retailerInvoiceOrders.orderId, orders.id))
+      .where(and(eq(orders.retailerId, retailerId), isNull(orders.deletedAt), isNull(retailerInvoiceOrders.id)))
+      .orderBy(desc(orders.orderDate));
+
+    return rows.map((row) => ({
+      id: row.id,
+      orderNumber: row.orderNumber,
+      orderDate: row.orderDate,
+      customerName: [row.firstName, row.lastName].filter((v): v is string => Boolean(v)).join(" "),
+      total: row.total,
+    }));
+  });
+}
+
+export interface InvoiceOrderSummary {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+}
+
+/**
+ * `tx`-scoped, not `withTenant`-wrapping — exported separately from `getInvoiceOrders` below
+ * so `invoicePdf.service.ts#generateRetailerInvoicePdf` (already running inside its own
+ * `withTenant` transaction) can call this directly instead of nesting a second transaction on
+ * a second pooled connection just to re-fetch the same invoice's orders.
+ */
+export async function fetchInvoiceOrders(tx: Transaction, retailerInvoiceId: string): Promise<InvoiceOrderSummary[]> {
+  const rows = await tx
+    .select({ id: orders.id, orderNumber: orders.orderNumber, firstName: customers.firstName, lastName: customers.lastName })
+    .from(retailerInvoiceOrders)
+    .innerJoin(orders, eq(orders.id, retailerInvoiceOrders.orderId))
+    .innerJoin(customers, eq(customers.id, orders.customerId))
+    .where(eq(retailerInvoiceOrders.retailerInvoiceId, retailerInvoiceId));
+
+  return rows.map((row) => ({
+    id: row.id,
+    orderNumber: row.orderNumber,
+    customerName: [row.firstName, row.lastName].filter((v): v is string => Boolean(v)).join(" "),
+  }));
+}
+
+/** The real orders bundled into one grouped invoice — legacy `InvoiceHistory.jsx`'s "View" dialog's order list (S.No/Order No/View), each row's own "View" drilling into that order's single-order PDF. */
+export function getInvoiceOrders(tenantId: string, invoiceId: string, actorRetailerId?: string | null): Promise<InvoiceOrderSummary[]> {
+  return withTenant(tenantId, async (tx) => {
+    const invoice = await requireInvoice(tx, invoiceId, actorRetailerId);
+    return fetchInvoiceOrders(tx, invoice.id);
   });
 }

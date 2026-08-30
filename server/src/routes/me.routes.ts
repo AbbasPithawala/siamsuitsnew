@@ -15,6 +15,16 @@ meRouter.get("/me", authenticate, async (req, res, next) => {
       if (!user) throw new HttpError(401, "UNAUTHORIZED", "Invalid or inactive account");
 
       const permissions = await resolveUserPermissions(user.id);
+
+      // Header branding (AppShell.tsx): a retailer-linked session shows that retailer's own
+      // logo — they're a distinct business the tenant serves — otherwise the tenant's own
+      // letterhead logo (`invoicePdf.service.ts`'s same `tenants.logo` field). Resolved here,
+      // not left to the client to fetch separately, since `/me` is already the one request
+      // every page makes before rendering anything.
+      const logo = actor.retailerId
+        ? ((await db.query.retailers.findFirst({ where: (t, { eq }) => eq(t.id, actor.retailerId!) }))?.logo ?? null)
+        : ((await db.query.tenants.findFirst({ where: (t, { eq }) => eq(t.id, user.tenantId) }))?.logo ?? null);
+
       res.status(200).json({
         data: {
           id: user.id,
@@ -24,6 +34,7 @@ meRouter.get("/me", authenticate, async (req, res, next) => {
           tenantId: user.tenantId,
           retailerId: actor.retailerId,
           permissions: [...permissions],
+          logo,
         },
       });
       return;
@@ -41,6 +52,7 @@ meRouter.get("/me", authenticate, async (req, res, next) => {
         tenantId: tailor.tenantId,
         retailerId: actor.retailerId,
         permissions: [] as string[],
+        logo: null,
       },
     });
   } catch (err) {

@@ -3,10 +3,15 @@ import type { FormEvent } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
 import Divider from "@mui/material/Divider";
-import FormControlLabel from "@mui/material/FormControlLabel";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemText from "@mui/material/ListItemText";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
@@ -16,7 +21,7 @@ import { useHasPermission } from "../auth/useHasPermission";
 import { useListProcessesQuery } from "../catalog/processesApi";
 import { useListProductsQuery } from "../catalog/productsApi";
 import { useListExtraPaymentCategoriesQuery } from "../extraPayments/extraPaymentCategoriesApi";
-import { useCreateExtraPaymentMutation } from "../extraPayments/extraPaymentsApi";
+import { useCreateExtraPaymentMutation, useRemoveExtraPaymentMutation } from "../extraPayments/extraPaymentsApi";
 import { useListTailorsQuery } from "../tailors/tailorsApi";
 import { CertifiedTailorSelect } from "./CertifiedTailorSelect";
 import { getManufacturingErrorMessage, getMessageForCode } from "./manufacturingErrors";
@@ -36,6 +41,11 @@ interface ActiveJob {
   stylingPrice: string;
 }
 
+interface AttachedPaymentState {
+  approved: boolean;
+  rejected: boolean;
+}
+
 /**
  * Factory floor job-assignment/completion screen — PHASE_6_TASKS.md Group 7.
  * The manual-id/lookup fallback this task explicitly allows: no camera/QR
@@ -49,14 +59,25 @@ interface ActiveJob {
  * assigning a step and completing the job it creates are one continuous
  * per-piece workflow on the factory floor (the legacy `AssignItem.jsx`'s
  * "showJob" card did the same — assign, then immediately offer completion +
- * extra payment on that same job). Completing a step that was assigned in an
- * *earlier* session (not this page load) isn't supported — there is no
- * `GET /jobs`/`GET /jobs/:id` endpoint anywhere in the API to look an
- * existing job up by id, only `POST .../assign` and `POST .../complete`, so
- * there is nothing to fetch. That gap is flagged in `PHASE_6_TASKS.md`'s
- * Group 7 write-up rather than invented here. The blocked-state message
- * below (`STEP_IN_PROGRESS`) still tells the operator which tailor already
- * has it, from `manufacturingSteps[].tailorId`, even without the job id.
+ * extra payment on that same job). There's still no generic `GET /jobs/:id`,
+ * but `getComponentDetail` resolves the one in-progress job this screen
+ * actually needs (`ComponentDetail.activeJob`, plus its already-attached
+ * extra payments' approved/rejected status), so re-looking-up a component —
+ * even after a reload, in a new tab, or in a different session entirely —
+ * recovers the "Complete job" screen rather than only the blocked-state
+ * message. An attached-but-still-pending extra payment can be removed again
+ * from here (`removeExtraPayment`) right up until the job completes; once
+ * an admin approves or rejects it on `ExtraPaymentsApprovalPage.tsx`, or the
+ * job completes, it's locked from this screen.
+ *
+ * `activeJob`/`attachedPayments` below are derived straight from
+ * `componentDetail` every render rather than mirrored into local state via
+ * an effect — every mutation that changes either (`assignNextStep`,
+ * `createExtraPayment`, `removeExtraPayment`, `completeStep`) already
+ * invalidates the `ManufacturingComponent` tag, so the refetched
+ * `componentDetail` is the single source of truth and there's nothing for
+ * local state to add except a stale-copy bug and a "setState in an effect"
+ * lint error.
  *
  * Uses MUI directly (Paper/Stack/Table-free card layout) rather than porting
  * `factory.css`'s bespoke classes/inline styles — Groups 0-6 of this same
@@ -72,8 +93,9 @@ export function JobAssignmentPage() {
   const [componentIdInput, setComponentIdInput] = useState("");
   const [lookupId, setLookupId] = useState("");
   const [selectedTailorId, setSelectedTailorId] = useState("");
-  const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [extraPaymentModalOpen, setExtraPaymentModalOpen] = useState(false);
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null);
+  const [extraPaymentModalError, setExtraPaymentModalError] = useState<string | null>(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [completeError, setCompleteError] = useState<string | null>(null);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
@@ -93,14 +115,16 @@ export function JobAssignmentPage() {
   const [assignNextStep, assignState] = useAssignNextStepMutation();
   const [completeStep, completeState] = useCompleteStepMutation();
   const [createExtraPayment] = useCreateExtraPaymentMutation();
+  const [removeExtraPayment] = useRemoveExtraPaymentMutation();
 
   const productNameById = new Map((products ?? []).map((product) => [product.id, product.name]));
   const processNameById = new Map((processes ?? []).map((process) => [process.id, process.name]));
   const tailorNameById = new Map((tailors ?? []).map((tailor) => [tailor.id, tailor.name]));
 
   function resetSessionState() {
-    setActiveJob(null);
-    setSelectedCategoryIds([]);
+    setExtraPaymentModalOpen(false);
+    setPendingCategoryId(null);
+    setExtraPaymentModalError(null);
     setSelectedTailorId("");
     setAssignError(null);
     setCompleteError(null);
@@ -113,41 +137,77 @@ export function JobAssignmentPage() {
     setLookupId(componentIdInput.trim());
   }
 
+  // Derived from `componentDetail` (see this file's doc comment) — recovers an
+  // in-progress job on any fresh lookup, a reload included, not just the
+  // browser tab that made the original `assignNextStep` call.
+  const activeJob: ActiveJob | null = (() => {
+    if (!componentDetail?.activeJob) return null;
+    const step = componentDetail.manufacturingSteps.find((s) => s.id === componentDetail.activeJob!.manufacturingStepId);
+    if (!step) return null;
+    return { id: componentDetail.activeJob.id, step, cost: componentDetail.activeJob.cost, stylingPrice: componentDetail.activeJob.stylingPrice };
+  })();
+
+  const attachedPayments: Record<string, AttachedPaymentState> = Object.fromEntries(
+    (componentDetail?.activeJobExtraPayments ?? []).map((p) => [p.categoryId, { approved: p.approved, rejected: p.rejected }])
+  );
+
   async function handleAssign() {
     if (!componentDetail?.nextStep || !selectedTailorId) return;
     setAssignError(null);
     try {
-      const result = await assignNextStep({ componentId: componentDetail.id, tailorId: selectedTailorId }).unwrap();
-      setActiveJob({ id: result.job.id, step: result.step, cost: result.job.cost, stylingPrice: result.job.stylingPrice });
+      await assignNextStep({ componentId: componentDetail.id, tailorId: selectedTailorId }).unwrap();
       setSelectedTailorId("");
     } catch (err) {
       setAssignError(getManufacturingErrorMessage(err, "Failed to assign the step."));
     }
   }
 
-  function toggleCategory(categoryId: string, checked: boolean) {
-    setSelectedCategoryIds((current) => (checked ? [...current, categoryId] : current.filter((id) => id !== categoryId)));
+  async function handleAttachExtraPayment(categoryId: string) {
+    if (!activeJob || !componentDetail) return;
+    setExtraPaymentModalError(null);
+    setPendingCategoryId(categoryId);
+    try {
+      await createExtraPayment({ jobId: activeJob.id, categoryId, componentId: componentDetail.id }).unwrap();
+    } catch (err) {
+      setExtraPaymentModalError(getManufacturingErrorMessage(err, "Failed to attach that extra payment."));
+    } finally {
+      setPendingCategoryId(null);
+    }
+  }
+
+  async function handleRemoveExtraPayment(categoryId: string) {
+    if (!activeJob || !componentDetail) return;
+    setExtraPaymentModalError(null);
+    setPendingCategoryId(categoryId);
+    try {
+      await removeExtraPayment({ jobId: activeJob.id, categoryId, componentId: componentDetail.id }).unwrap();
+    } catch (err) {
+      setExtraPaymentModalError(getManufacturingErrorMessage(err, "Failed to remove that extra payment."));
+    } finally {
+      setPendingCategoryId(null);
+    }
   }
 
   async function handleCompleteJob() {
     if (!activeJob || !componentDetail) return;
     setCompleteError(null);
     try {
-      let extraTotal = 0;
-      for (const categoryId of selectedCategoryIds) {
-        const category = matchingCategories.find((c) => c.id === categoryId);
-        await createExtraPayment({ jobId: activeJob.id, categoryId }).unwrap();
-        extraTotal += Number(category?.cost ?? 0);
-      }
+      // Rejected attachments don't count toward the preview total below — an admin already
+      // decided this one isn't getting paid. The real payroll total is always recomputed
+      // server-side from `approved` extra payments at settlement time regardless (see
+      // `payroll.service.ts`'s `createSettlement`); this is display-only.
+      const payableCategoryIds = Object.keys(attachedPayments).filter((id) => !attachedPayments[id]?.rejected);
+      const extraTotal = matchingCategories
+        .filter((category) => payableCategoryIds.includes(category.id))
+        .reduce((sum, category) => sum + Number(category.cost), 0);
 
       await completeStep({ jobId: activeJob.id, componentId: componentDetail.id }).unwrap();
 
       const total = Number(activeJob.cost) + Number(activeJob.stylingPrice) + extraTotal;
       setFlashMessage(
-        `Job completed${selectedCategoryIds.length > 0 ? ` with ${selectedCategoryIds.length} extra payment(s)` : ""}. Total pay: THB ${total.toFixed(2)}.`
+        `Job completed${payableCategoryIds.length > 0 ? ` with ${payableCategoryIds.length} extra payment(s)` : ""}. Total pay: THB ${total.toFixed(2)}.`
       );
-      setActiveJob(null);
-      setSelectedCategoryIds([]);
+      setExtraPaymentModalOpen(false);
     } catch (err) {
       setCompleteError(getManufacturingErrorMessage(err, "Failed to complete the job."));
     }
@@ -235,26 +295,10 @@ export function JobAssignmentPage() {
                 {(Number(activeJob.cost) + Number(activeJob.stylingPrice)).toFixed(2)}
               </Typography>
 
-              {canManageExtraPayments && matchingCategories.length > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Extra payments for this product/process
-                  </Typography>
-                  <Stack>
-                    {matchingCategories.map((category) => (
-                      <FormControlLabel
-                        key={category.id}
-                        control={
-                          <Checkbox
-                            checked={selectedCategoryIds.includes(category.id)}
-                            onChange={(event) => toggleCategory(category.id, event.target.checked)}
-                          />
-                        }
-                        label={`${category.name}${category.thaiName ? ` / ${category.thaiName}` : ""} — THB ${category.cost}`}
-                      />
-                    ))}
-                  </Stack>
-                </Box>
+              {Object.keys(attachedPayments).length > 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {Object.keys(attachedPayments).length} extra payment(s) attached.
+                </Typography>
               )}
 
               {completeError && (
@@ -263,17 +307,20 @@ export function JobAssignmentPage() {
                 </Alert>
               )}
 
-              {canComplete ? (
-                <Button variant="contained" onClick={handleCompleteJob} disabled={completeState.isLoading}>
-                  {completeState.isLoading
-                    ? "Completing…"
-                    : selectedCategoryIds.length > 0
-                      ? "Attach extra payment(s) & complete job"
-                      : "Complete job"}
-                </Button>
-              ) : (
-                <Alert severity="warning">You do not have permission to complete this job.</Alert>
-              )}
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ flexWrap: "wrap", gap: 1 }}>
+                {canComplete ? (
+                  <Button variant="contained" onClick={handleCompleteJob} disabled={completeState.isLoading}>
+                    {completeState.isLoading ? "Completing…" : "Complete job"}
+                  </Button>
+                ) : (
+                  <Alert severity="warning">You do not have permission to complete this job.</Alert>
+                )}
+                {canManageExtraPayments && matchingCategories.length > 0 && (
+                  <Button variant="outlined" onClick={() => setExtraPaymentModalOpen(true)}>
+                    Attach extra payment
+                  </Button>
+                )}
+              </Stack>
             </Box>
           ) : componentDetail.nextStep ? (
             <Box>
@@ -306,6 +353,65 @@ export function JobAssignmentPage() {
           )}
         </Paper>
       )}
+
+      <Dialog open={extraPaymentModalOpen} onClose={() => setExtraPaymentModalOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Attach extra payment</DialogTitle>
+        <DialogContent>
+          {extraPaymentModalError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {extraPaymentModalError}
+            </Alert>
+          )}
+          <List disablePadding>
+            {matchingCategories.map((category) => {
+              const attached = attachedPayments[category.id];
+              const isPending = pendingCategoryId === category.id;
+              return (
+                <ListItem
+                  key={category.id}
+                  disableGutters
+                  secondaryAction={
+                    !attached ? (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleAttachExtraPayment(category.id)}
+                        disabled={isPending}
+                      >
+                        {isPending ? "Adding…" : "Add"}
+                      </Button>
+                    ) : attached.approved ? (
+                      <Chip size="small" color="success" label="Approved" />
+                    ) : attached.rejected ? (
+                      <Chip size="small" color="error" label="Rejected" />
+                    ) : (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip size="small" color="success" label="Added" />
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => handleRemoveExtraPayment(category.id)}
+                          disabled={isPending}
+                        >
+                          {isPending ? "Removing…" : "Remove"}
+                        </Button>
+                      </Stack>
+                    )
+                  }
+                >
+                  <ListItemText
+                    primary={`${category.name}${category.thaiName ? ` / ${category.thaiName}` : ""}`}
+                    secondary={`THB ${category.cost}`}
+                  />
+                </ListItem>
+              );
+            })}
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExtraPaymentModalOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

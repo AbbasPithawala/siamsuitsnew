@@ -41,9 +41,12 @@ import {
   buildComponentInput,
   buildOrderItemsFromLineItems,
   emptyMeasurementComponentDraft,
+  seedSharedMeasurementsForNewLineItem,
   toFeatureValue,
   toMeasurementValue,
+  withSharedMeasurementsSynced,
 } from "./orderItemBuilder";
+import { LineItemReviewCard } from "./LineItemReviewCard";
 import { ManualSizeEditor } from "./ManualSizeEditor";
 import { useCreateOrderMutation, useEditOrderMutation, useGetOrderQuery } from "./ordersApi";
 import type { CreateOrderInput, CreatedOrder, EditOrderItemInput } from "./ordersApi";
@@ -189,6 +192,23 @@ export function OrderBuilderPage() {
 
   const selectedRetailer = retailers?.find((retailer) => retailer.id === retailerId) ?? null;
   const selectedCustomer = customers?.find((customer) => customer.id === customerId) ?? null;
+
+  /**
+   * A retailer-linked session never sees the Retailer step's content (the
+   * auto-select block above jumps straight past it) — showing an already-
+   * checked "Retailer" circle in the bar for a step nobody ever interacts
+   * with is confusing, not reassuring. Drop it from the *displayed* bar only;
+   * `activeStep`/`RETAILER_STEP`/etc. stay the real, unshifted step indices
+   * everywhere else in this file (Back/Next, the `canProceed` map, the
+   * `activeStep === X` content switches) so this is purely a rendering
+   * concern, not a renumbering of the wizard itself. Clamped at 0 for the
+   * repeat-order flow, where `activeStep` can still be `RETAILER_STEP` for a
+   * retailer-linked session (that block deliberately skips the auto-jump —
+   * see its own doc comment) — never negative, just falls back to
+   * highlighting the first visible step.
+   */
+  const stepLabels = me?.retailerId ? STEP_LABELS.slice(1) : STEP_LABELS;
+  const displayActiveStep = me?.retailerId ? Math.max(0, activeStep - 1) : activeStep;
 
   /**
    * React's own "adjusting state when a prop/query result changes" pattern
@@ -360,7 +380,22 @@ export function OrderBuilderPage() {
   function handleAddLineItem(superProductId: string) {
     const superProduct = superProducts?.find((sp) => sp.id === superProductId);
     if (!superProduct) return;
-    setLineItems((current) => [...current, createLineItemDraft(superProduct)]);
+    setLineItems((current) => {
+      const newLineItem = createLineItemDraft(superProduct);
+      // Seed the new line item's shared measurements from any existing line item
+      // that already embeds the same underlying product (e.g. adding "Suit" after
+      // "Jacket" already has real measurements) — see `withSharedMeasurementsSynced`'s
+      // own doc comment for the real bug this (and its edit-time counterpart below)
+      // fixes.
+      const measurementsByLineItemId = Object.fromEntries(current.map((item) => [item.id, item.measurementsDraft]));
+      newLineItem.measurementsDraft = seedSharedMeasurementsForNewLineItem(
+        superProduct.components,
+        current,
+        measurementsByLineItemId,
+        superProducts ?? []
+      );
+      return [...current, newLineItem];
+    });
   }
 
   function handleRemoveLineItem(id: string) {
@@ -389,11 +424,11 @@ export function OrderBuilderPage() {
   }
 
   function handleChangeMeasurements(id: string, componentId: string, next: LineItemComponentMeasurementDraft) {
-    setLineItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, measurementsDraft: { ...item.measurementsDraft, [componentId]: next } } : item
-      )
-    );
+    setLineItems((current) => {
+      const measurementsByLineItemId = Object.fromEntries(current.map((item) => [item.id, item.measurementsDraft]));
+      const synced = withSharedMeasurementsSynced(measurementsByLineItemId, current, superProducts ?? [], id, componentId, next);
+      return current.map((item) => ({ ...item, measurementsDraft: synced[item.id] ?? item.measurementsDraft }));
+    });
   }
 
   function handleChangeStyling(id: string, next: UnitStylingDraft[]) {
@@ -619,8 +654,8 @@ export function OrderBuilderPage() {
         </Alert>
       )}
 
-      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-        {STEP_LABELS.map((label) => (
+      <Stepper activeStep={displayActiveStep} sx={{ mb: 4 }}>
+        {stepLabels.map((label) => (
           <Step key={label}>
             <StepLabel>{label}</StepLabel>
           </Step>
@@ -769,38 +804,7 @@ export function OrderBuilderPage() {
             {lineItems.map((lineItem) => {
               const superProduct = superProducts?.find((sp) => sp.id === lineItem.superProductId);
               if (!superProduct) return null;
-              return (
-                <Paper key={lineItem.id} variant="outlined" sx={{ p: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    {superProduct.name} × {lineItem.stylingDrafts.length}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {Object.values(lineItem.measurementsDraft).reduce((sum, d) => sum + d.measurements.length, 0)}{" "}
-                    shared measurement(s) entered
-                  </Typography>
-                  {lineItem.stylingDrafts.map((unit, index) => (
-                    <Box key={index} sx={{ mt: 1.5 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        Unit {index + 1}
-                      </Typography>
-                      <Box
-                        component="pre"
-                        sx={{
-                          fontSize: 12,
-                          bgcolor: "action.hover",
-                          p: 1.5,
-                          borderRadius: 1,
-                          overflowX: "auto",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        {JSON.stringify(unit, null, 2)}
-                      </Box>
-                    </Box>
-                  ))}
-                </Paper>
-              );
+              return <LineItemReviewCard key={lineItem.id} lineItem={lineItem} superProduct={superProduct} />;
             })}
 
             {canRush && !isEditMode && (

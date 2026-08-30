@@ -17,6 +17,7 @@ import { ArrowForwardIosSharp as ExpandArrowIcon, Logout as LogoutIcon } from "@
 import { useMeQuery } from "../../api/baseApi";
 import type { AppDispatch, RootState } from "../../app/store";
 import { logout } from "../../features/auth/authSlice";
+import { resolveUploadUrl } from "../../features/uploads/uploadsApi";
 import { navGroups } from "./navConfig";
 import "../../styles/legacyAdmin/sidebar.css";
 
@@ -107,9 +108,13 @@ export function AppShell() {
     <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
-          <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600 }}>
-            Siam Suits
-          </Typography>
+          {me?.logo ? (
+            <Box component="img" src={resolveUploadUrl(me.logo)} alt="Logo" sx={{ height: 40, maxWidth: 200, objectFit: "contain" }} />
+          ) : (
+            <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600 }}>
+              Siam Suits
+            </Typography>
+          )}
           {me && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Typography variant="body2">

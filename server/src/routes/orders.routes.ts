@@ -9,6 +9,8 @@ import { requireParam } from "../utils/params";
 import { paginationQuerySchema, paginatedResult } from "../utils/pagination";
 import * as ordersService from "../services/orders.service";
 import * as orderPdfService from "../services/orderPdf.service";
+import * as orderInvoicesService from "../services/orderInvoices.service";
+import * as invoicePdfService from "../services/invoicePdf.service";
 
 const measurementSchema = z.object({
   measurementDefinitionId: z.string().uuid(),
@@ -59,6 +61,18 @@ const setOrderStatusSchema = z.object({
 
 const reassignOrderRetailerSchema = z.object({
   retailerId: z.string().uuid(),
+});
+
+const orderInvoiceLineInputSchema = z.object({
+  groupLabel: z.string().min(1),
+  kind: z.enum(orderInvoicesService.ORDER_INVOICE_LINE_KINDS),
+  label: z.string().min(1),
+  price: z.number().nonnegative(),
+});
+
+const saveOrderInvoiceSchema = z.object({
+  note: z.string().optional(),
+  lines: z.array(orderInvoiceLineInputSchema).min(1),
 });
 
 const createOrderSchema = z
@@ -207,3 +221,45 @@ ordersRouter.patch(
     }
   }
 );
+
+/**
+ * Legacy `CreateInvoice.jsx`'s `handleClickOpen` — a saved invoice if `PUT` was ever called
+ * for this order, otherwise a freshly-computed (not persisted) draft. Gated by
+ * `invoices.manage`, not `orders.view`: this is the per-order pricing screen legacy reserves
+ * for superAdmin only (never exposed to a retailer session), and it's financial data, not
+ * order content.
+ */
+ordersRouter.get("/orders/:id/invoice", authenticate, requirePermission("invoices.manage"), async (req, res, next) => {
+  try {
+    const invoice = await orderInvoicesService.getOrderInvoice(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    res.status(200).json({ data: invoice });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Legacy `CreateInvoice.jsx`'s "Save" (`handleCreateInvoice`) — full replace of this order's invoice lines; `total`/`amount` are always server-computed, never trusted from the client. */
+ordersRouter.put(
+  "/orders/:id/invoice",
+  authenticate,
+  requirePermission("invoices.manage"),
+  validateBody(saveOrderInvoiceSchema),
+  async (req, res, next) => {
+    try {
+      const invoice = await orderInvoicesService.saveOrderInvoice(req.actor!.tenantId, requireParam(req, "id"), req.body, req.actor!.retailerId);
+      res.status(200).json({ data: invoice });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/** Legacy `CreateInvoice.jsx`/`InvoiceHistory.jsx`'s single-order invoice PDF (`exportPDF`/`exportSingleInvoicePDF`) — server-rendered and persisted, per PHASE_10_TASKS.md's invoicing follow-up, rather than legacy's client-side `jsPDF`. Requires a saved order invoice (`PUT` above) to already exist. */
+ordersRouter.post("/orders/:id/invoice/pdf", authenticate, requirePermission("invoices.manage"), async (req, res, next) => {
+  try {
+    const path = await invoicePdfService.generateOrderInvoicePdf(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    res.status(201).json({ data: { path } });
+  } catch (err) {
+    next(err);
+  }
+});

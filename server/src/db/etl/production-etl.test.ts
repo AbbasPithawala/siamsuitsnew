@@ -171,7 +171,7 @@ describe("production ETL (PHASE_7_TASKS.md Group 0)", () => {
     expect(detail.settlement.totalPay).toBe(settlement.totalPay);
     expect(detail.jobs.length).toBeGreaterThan(0);
     // Every linked job actually belongs to this settlement's tailor.
-    for (const job of detail.jobs) expect(job.tailorId).toBe(settlement.tailorId);
+    for (const entry of detail.jobs) expect(entry.job.tailorId).toBe(settlement.tailorId);
   });
 
   it("traces a real migrated extra payment back to its job/category/component chain", async () => {

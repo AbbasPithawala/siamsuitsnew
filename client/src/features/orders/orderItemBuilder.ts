@@ -2,7 +2,8 @@ import type { MeasurementValue } from "../measurements/MeasurementForm";
 import type { ProductMeasurementLink } from "../measurements/measurementsApi";
 import type { FeatureValue } from "../featureSelector/featuresApi";
 import type { SuperProduct, SuperProductComponent } from "../catalog/superProductsApi";
-import type { LineItemComponentMeasurementDraft } from "./LineItemMeasurementsPanel";
+import { createEmptyLineItemMeasurementsDraft } from "./LineItemMeasurementsPanel";
+import type { LineItemComponentMeasurementDraft, LineItemMeasurementsDraft } from "./LineItemMeasurementsPanel";
 import type { LineItemDraft } from "./OrderCartStep";
 import { emptyComponentStylingDraft } from "./StylingAccordion";
 import type { UnitStylingDraft } from "./StylingAccordion";
@@ -23,6 +24,87 @@ import type { CreateOrderComponentInput, CreateOrderItemInput, EditOrderComponen
 
 export function emptyMeasurementComponentDraft(): LineItemComponentMeasurementDraft {
   return { measurements: [], measurementNote: "", features: [] };
+}
+
+/** One customer/cart's shared measurement drafts, keyed by line item id — `OrderBuilderPage.tsx`'s own `LineItemDraft[]` and `NewGroupOrderPage.tsx`'s per-customer `measurementsByLineItem` are both this same shape underneath. */
+export type LineItemMeasurementsByLineItemId = Record<string, LineItemMeasurementsDraft>;
+
+/**
+ * Real reported bug: a primary product (e.g. "Jacket") is also its own super
+ * product, so the same product can appear as a standalone line item *and* as a
+ * component slot inside another super product (e.g. "Suit"'s own Jacket slot) —
+ * two different cart rows, but physically the same garment for the same
+ * customer. Editing the chest measurement on one must update the other too, and
+ * vice versa, for every line item that embeds that product anywhere. This
+ * broadcasts the just-edited component's full shared draft (measurements, note,
+ * Shoulder Type selection, manual size image — `LineItemComponentMeasurementDraft`
+ * in full, not just the one field touched) to every component, in every line
+ * item, whose `productId` matches the edited component's — including sibling
+ * components within the *same* super product (a super product can legitimately
+ * have two components pointing at the same product), not only across line items.
+ */
+export function withSharedMeasurementsSynced(
+  measurementsByLineItemId: LineItemMeasurementsByLineItemId,
+  lineItems: { id: string; superProductId: string }[],
+  superProducts: SuperProduct[],
+  editedLineItemId: string,
+  editedComponentId: string,
+  next: LineItemComponentMeasurementDraft
+): LineItemMeasurementsByLineItemId {
+  const editedItem = lineItems.find((item) => item.id === editedLineItemId);
+  const editedSuperProduct = editedItem && superProducts.find((sp) => sp.id === editedItem.superProductId);
+  const editedComponent = editedSuperProduct?.components.find((c) => c.id === editedComponentId);
+  const productId = editedComponent?.productId;
+
+  const result: LineItemMeasurementsByLineItemId = { ...measurementsByLineItemId };
+  for (const item of lineItems) {
+    const superProduct = superProducts.find((sp) => sp.id === item.superProductId);
+    if (!superProduct) continue;
+    const matchingComponentIds = productId
+      ? superProduct.components.filter((c) => c.productId === productId).map((c) => c.id)
+      : [];
+    if (item.id === editedLineItemId && !matchingComponentIds.includes(editedComponentId)) {
+      matchingComponentIds.push(editedComponentId);
+    }
+    if (matchingComponentIds.length === 0) continue;
+    const itemDraft = { ...(result[item.id] ?? {}) };
+    for (const componentId of matchingComponentIds) {
+      itemDraft[componentId] = next;
+    }
+    result[item.id] = itemDraft;
+  }
+  return result;
+}
+
+/**
+ * The add-time counterpart to `withSharedMeasurementsSynced` above: without this,
+ * the shared-measurement invariant only starts holding after the *next* edit —
+ * adding "Suit" after "Jacket" already has real measurements would leave the
+ * Suit's own Jacket slot blank until something touches it. Seeds each of the new
+ * line item's components from the first existing line item (in this same
+ * cart/customer) that already has a real draft for a component with the same
+ * `productId`, so the invariant holds from the moment the line item is added.
+ */
+export function seedSharedMeasurementsForNewLineItem(
+  newComponents: SuperProductComponent[],
+  existingLineItems: { id: string; superProductId: string }[],
+  existingMeasurementsByLineItemId: LineItemMeasurementsByLineItemId,
+  superProducts: SuperProduct[]
+): LineItemMeasurementsDraft {
+  const draft = createEmptyLineItemMeasurementsDraft(newComponents);
+  for (const component of newComponents) {
+    for (const item of existingLineItems) {
+      const superProduct = superProducts.find((sp) => sp.id === item.superProductId);
+      const match = superProduct?.components.find((c) => c.productId === component.productId);
+      if (!match) continue;
+      const existingDraft = existingMeasurementsByLineItemId[item.id]?.[match.id];
+      if (existingDraft) {
+        draft[component.id] = existingDraft;
+        break;
+      }
+    }
+  }
+  return draft;
 }
 
 /** `exactOptionalPropertyTypes` forbids assigning `value: undefined` explicitly — these omit the key entirely instead, same shape `sanitizeMeasurements`/`sanitizeFeatures` below produce. */

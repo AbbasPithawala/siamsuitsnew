@@ -304,7 +304,9 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
 
     const secondPdf = await buildOrderPdfHtml(owner.tenantId, second.data.id);
     expect(secondPdf.oldOrderNumber).toBe(first.data.orderNumber);
-    expect(secondPdf.html).toContain('class="banner banner-old-order"');
+    // Shown once, as a plain "Old Order:" header row — matches legacy exactly, which never
+    // repeats it a second time as a separate colored banner.
+    expect(secondPdf.html).toContain('<span class="label">Old Order:</span>');
     expect(secondPdf.html).toContain(first.data.orderNumber);
 
     // The first order's own PDF still has no "old order" — it's the earliest for this customer.
@@ -331,7 +333,9 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
 
     const childPdf = await buildOrderPdfHtml(owner.tenantId, childOrderId);
     expect(childPdf.groupOrderNumber).toBe(group.data.orderNumber);
-    expect(childPdf.html).toContain('class="banner banner-group-order"');
+    // Shown once, inside the order-info-box (alongside order number/type) — matches legacy
+    // exactly, which never repeats it a second time as a separate colored banner.
+    expect(childPdf.html).toContain('class="order-info-box"');
     expect(childPdf.html).toContain(group.data.orderNumber);
 
     const normalRes = await postJson(baseUrl, "/api/orders", owner.token, {
@@ -342,10 +346,7 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
     const normal = (await normalRes.json()) as { data: { id: string } };
     const normalPdf = await buildOrderPdfHtml(owner.tenantId, normal.data.id);
     expect(normalPdf.groupOrderNumber).toBeNull();
-    // Negative assertion targets the actual rendered `<div>`, not the bare substring — the
-    // stylesheet's own `.banner-group-order { ... }` rule contains that substring on every
-    // page regardless of whether the banner itself is ever rendered.
-    expect(normalPdf.html).not.toContain('class="banner banner-group-order"');
+    expect(normalPdf.html).not.toContain(group.data.orderNumber);
   });
 
   it("renders a 'Modified on: <date>' banner once orders.last_modified_at is stamped, and never before", async () => {
@@ -368,7 +369,7 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
 
     const modifiedPdf = await buildOrderPdfHtml(owner.tenantId, created.data.id);
     expect(modifiedPdf.html).toContain('class="banner banner-modified"');
-    expect(modifiedPdf.html).toContain("Modified on:");
+    expect(modifiedPdf.html).toContain("Modified on :");
   });
 
   it("renders the Manual Size image once orders.edit sets order_item_components.manual_size_image, and never before", async () => {
@@ -481,7 +482,7 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
       // Rush/Repeat/Old Order banners.
       expect(html).toContain('class="badge badge-rush"');
       expect(html).toContain('class="badge badge-repeat"');
-      expect(html).toContain('class="banner banner-old-order"');
+      expect(html).toContain('<span class="label">Old Order:</span>');
       expect(html).toContain(baseline.data.orderNumber);
       expect(html).not.toContain("badge-modified");
 
@@ -505,10 +506,11 @@ describe("Order PDF fidelity — old order / group order / changed-from-profile 
       // Measurements table with the changed-from-profile checkmark.
       expect(html).toContain('class="changed-check"');
 
-      // Shoulder Type render-slot value + image, now inside the Measurement Note table.
+      // Shoulder Type render-slot value, inside the Measurement Note table — value only, no
+      // image column (a real reported request: the image added visual noise for no benefit).
       expect(html).toContain('class="measurement-note-table"');
       expect(html).toContain("Sloping");
-      expect(html).toContain("/ImagesFabric/jacket/sloping.png");
+      expect(html).not.toContain("/ImagesFabric/jacket/sloping.png");
 
       // Fabric/Lining detail cards (generic, not hardcoded field names — asserted via the
       // real feature names/values submitted above, not a literal "Fabric"/"Lining" string),

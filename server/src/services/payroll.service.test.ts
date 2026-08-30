@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../db/index";
@@ -31,10 +33,31 @@ import { hashPassword } from "./auth.service";
 import { createOrder } from "./orders.service";
 import { assignNextStep, completeStep } from "./manufacturing.service";
 import { createExtraPayment, approveExtraPayment } from "./extra-payments.service";
-import { createAdvancePayment, createSettlement, getSettlement, listUnpaidCompletedJobs } from "./payroll.service";
+import { createAdvancePayment, createSettlement, getSettlement, listSettlements, listUnpaidCompletedJobs } from "./payroll.service";
+import { generateSettlementPdf } from "./settlementPdf.service";
+import { generateJobSlipPdf } from "./jobSlipPdf.service";
+import { closePdfBrowser } from "./pdfRenderer";
+import { localStorageRootDir, LOCAL_STATIC_URL_PREFIX } from "./storage.service";
 import { HttpError } from "../utils/http-error";
 
 const suffix = randomUUID();
+
+/** Local-disk-backend URLs are `${LOCAL_STATIC_URL_PREFIX}/<key>` (see `storage.service.ts`) — resolves straight back to the file on disk, no HTTP round-trip needed for a service-level test. */
+function pdfUrlToLocalPath(url: string): string {
+  const prefix = `${LOCAL_STATIC_URL_PREFIX}/`;
+  const key = url.slice(url.indexOf(prefix) + prefix.length);
+  return path.join(localStorageRootDir, key);
+}
+
+/** Same regex-on-raw-PDF-bytes technique `orderPdf.fidelity.test.ts`'s `firstMediaBoxIsLandscape` uses — converts the `/MediaBox` (in points) to mm. */
+function firstMediaBoxSizeMm(buffer: Buffer): { widthMm: number; heightMm: number } {
+  const text = buffer.toString("latin1");
+  const match = /\/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]/.exec(text);
+  if (!match) throw new Error("No /MediaBox found in PDF");
+  const [, x0, y0, x1, y1] = match.map(Number) as unknown as [number, number, number, number, number];
+  const ptToMm = 25.4 / 72;
+  return { widthMm: Math.abs(x1! - x0!) * ptToMm, heightMm: Math.abs(y1! - y0!) * ptToMm };
+}
 
 describe("payroll.service", () => {
   let tenantId: string;
@@ -140,6 +163,8 @@ describe("payroll.service", () => {
   });
 
   afterAll(async () => {
+    await closePdfBrowser();
+
     const stepRows = componentIds.length
       ? await db.query.manufacturingSteps.findMany({ where: inArray(manufacturingSteps.orderItemComponentId, componentIds) })
       : [];
@@ -255,14 +280,71 @@ describe("payroll.service", () => {
 
     const detail = await getSettlement(tenantId, tailorId, settlement.id);
     expect(detail.jobs).toHaveLength(1);
-    expect(detail.jobs[0]!.id).toBe(job.id);
+    expect(detail.jobs[0]!.job.id).toBe(job.id);
 
     // getSettlement enrichment (PHASE_6_TASKS.md Group 8): the settlement
     // confirmation screen's source for "which extra payments did this
     // settlement actually pay" — the previously-dead `paid` flag, visible.
     expect(detail.extraPayments).toHaveLength(1);
-    expect(detail.extraPayments[0]).toMatchObject({ id: extraPayment.id, paid: true });
+    expect(detail.extraPayments[0]).toMatchObject({ id: extraPayment.id, paid: true, category: { id: categoryId } });
     expect(detail.clearedAdvances).toHaveLength(0);
+  });
+
+  it("listSettlements returns this tailor's settlements newest first", async () => {
+    const job = await createSettleableJob();
+    const settlement = await createSettlement(tenantId, tailorId, { jobIds: [job.id] });
+    settlementIds.push(settlement.id);
+
+    const settlements = await listSettlements(tenantId, tailorId);
+    expect(settlements.length).toBeGreaterThan(0);
+    expect(settlements[0]!.id).toBe(settlement.id);
+    expect(settlements.every((s) => s.tailorId === tailorId)).toBe(true);
+  });
+
+  it(
+    "generateSettlementPdf renders a real PDF and returns an uploaded URL",
+    async () => {
+      const job = await createSettleableJob();
+      const settlement = await createSettlement(tenantId, tailorId, { jobIds: [job.id] });
+      settlementIds.push(settlement.id);
+
+      const url = await generateSettlementPdf(tenantId, tailorId, settlement.id);
+      expect(typeof url).toBe("string");
+      expect(url.length).toBeGreaterThan(0);
+    },
+    30000
+  );
+
+  it(
+    "generateJobSlipPdf renders a real PDF for a still-unsettled job, including its approved extra payment",
+    async () => {
+      const job = await createSettleableJob();
+      const extraPayment = await createExtraPayment(tenantId, job.id, categoryId);
+      await approveExtraPayment(tenantId, extraPayment.id);
+
+      const url = await generateJobSlipPdf(tenantId, job.id);
+      expect(typeof url).toBe("string");
+      expect(url.length).toBeGreaterThan(0);
+
+      // The whole point: this job is genuinely still unpaid/unsettled — the slip printed
+      // before settlement, not after.
+      const reloadedJob = await db.query.jobs.findFirst({ where: eq(jobs.id, job.id) });
+      expect(reloadedJob?.paid).toBe(false);
+
+      // The actual reported requirement: this prints on a physical slip printer loaded
+      // with fixed stock, so the page must be exactly 80x290mm — legacy's own
+      // `new jsPDF({ unit: 'mm', format: [80, 290] })` — not merely "close enough".
+      const buffer = await readFile(pdfUrlToLocalPath(url));
+      expect(buffer.subarray(0, 4).toString("ascii")).toBe("%PDF");
+      const size = firstMediaBoxSizeMm(buffer);
+      expect(size.widthMm).toBeCloseTo(80, 0);
+      expect(size.heightMm).toBeCloseTo(290, 0);
+    },
+    30000
+  );
+
+  it("generateJobSlipPdf 404s cleanly for a bogus jobId", async () => {
+    await expect(generateJobSlipPdf(tenantId, randomUUID())).rejects.toMatchObject({ status: 404 });
   });
 
   /**
