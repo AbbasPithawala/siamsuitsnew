@@ -1,10 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { afterAll, describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitForElementToBeRemoved, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { baseApi } from "../../api/baseApi";
 import type { AuthTokenSliceState } from "../../api/baseApi";
+import { createLimitedUserInTenant } from "../../routes/testSupport/permissionFixtures";
 import { JobAssignmentPage } from "./JobAssignmentPage";
 
 /**
@@ -29,12 +30,12 @@ function uniqueSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function fetchSeedToken(): Promise<string | null> {
+async function fetchToken(credentials: { tenant: string; username: string; password: string }): Promise<string | null> {
   try {
     const res = await fetch(`${apiBaseUrl}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(SEED_CREDENTIALS),
+      body: JSON.stringify(credentials),
     });
     if (!res.ok) return null;
     const body = (await res.json()) as { data: { token: string } };
@@ -44,7 +45,19 @@ async function fetchSeedToken(): Promise<string | null> {
   }
 }
 
-const seededToken = await fetchSeedToken();
+const seededToken = await fetchToken(SEED_CREDENTIALS);
+
+/**
+ * PHASE_10_TASKS.md Workstream E Group 5: `admin` (Owner) no longer holds
+ * `orders.create`, so the real `POST /orders` fixture calls below need a
+ * token that does. Minted once, in the same `siam-suits` tenant as every
+ * other fixture here (not a fresh tenant — see `createLimitedUserInTenant`'s
+ * own doc comment). Rendering `JobAssignmentPage` itself (`renderPage`, still
+ * `admin`'s token via `buildTestStore`) and every other setup call is
+ * unaffected — `admin` still holds everything else this file needs.
+ */
+const orderCreatorFixture = seededToken ? await createLimitedUserInTenant("siam-suits", ["orders.create"]) : null;
+const orderCreatorToken = orderCreatorFixture ? await fetchToken(orderCreatorFixture) : null;
 
 async function apiRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${apiBaseUrl}${path}`, {
@@ -98,6 +111,12 @@ const createdCategoryIds: string[] = [];
 afterAll(async () => {
   if (!seededToken) return;
   const token = seededToken;
+
+  if (orderCreatorFixture) {
+    await orderCreatorFixture.cleanup().catch((err: unknown) =>
+      console.error("Failed to clean up the orders.create fixture user:", err)
+    );
+  }
 
   const { deleteJobsAndExtraPayments } = await import("./testSupport/manufacturingDbCleanup");
   const { hardDeleteOrders, countOrdersByIds } = await import("../orders/testSupport/orderDbCleanup");
@@ -210,7 +229,10 @@ describe.skipIf(!seededToken)("JobAssignmentPage (live siam/server integration)"
       });
       createdCustomerIds.push(customer.data.id);
 
-      const order = await apiRequest<{ data: { id: string } }>("/orders", token, {
+      if (!orderCreatorToken) {
+        throw new Error("Expected an orders.create-holding fixture token to have been minted for this file");
+      }
+      const order = await apiRequest<{ data: { id: string } }>("/orders", orderCreatorToken, {
         method: "POST",
         body: JSON.stringify({
           retailerId: retailer.data.id,
@@ -273,6 +295,12 @@ describe.skipIf(!seededToken)("JobAssignmentPage (live siam/server integration)"
       await screen.findByText(new RegExp(`Next step: ${processName}`), {}, NETWORK_WAIT);
 
       // Certified-tailor filtering: only the certified tailor is offered.
+      // `CertifiedTailorSelect` disables itself (`stillLoading`) until every
+      // active tailor's own `GET /tailors/:id` certification probe resolves —
+      // with a real tenant's full active-tailor list (not just this test's
+      // own two fixtures) that's a real, variable number of network round
+      // trips, so wait for it to finish before clicking rather than racing it.
+      await screen.findByText(new RegExp(`Showing tailors certified for "${processName}"`), {}, NETWORK_WAIT);
       await user.click(screen.getByLabelText("Tailor"));
       const listbox = await screen.findByRole("listbox");
       await within(listbox).findByRole("option", { name: certifiedTailorName });
@@ -284,11 +312,26 @@ describe.skipIf(!seededToken)("JobAssignmentPage (live siam/server integration)"
       await screen.findByText(new RegExp(`Job assigned — process ${processName}`), {}, NETWORK_WAIT);
       await screen.findByText(/Cost: THB 100\.00 \(process fee\) \+ THB 20\.00 \(styling\) = THB 120\.00/, {}, NETWORK_WAIT);
 
-      // Attach the real extra payment category before completing.
-      const categoryCheckbox = await screen.findByRole("checkbox", { name: new RegExp(categoryName) }, NETWORK_WAIT);
-      await user.click(categoryCheckbox);
+      // Attach the real extra payment category via the "Attach extra payment"
+      // dialog before completing — each category is added immediately through
+      // its own real `POST /jobs/:id/extra-payments` call (not batched until
+      // "Complete job"), per `JobAssignmentPage.tsx`'s own doc comment on why
+      // `activeJob`/`attachedPayments` are derived straight from a refetched
+      // `componentDetail` rather than mirrored into local-only state.
+      await user.click(screen.getByRole("button", { name: "Attach extra payment" }));
+      const extraPaymentDialog = await screen.findByRole("dialog");
+      await within(extraPaymentDialog).findByText(new RegExp(categoryName));
+      await user.click(within(extraPaymentDialog).getByRole("button", { name: "Add" }));
+      await within(extraPaymentDialog).findByRole("button", { name: "Remove" }, NETWORK_WAIT);
+      await user.click(within(extraPaymentDialog).getByRole("button", { name: "Close" }));
+      // MUI's Dialog exit transition leaves the rest of the page `aria-hidden`
+      // until it finishes unmounting — wait it out before querying by role
+      // again, or "Complete job" behind it is invisible to accessibility queries.
+      await waitForElementToBeRemoved(() => screen.queryByRole("dialog"), NETWORK_WAIT);
 
-      await user.click(screen.getByRole("button", { name: "Attach extra payment(s) & complete job" }));
+      await screen.findByText("1 extra payment(s) attached.", {}, NETWORK_WAIT);
+
+      await user.click(screen.getByRole("button", { name: "Complete job" }));
 
       await screen.findByText(/Job completed with 1 extra payment\(s\)\. Total pay: THB 140\.00\./, {}, NETWORK_WAIT);
 
@@ -311,7 +354,7 @@ describe.skipIf(!seededToken)("JobAssignmentPage (live siam/server integration)"
   );
 
   it(
-    "reflects STEP_LOCKED as a specific message (with the assigned tailor's name) on a fresh lookup, instead of raw failure text",
+    "recovers the in-progress job (with the assigned tailor's name) on a fresh lookup by a different operator, rather than only a STEP_LOCKED blocked message",
     async () => {
       const token = seededToken as string;
       const suffix = uniqueSuffix();
@@ -361,7 +404,10 @@ describe.skipIf(!seededToken)("JobAssignmentPage (live siam/server integration)"
       });
       createdCustomerIds.push(customer.data.id);
 
-      const order = await apiRequest<{ data: { id: string } }>("/orders", token, {
+      if (!orderCreatorToken) {
+        throw new Error("Expected an orders.create-holding fixture token to have been minted for this file");
+      }
+      const order = await apiRequest<{ data: { id: string } }>("/orders", orderCreatorToken, {
         method: "POST",
         body: JSON.stringify({
           retailerId: retailer.data.id,
@@ -402,18 +448,32 @@ describe.skipIf(!seededToken)("JobAssignmentPage (live siam/server integration)"
       await screen.findByText(`${processAName}: assigned`, {}, NETWORK_WAIT);
       await screen.findByText(`${processBName}: pending`, {}, NETWORK_WAIT);
 
-      await screen.findByText(
-        /previous manufacturing step on this component isn't complete yet — finish that one before assigning this one/,
-        {},
-        NETWORK_WAIT
-      );
+      // The backend still computes `blockedReason: "STEP_LOCKED"` for process
+      // B (confirmed directly against a real `GET /manufacturing/components/:id`
+      // response), but `getComponentDetail`'s `activeJob` recovery (this file's
+      // sibling test's doc comment, and `JobAssignmentPage.tsx`'s own) takes
+      // priority in the UI: since process A's step is `assigned` (not
+      // `complete`), there's always a real in-progress job to recover, so a
+      // fresh lookup — even by a different operator/session — shows the
+      // "Job assigned" completion panel for process A rather than a passive
+      // blocked-message dead end. The raw `STEP_LOCKED` copy in
+      // `manufacturingErrors.ts` is only ever reachable from `assignNextStep`'s
+      // own failure response now (`getManufacturingErrorMessage`), not from a
+      // proactive `getComponentDetail` read, because every state that would
+      // produce that `blockedReason` also always has an `activeJob` to recover
+      // (a step can only ever become non-`pending` via `assignNextStep`, which
+      // atomically creates its `jobs` row in the same transaction).
+      await screen.findByText(new RegExp(`Job assigned — process ${processAName}`), {}, NETWORK_WAIT);
       await screen.findByText(new RegExp(`Currently assigned to ${tailorName}`), {}, NETWORK_WAIT);
+      await screen.findByText(/Cost: THB 40\.00 \(process fee\) \+ THB 0\.00 \(styling\) = THB 40\.00/, {}, NETWORK_WAIT);
 
-      // No assign form (no next step is reachable) and no job-completion
-      // panel (this page load never assigned anything itself).
+      // No assign form (no next step is reachable — process B is still
+      // locked behind process A), but the recovered job *can* be completed
+      // from here, by anyone holding `factory.jobs.complete` (admin, here),
+      // regardless of which session originally assigned it.
       expect(screen.queryByLabelText("Tailor")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Assign" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Complete job/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Complete job" })).toBeInTheDocument();
     },
     45000
   );

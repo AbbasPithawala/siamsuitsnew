@@ -290,6 +290,11 @@ export function JobAssignmentPage() {
               <Typography variant="subtitle1" gutterBottom>
                 Job assigned — process {processNameById.get(activeJob.step.processId) ?? activeJob.step.processId}
               </Typography>
+              {activeJob.step.tailorId && (
+                <Typography color="text.secondary" sx={{ mb: 1 }}>
+                  Currently assigned to {tailorNameById.get(activeJob.step.tailorId) ?? activeJob.step.tailorId}.
+                </Typography>
+              )}
               <Typography sx={{ mb: 2 }}>
                 Cost: THB {activeJob.cost} (process fee) + THB {activeJob.stylingPrice} (styling) = THB{" "}
                 {(Number(activeJob.cost) + Number(activeJob.stylingPrice)).toFixed(2)}

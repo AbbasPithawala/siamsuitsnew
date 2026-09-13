@@ -36,7 +36,7 @@ const requireShippingRead = requirePermission(["shipping.view", "shipping.manage
 shippingRouter.get("/shipping-boxes", authenticate, requireShippingRead, async (req, res, next) => {
   try {
     const { page, pageSize, ...filter } = listShippingBoxesQuerySchema.parse(req.query);
-    const { data, total } = await shippingService.listShippingBoxes(req.actor!.tenantId, filter, { page, pageSize }, req.actor!.retailerId);
+    const { data, total } = await shippingService.listShippingBoxes(req.actor!.tenantId!, filter, { page, pageSize }, req.actor!.retailerId);
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -49,7 +49,7 @@ shippingRouter.get("/shipping-boxes", authenticate, requireShippingRead, async (
 
 shippingRouter.get("/shipping-boxes/:id", authenticate, requireShippingRead, async (req, res, next) => {
   try {
-    const box = await shippingService.getShippingBox(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const box = await shippingService.getShippingBox(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(200).json({ data: box });
   } catch (err) {
     next(err);
@@ -63,7 +63,7 @@ shippingRouter.post(
   validateBody(createShippingBoxSchema),
   async (req, res, next) => {
     try {
-      const box = await shippingService.createShippingBox(req.actor!.tenantId, req.body);
+      const box = await shippingService.createShippingBox(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: box });
     } catch (err) {
       next(err);
@@ -79,7 +79,7 @@ shippingRouter.post(
   async (req, res, next) => {
     try {
       const item = await shippingService.addItemToBox(
-        req.actor!.tenantId,
+        req.actor!.tenantId!,
         requireParam(req, "id"),
         req.body.orderItemComponentId,
         req.actor!.retailerId
@@ -98,7 +98,7 @@ shippingRouter.delete(
   async (req, res, next) => {
     try {
       await shippingService.removeItemFromBox(
-        req.actor!.tenantId,
+        req.actor!.tenantId!,
         requireParam(req, "id"),
         requireParam(req, "componentId"),
         req.actor!.retailerId
@@ -112,7 +112,7 @@ shippingRouter.delete(
 
 shippingRouter.post("/shipping-boxes/:id/close", authenticate, requirePermission("shipping.manage"), async (req, res, next) => {
   try {
-    const box = await shippingService.closeShippingBox(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const box = await shippingService.closeShippingBox(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(200).json({ data: box });
   } catch (err) {
     next(err);
@@ -132,8 +132,8 @@ shippingRouter.post(
   requirePermission("shipping.manage"),
   async (req, res, next) => {
     try {
-      const { url, orderId } = await generateItemSlipPdf(req.actor!.tenantId, requireParam(req, "componentId"));
-      await setOrderStatus(req.actor!.tenantId, orderId, "Shipment", req.actor!.retailerId);
+      const { url, orderId } = await generateItemSlipPdf(req.actor!.tenantId!, requireParam(req, "componentId"));
+      await setOrderStatus(req.actor!.tenantId!, orderId, "Shipment", req.actor!.retailerId);
       res.status(201).json({ data: { path: url } });
     } catch (err) {
       next(err);

@@ -87,7 +87,7 @@ function StatusChip({ order }: { order: OrderListItem }) {
     <Chip
       size="small"
       label={order.status}
-      sx={palette ? { color: palette.color, backgroundColor: palette.background, fontWeight: 600 } : undefined}
+      {...(palette ? { sx: { color: palette.color, backgroundColor: palette.background, fontWeight: 600 } } : {})}
     />
   );
 }
@@ -267,7 +267,7 @@ export function OrderListPage() {
     }
   }
 
-  async function handleRowStatusChange(event: React.MouseEvent | React.SyntheticEvent, order: OrderListItem, status: string) {
+  async function handleRowStatusChange(event: { stopPropagation: () => void }, order: OrderListItem, status: string) {
     event.stopPropagation();
     try {
       await setOrderStatus({ id: order.id, status }).unwrap();

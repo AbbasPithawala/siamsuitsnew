@@ -33,6 +33,10 @@ const componentInputSchema = z.object({
   measurementNote: z.string().min(1).optional(),
   stylingNote: z.string().min(1).optional(),
   referenceImage: z.string().min(1).optional(),
+  // Accepted on create too (not just edit) so "Repeat this order" — which always submits
+  // through this create schema, never the server's separate verbatim-clone path — can carry
+  // a prior order's Manual Size annotation into the new one instead of silently dropping it.
+  manualSizeImage: z.string().min(1).optional(),
 });
 
 export const orderItemInputSchema = z.object({
@@ -42,7 +46,6 @@ export const orderItemInputSchema = z.object({
 
 const editComponentInputSchema = componentInputSchema.extend({
   id: z.string().uuid().optional(),
-  manualSizeImage: z.string().min(1).optional(),
 });
 
 const editOrderItemInputSchema = z.object({
@@ -106,7 +109,7 @@ export const ordersRouter = Router();
 ordersRouter.get("/orders", authenticate, requirePermission("orders.view"), async (req, res, next) => {
   try {
     const { page, pageSize, ...filter } = listOrdersQuerySchema.parse(req.query);
-    const { data, total } = await ordersService.listOrders(req.actor!.tenantId, filter, { page, pageSize }, req.actor!.retailerId);
+    const { data, total } = await ordersService.listOrders(req.actor!.tenantId!, filter, { page, pageSize }, req.actor!.retailerId);
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -119,7 +122,7 @@ ordersRouter.get("/orders", authenticate, requirePermission("orders.view"), asyn
 
 ordersRouter.get("/orders/:id", authenticate, requirePermission("orders.view"), async (req, res, next) => {
   try {
-    const order = await ordersService.getOrder(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const order = await ordersService.getOrder(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(200).json({ data: order });
   } catch (err) {
     next(err);
@@ -142,7 +145,7 @@ ordersRouter.post(
       if (req.body.isRush) await assertPermission(req.actor!.id, "orders.rush");
       if (req.body.repeatOfOrderId) await assertPermission(req.actor!.id, "orders.repeat");
 
-      const order = await ordersService.createOrder(req.actor!.tenantId, req.body);
+      const order = await ordersService.createOrder(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: order });
     } catch (err) {
       next(err);
@@ -158,7 +161,7 @@ ordersRouter.post(
  */
 ordersRouter.post("/orders/:id/pdf", authenticate, requirePermission("orders.view"), async (req, res, next) => {
   try {
-    const result = await orderPdfService.generateOrderPdf(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const result = await orderPdfService.generateOrderPdf(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(201).json({ data: result });
   } catch (err) {
     next(err);
@@ -179,7 +182,7 @@ ordersRouter.patch(
   validateBody(editOrderSchema),
   async (req, res, next) => {
     try {
-      const order = await ordersService.editOrderItems(req.actor!.tenantId, requireParam(req, "id"), req.body, req.actor!.retailerId);
+      const order = await ordersService.editOrderItems(req.actor!.tenantId!, requireParam(req, "id"), req.body, req.actor!.retailerId);
       res.status(200).json({ data: order });
     } catch (err) {
       next(err);
@@ -194,7 +197,7 @@ ordersRouter.patch(
   validateBody(setOrderStatusSchema),
   async (req, res, next) => {
     try {
-      const order = await ordersService.setOrderStatus(req.actor!.tenantId, requireParam(req, "id"), req.body.status, req.actor!.retailerId);
+      const order = await ordersService.setOrderStatus(req.actor!.tenantId!, requireParam(req, "id"), req.body.status, req.actor!.retailerId);
       res.status(200).json({ data: order });
     } catch (err) {
       next(err);
@@ -210,7 +213,7 @@ ordersRouter.patch(
   async (req, res, next) => {
     try {
       const order = await ordersService.reassignOrderRetailer(
-        req.actor!.tenantId,
+        req.actor!.tenantId!,
         requireParam(req, "id"),
         req.body.retailerId,
         req.actor!.retailerId
@@ -231,7 +234,7 @@ ordersRouter.patch(
  */
 ordersRouter.get("/orders/:id/invoice", authenticate, requirePermission("invoices.manage"), async (req, res, next) => {
   try {
-    const invoice = await orderInvoicesService.getOrderInvoice(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const invoice = await orderInvoicesService.getOrderInvoice(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(200).json({ data: invoice });
   } catch (err) {
     next(err);
@@ -246,7 +249,7 @@ ordersRouter.put(
   validateBody(saveOrderInvoiceSchema),
   async (req, res, next) => {
     try {
-      const invoice = await orderInvoicesService.saveOrderInvoice(req.actor!.tenantId, requireParam(req, "id"), req.body, req.actor!.retailerId);
+      const invoice = await orderInvoicesService.saveOrderInvoice(req.actor!.tenantId!, requireParam(req, "id"), req.body, req.actor!.retailerId);
       res.status(200).json({ data: invoice });
     } catch (err) {
       next(err);
@@ -257,7 +260,7 @@ ordersRouter.put(
 /** Legacy `CreateInvoice.jsx`/`InvoiceHistory.jsx`'s single-order invoice PDF (`exportPDF`/`exportSingleInvoicePDF`) — server-rendered and persisted, per PHASE_10_TASKS.md's invoicing follow-up, rather than legacy's client-side `jsPDF`. Requires a saved order invoice (`PUT` above) to already exist. */
 ordersRouter.post("/orders/:id/invoice/pdf", authenticate, requirePermission("invoices.manage"), async (req, res, next) => {
   try {
-    const path = await invoicePdfService.generateOrderInvoicePdf(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const path = await invoicePdfService.generateOrderInvoicePdf(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(201).json({ data: { path } });
   } catch (err) {
     next(err);

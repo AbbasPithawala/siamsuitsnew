@@ -30,7 +30,7 @@ export const orderGroupsRouter = Router();
 orderGroupsRouter.get("/order-groups", authenticate, requirePermission("orders.view"), async (req, res, next) => {
   try {
     const { page, pageSize, ...filter } = listOrderGroupsQuerySchema.parse(req.query);
-    const { data, total } = await orderGroupsService.listOrderGroups(req.actor!.tenantId, filter, { page, pageSize }, req.actor!.retailerId);
+    const { data, total } = await orderGroupsService.listOrderGroups(req.actor!.tenantId!, filter, { page, pageSize }, req.actor!.retailerId);
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -43,7 +43,7 @@ orderGroupsRouter.get("/order-groups", authenticate, requirePermission("orders.v
 
 orderGroupsRouter.get("/order-groups/:id", authenticate, requirePermission("orders.view"), async (req, res, next) => {
   try {
-    const group = await orderGroupsService.getOrderGroup(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const group = await orderGroupsService.getOrderGroup(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(200).json({ data: group });
   } catch (err) {
     next(err);
@@ -57,7 +57,7 @@ orderGroupsRouter.post(
   validateBody(createOrderGroupSchema),
   async (req, res, next) => {
     try {
-      const group = await orderGroupsService.createOrderGroup(req.actor!.tenantId, req.body);
+      const group = await orderGroupsService.createOrderGroup(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: group });
     } catch (err) {
       next(err);

@@ -5,6 +5,7 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
+import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -20,6 +21,8 @@ import {
   Key as KeyIcon,
   Login as LoginIcon,
   PersonOutline as PersonOutlineIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
 } from "@mui/icons-material";
 import type { AppDispatch } from "../../app/store";
 import { getApiErrorMessage } from "../../api/errorUtils";
@@ -38,6 +41,7 @@ export function LoginPage() {
   const [tenant, setTenant] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [login, { isLoading, error }] = useLoginMutation();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -107,7 +111,7 @@ export function LoginPage() {
           />
           <TextField
             label="Password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             fullWidth
             required
             margin="normal"
@@ -117,6 +121,17 @@ export function LoginPage() {
               startAdornment: (
                 <InputAdornment position="start">
                   <KeyIcon />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((show) => !show)}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
                 </InputAdornment>
               ),
             }}

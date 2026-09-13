@@ -34,10 +34,10 @@ superProductsRouter.get("/super-products", authenticate, async (req, res, next) 
     const query = listSuperProductsQuerySchema.parse(req.query);
     const pagination = resolveOptionalPagination(query);
     if (pagination) {
-      const { data, total } = await superProductsService.listSuperProducts(req.actor!.tenantId, pagination);
+      const { data, total } = await superProductsService.listSuperProducts(req.actor!.tenantId!, pagination);
       res.status(200).json(paginatedResult(data, total, pagination.page, pagination.pageSize));
     } else {
-      const data = await superProductsService.listSuperProducts(req.actor!.tenantId);
+      const data = await superProductsService.listSuperProducts(req.actor!.tenantId!);
       res.status(200).json({ data });
     }
   } catch (err) {
@@ -51,7 +51,7 @@ superProductsRouter.get("/super-products", authenticate, async (req, res, next) 
 
 superProductsRouter.get("/super-products/:id", authenticate, async (req, res, next) => {
   try {
-    const superProduct = await superProductsService.getSuperProduct(req.actor!.tenantId, requireParam(req, "id"));
+    const superProduct = await superProductsService.getSuperProduct(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: superProduct });
   } catch (err) {
     next(err);
@@ -65,7 +65,7 @@ superProductsRouter.post(
   validateBody(createSuperProductSchema),
   async (req, res, next) => {
     try {
-      const superProduct = await superProductsService.createSuperProduct(req.actor!.tenantId, req.body);
+      const superProduct = await superProductsService.createSuperProduct(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: superProduct });
     } catch (err) {
       next(err);
@@ -80,7 +80,7 @@ superProductsRouter.patch(
   validateBody(updateSuperProductSchema),
   async (req, res, next) => {
     try {
-      const superProduct = await superProductsService.updateSuperProduct(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const superProduct = await superProductsService.updateSuperProduct(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(200).json({ data: superProduct });
     } catch (err) {
       next(err);
@@ -94,7 +94,7 @@ superProductsRouter.delete(
   requirePermission("catalog.super_products.manage"),
   async (req, res, next) => {
     try {
-      await superProductsService.softDeleteSuperProduct(req.actor!.tenantId, requireParam(req, "id"));
+      await superProductsService.softDeleteSuperProduct(req.actor!.tenantId!, requireParam(req, "id"));
       res.status(204).send();
     } catch (err) {
       next(err);
@@ -109,7 +109,7 @@ superProductsRouter.post(
   validateBody(componentSchema),
   async (req, res, next) => {
     try {
-      const components = await superProductsService.addComponent(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const components = await superProductsService.addComponent(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(201).json({ data: components });
     } catch (err) {
       next(err);
@@ -125,7 +125,7 @@ superProductsRouter.patch(
   async (req, res, next) => {
     try {
       const components = await superProductsService.updateComponent(
-        req.actor!.tenantId,
+        req.actor!.tenantId!,
         requireParam(req, "id"),
         requireParam(req, "componentId"),
         req.body
@@ -143,7 +143,7 @@ superProductsRouter.delete(
   requirePermission("catalog.super_products.manage"),
   async (req, res, next) => {
     try {
-      await superProductsService.removeComponent(req.actor!.tenantId, requireParam(req, "id"), requireParam(req, "componentId"));
+      await superProductsService.removeComponent(req.actor!.tenantId!, requireParam(req, "id"), requireParam(req, "componentId"));
       res.status(204).send();
     } catch (err) {
       next(err);

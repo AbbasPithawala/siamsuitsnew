@@ -29,10 +29,10 @@ measurementsRouter.get("/measurement-definitions", authenticate, async (req, res
     const query = listMeasurementDefinitionsQuerySchema.parse(req.query);
     const pagination = resolveOptionalPagination(query);
     if (pagination) {
-      const { data, total } = await measurementsService.listMeasurementDefinitions(req.actor!.tenantId, pagination);
+      const { data, total } = await measurementsService.listMeasurementDefinitions(req.actor!.tenantId!, pagination);
       res.status(200).json(paginatedResult(data, total, pagination.page, pagination.pageSize));
     } else {
-      const data = await measurementsService.listMeasurementDefinitions(req.actor!.tenantId);
+      const data = await measurementsService.listMeasurementDefinitions(req.actor!.tenantId!);
       res.status(200).json({ data });
     }
   } catch (err) {
@@ -46,7 +46,7 @@ measurementsRouter.get("/measurement-definitions", authenticate, async (req, res
 
 measurementsRouter.get("/measurement-definitions/:id", authenticate, async (req, res, next) => {
   try {
-    const definition = await measurementsService.getMeasurementDefinition(req.actor!.tenantId, requireParam(req, "id"));
+    const definition = await measurementsService.getMeasurementDefinition(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: definition });
   } catch (err) {
     next(err);
@@ -60,7 +60,7 @@ measurementsRouter.post(
   validateBody(createDefinitionSchema),
   async (req, res, next) => {
     try {
-      const definition = await measurementsService.createMeasurementDefinition(req.actor!.tenantId, req.body);
+      const definition = await measurementsService.createMeasurementDefinition(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: definition });
     } catch (err) {
       next(err);
@@ -75,7 +75,7 @@ measurementsRouter.patch(
   validateBody(updateDefinitionSchema),
   async (req, res, next) => {
     try {
-      const definition = await measurementsService.updateMeasurementDefinition(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const definition = await measurementsService.updateMeasurementDefinition(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(200).json({ data: definition });
     } catch (err) {
       next(err);
@@ -89,7 +89,7 @@ measurementsRouter.delete(
   requirePermission("catalog.measurements.manage"),
   async (req, res, next) => {
     try {
-      await measurementsService.softDeleteMeasurementDefinition(req.actor!.tenantId, requireParam(req, "id"));
+      await measurementsService.softDeleteMeasurementDefinition(req.actor!.tenantId!, requireParam(req, "id"));
       res.status(204).send();
     } catch (err) {
       next(err);
@@ -99,7 +99,7 @@ measurementsRouter.delete(
 
 measurementsRouter.get("/products/:productId/measurements", authenticate, async (req, res, next) => {
   try {
-    const links = await measurementsService.getProductMeasurements(req.actor!.tenantId, requireParam(req, "productId"));
+    const links = await measurementsService.getProductMeasurements(req.actor!.tenantId!, requireParam(req, "productId"));
     res.status(200).json({ data: links });
   } catch (err) {
     next(err);
@@ -114,7 +114,7 @@ measurementsRouter.put(
   async (req, res, next) => {
     try {
       const links = await measurementsService.setProductMeasurements(
-        req.actor!.tenantId,
+        req.actor!.tenantId!,
         requireParam(req, "productId"),
         req.body.measurementDefinitionIds
       );

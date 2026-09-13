@@ -157,7 +157,7 @@ function OrderInvoiceEditorForm({ orderId, orderInvoice, onClose }: OrderInvoice
       await saveOrderInvoice({
         orderId,
         body: {
-          note: note.trim() || undefined,
+          ...(note.trim() ? { note: note.trim() } : {}),
           lines: lines.map((line) => ({
             groupLabel: line.groupLabel,
             kind: line.kind,

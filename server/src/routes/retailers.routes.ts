@@ -44,7 +44,7 @@ export const retailersRouter = Router();
 retailersRouter.get("/retailers", authenticate, async (req, res, next) => {
   try {
     const { page, pageSize } = listRetailersQuerySchema.parse(req.query);
-    const { data, total } = await retailersService.listRetailers(req.actor!.tenantId, { page, pageSize });
+    const { data, total } = await retailersService.listRetailers(req.actor!.tenantId!, { page, pageSize });
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -57,7 +57,7 @@ retailersRouter.get("/retailers", authenticate, async (req, res, next) => {
 
 retailersRouter.get("/retailers/:id", authenticate, async (req, res, next) => {
   try {
-    const retailer = await retailersService.getRetailer(req.actor!.tenantId, requireParam(req, "id"));
+    const retailer = await retailersService.getRetailer(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: retailer });
   } catch (err) {
     next(err);
@@ -71,7 +71,7 @@ retailersRouter.post(
   validateBody(createRetailerSchema),
   async (req, res, next) => {
     try {
-      const retailer = await retailersService.createRetailer(req.actor!.tenantId, req.body);
+      const retailer = await retailersService.createRetailer(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: retailer });
     } catch (err) {
       next(err);
@@ -87,7 +87,7 @@ retailersRouter.patch(
     try {
       const id = requireParam(req, "id");
       await assertCanUpdateRetailer(req.actor!.id, req.actor!.actorType, req.actor!.retailerId, id);
-      const retailer = await retailersService.updateRetailer(req.actor!.tenantId, id, req.body);
+      const retailer = await retailersService.updateRetailer(req.actor!.tenantId!, id, req.body);
       res.status(200).json({ data: retailer });
     } catch (err) {
       next(err);
@@ -97,7 +97,7 @@ retailersRouter.patch(
 
 retailersRouter.delete("/retailers/:id", authenticate, requirePermission("retailers.manage"), async (req, res, next) => {
   try {
-    await retailersService.softDeleteRetailer(req.actor!.tenantId, requireParam(req, "id"));
+    await retailersService.softDeleteRetailer(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(204).send();
   } catch (err) {
     next(err);

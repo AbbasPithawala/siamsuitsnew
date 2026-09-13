@@ -9,7 +9,7 @@ import type { AuthTokenSliceState } from "../../api/baseApi";
 import {
   LineItemMeasurementsPanel,
   createEmptyLineItemMeasurementsDraft,
-  useLineItemMeasurementsCompleteness,
+  useLineItemMeasurementsEntered,
 } from "./LineItemMeasurementsPanel";
 import type { LineItemMeasurementsDraft } from "./LineItemMeasurementsPanel";
 import type { SuperProductComponent } from "../catalog/superProductsApi";
@@ -115,15 +115,15 @@ function Harness({
   excludeOrderId?: string;
 }) {
   const [draft, setDraft] = useState<LineItemMeasurementsDraft>(() => createEmptyLineItemMeasurementsDraft(components));
-  const complete = useLineItemMeasurementsCompleteness(components, draft);
+  const complete = useLineItemMeasurementsEntered(components, draft);
   return (
     <>
       <LineItemMeasurementsPanel
         components={components}
         draft={draft}
         customerId={customerId}
-        excludeOrderId={excludeOrderId}
         onChange={(componentId, next) => setDraft((current) => ({ ...current, [componentId]: next }))}
+        {...(excludeOrderId !== undefined ? { excludeOrderId } : {})}
       />
       <pre data-testid="current-draft">{JSON.stringify(draft)}</pre>
       <pre data-testid="hook-complete">{String(complete)}</pre>
@@ -656,7 +656,7 @@ describe.skipIf(!seededToken)(
         // components of the same suit), matching how a real prior Suit order would look.
         const customerId = await createCustomerFixture(token, retailer.id, "MultiComp Customer");
         await withOrderCreatorToken((orderCreatorToken) =>
-          apiRequest("/orders", orderCreatorToken, {
+          apiRequest<{ data: { id: string } }>("/orders", orderCreatorToken, {
             method: "POST",
             body: JSON.stringify({
               retailerId: retailer.id,
@@ -671,7 +671,7 @@ describe.skipIf(!seededToken)(
                 },
               ],
             }),
-          }).then((res: { data: { id: string } }) => createdOrderIds.push(res.data.id))
+          }).then((res) => createdOrderIds.push(res.data.id))
         );
 
         const user = userEvent.setup();

@@ -146,6 +146,34 @@ export function useLineItemMeasurementsCompleteness(
 }
 
 /**
+ * The "Complete"/"Missing" badge the retailer actually sees (`OrderCartStep.tsx`'s cart-row
+ * status and this panel's own header, below) — a genuinely different question from
+ * `useLineItemMeasurementsCompleteness` above, which stays the "Place Order" gate
+ * (`LineItemCompletenessProbe.tsx`) and deliberately ignores `draft` entirely (see its own doc
+ * comment: no measurement is ever required to place an order). Retailers read the badge as "has
+ * anything been entered for this customer" — showing green before a single field is touched
+ * (as soon as the product's catalog merely loads) reads as done-when-it-isn't, which is the bug
+ * this hook fixes.
+ *
+ * "Entered" means at least one measurement on at least one of the line item's components has a
+ * real draft entry — never all of them (matching the same "don't force filling 10+ fields"
+ * product decision `useLineItemMeasurementsCompleteness` documents), and never per-component
+ * either (a multi-component Suit with only its jacket filled in still reads as progress, not
+ * nothing). A component's `measurements` array only ever gains an entry when something wrote a
+ * real, deliberate value to it — a user keystroke (`MeasurementForm.tsx`'s `handleFieldChange`,
+ * including the explicit "0" `handleFieldBlur` writes for a field left blank on purpose), a
+ * Manual Fit preset, or the customer measurement profile pre-fill effect below (which is itself
+ * only ever seeded from that specific customer's own real past order) — never a placeholder, so
+ * simple presence in the array is enough, no need to inspect `value`/`adjustmentValue` individually.
+ */
+export function useLineItemMeasurementsEntered(
+  components: SuperProductComponent[],
+  draft: LineItemMeasurementsDraft
+): boolean {
+  return components.some((component) => (draft[component.id]?.measurements.length ?? 0) > 0);
+}
+
+/**
  * PHASE_9_TASKS.md Group 6: the per-line-item Measurements panel — entered
  * exactly once regardless of the line item's quantity (Decision 3), hosting
  * one `<MeasurementForm>` per the super product's real components. This is
@@ -164,7 +192,7 @@ export function useLineItemMeasurementsCompleteness(
  * sibling units' components, per Decision 3).
  */
 export function LineItemMeasurementsPanel({ components, draft, onChange, customerId, onOpenManualSize, excludeOrderId }: LineItemMeasurementsPanelProps) {
-  const complete = useLineItemMeasurementsCompleteness(components, draft);
+  const complete = useLineItemMeasurementsEntered(components, draft);
 
   return (
     <Paper variant="outlined" sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -208,8 +236,8 @@ export function LineItemMeasurementsPanel({ components, draft, onChange, custome
               component={component}
               componentDraft={componentDraft}
               customerId={customerId}
-              excludeOrderId={excludeOrderId}
               onChange={(next) => onChange(component.id, next)}
+              {...(excludeOrderId !== undefined ? { excludeOrderId } : {})}
             />
             {index < components.length - 1 && <Divider sx={{ mt: 2 }} />}
           </Box>
@@ -297,14 +325,41 @@ interface ComponentMeasurementsSectionProps {
  * `react-hooks/set-state-in-effect` rule does not flag it, structurally
  * cannot, since no local `useState` setter is ever called here.
  *
- * Self-terminating with no extra "already seeded" flag needed: the guard
- * (`componentDraft.measurements.length === 0`) is only ever true before the
- * very first real entry lands — the seed itself pushes real entries into
- * that array, so every later run of this effect (including a profile
- * refetch, or this component simply re-rendering for an unrelated reason)
- * fails the guard and no-ops. It also naturally loses to a user who starts
- * typing before the profile query resolves — their own entry already fails
- * the guard first, so a slow profile fetch can never clobber real user input.
+ * Seeds **per measurement definition id**, not all-or-nothing: real production bug
+ * (`FUNCTIONALITY_OVERVIEW.md`/live bug report) — a repeat/edit prefill (`OrderBuilderPage.tsx`'s
+ * two render-time blocks) copies a *specific past order's* `match.measurements` verbatim into
+ * this same `componentDraft.measurements` before this component ever mounts, so the array is
+ * already non-empty the very first time this effect runs. An all-or-nothing
+ * `componentDraft.measurements.length > 0` guard (this effect's original shape) would then never
+ * seed anything for that component again — including a measurement definition added to the
+ * product's catalog *after* the original order was placed, which the old order's own stored rows
+ * (and therefore the repeat/edit prefill copying them) never had an entry for at all. Left
+ * unseeded, that specific field silently defaults to "0" at submit time
+ * (`orderItemBuilder.ts`'s `sanitizeMeasurements`/the server's identical `backfillMissingMeasurements`)
+ * instead of the customer's real saved profile value — the actual reported bug. So instead of
+ * "seed everything, once, only if the array started empty," this diffs `profile.values` against
+ * `componentDraft.measurements` **by `measurementDefinitionId`** and only appends the profile
+ * entries whose id isn't present in the draft at all, leaving every id the draft already carries
+ * (whether from repeat/edit history, an earlier run of this same effect, or the user's own typing)
+ * completely untouched.
+ *
+ * Self-terminating with no extra "already seeded" flag needed, same as the effect's original
+ * all-or-nothing shape, just at per-id instead of per-array granularity: once every one of
+ * `profile.values`'s ids is present in `componentDraft.measurements` (whatever put it there), the
+ * "missing" list this computes is empty and the effect no-ops on every later run (a profile
+ * refetch, or this component simply re-rendering for an unrelated reason). Deliberately checks
+ * **presence of the id in the array**, not "is this specific field's value blank" — a field the
+ * user (or a prior order) has ever touched always has a real entry, even an explicit "0" written
+ * by `MeasurementForm.tsx`'s own `handleFieldBlur` for a field intentionally left blank, so
+ * "present in the array at all" already means "has a real, deliberate value (possibly zero) that
+ * must never be silently replaced" — no separate "already attempted to seed this field" flag is
+ * needed on top of that. It also naturally loses to a user who starts typing a genuinely new field
+ * before the profile query resolves: whichever commits first (their own keystroke via `onChange`,
+ * or this effect's merge) simply wins the presence check for that one id — if the user's entry
+ * lands first, this effect sees the id already present and skips it; if this effect's merge lands
+ * first, the user's very next keystroke on that field finds (and overwrites) the just-seeded entry
+ * exactly like editing any other pre-filled field. Either order, the user's own typed value is
+ * always what ends up in the draft, never silently dropped.
  *
  * Gated behind a loading check while the profile query is in flight (not
  * merely relying on the effect's own guard): rendering `<MeasurementForm>`
@@ -331,8 +386,13 @@ function ComponentMeasurementsSection({ component, componentDraft, customerId, e
 
   useEffect(() => {
     if (!profile || profile.values.length === 0) return;
-    if (componentDraft.measurements.length > 0) return;
-    onChange({ ...componentDraft, measurements: profile.values.map(toProfileMeasurementValue) });
+    const presentIds = new Set(componentDraft.measurements.map((m) => m.measurementDefinitionId));
+    const missingProfileValues = profile.values.filter((entry) => !presentIds.has(entry.measurementDefinitionId));
+    if (missingProfileValues.length === 0) return;
+    onChange({
+      ...componentDraft,
+      measurements: [...componentDraft.measurements, ...missingProfileValues.map(toProfileMeasurementValue)],
+    });
   }, [profile, componentDraft, onChange]);
 
   const changedMeasurementDefinitionIds = useMemo(

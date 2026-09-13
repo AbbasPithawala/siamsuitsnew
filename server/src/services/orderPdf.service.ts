@@ -496,15 +496,15 @@ function renderPageHeader(params: PageHeaderParams): string {
 async function renderSummaryRow(
   component: DetailComponent,
   display: DisplayData,
-  unitLabel: string
+  unitLabel: string,
+  superProductName: string
 ): Promise<{ html: string; primaryFeatureName: string | null }> {
-  const product = display.productById.get(component.productId);
   const qrDataUrl = await QRCode.toDataURL(component.id, { margin: 1, width: 90 });
   const primary = findInlineTextFeatures(component, display)[0];
 
   const html = `
     <tr class="summary-row" data-component-id="${escapeHtml(component.id)}">
-      <td>${escapeHtml(titleCase(product?.name ?? component.slotLabel))}</td>
+      <td>${escapeHtml(titleCase(superProductName))}</td>
       <td>${escapeHtml(titleCase(unitLabel))}</td>
       <td class="primary-detail">${escapeHtml(titleCase(primary?.link.textValue ?? "-"))}</td>
       <td class="qr-cell"><img src="${qrDataUrl}" alt="QR code for ${escapeHtml(component.id)}" /><br /><span>${escapeHtml(component.id)}</span></td>
@@ -517,11 +517,19 @@ async function renderSummaryPage(
   display: DisplayData,
   headerHtml: string,
   quantityFooterHtml: string,
-  unitLabelById: Map<string, string>
+  unitLabelById: Map<string, string>,
+  unitSuperProductNameById: Map<string, string>
 ): Promise<string> {
   const rows = await Promise.all(
     detail.items.flatMap((item) =>
-      item.components.map((component) => renderSummaryRow(component, display, unitLabelById.get(component.id) ?? component.slotLabel))
+      item.components.map((component) =>
+        renderSummaryRow(
+          component,
+          display,
+          unitLabelById.get(component.id) ?? component.slotLabel,
+          unitSuperProductNameById.get(component.id) ?? "Item"
+        )
+      )
     )
   );
   // The column header names itself off whichever real text feature actually supplied the
@@ -771,7 +779,7 @@ async function renderOrderHtml(
     qrDataUrl: orderQrDataUrl,
     qrCaption: detail.orderNumber,
   });
-  const summaryPage = await renderSummaryPage(detail, display, summaryHeader, quantitySummaryHtml, unitLabelById);
+  const summaryPage = await renderSummaryPage(detail, display, summaryHeader, quantitySummaryHtml, unitLabelById, unitSuperProductNameById);
 
   const detailPages = await Promise.all(
     allUnits.map(async ({ item, component }) => {

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db, type Database } from "./index";
+import { HttpError } from "../utils/http-error";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -21,10 +22,15 @@ export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
  * `set_config`, not string-interpolated `SET LOCAL`, because `SET LOCAL app.tenant_id =
  * '...'` has no parameterized form — `set_config('app.tenant_id', $1, true)` does, so the
  * driver binds `tenantId` as a real parameter instead of it being spliced into SQL text.
+ *
+ * `tenantId` is `string | null` because a `platform_admin` actor has no tenant context at
+ * all (`authenticate.ts` sets `req.actor.tenantId = null` for that actor type) — `null`
+ * fails the UUID check exactly like any other malformed value, and is rejected with the
+ * same 403 rather than a distinct code path, since to a caller both are "no valid tenant."
  */
-export async function withTenant<T>(tenantId: string, callback: (tx: Transaction) => Promise<T>): Promise<T> {
-  if (!UUID_RE.test(tenantId)) {
-    throw new Error(`withTenant: "${tenantId}" is not a valid tenant id`);
+export async function withTenant<T>(tenantId: string | null, callback: (tx: Transaction) => Promise<T>): Promise<T> {
+  if (tenantId === null || !UUID_RE.test(tenantId)) {
+    throw new HttpError(403, "FORBIDDEN", "This actor has no tenant context");
   }
 
   return db.transaction(async (tx) => {

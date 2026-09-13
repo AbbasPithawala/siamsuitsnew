@@ -33,10 +33,19 @@ export const invoiceSettingsApi = baseApi.injectEndpoints({
       transformResponse: (response: InvoiceSettingsResponseEnvelope) => response.data,
       providesTags: [{ type: "InvoiceSettings", id: "SINGLETON" }],
     }),
+    /**
+     * Also invalidates `"Me"` (PHASE_11_TASKS.md Workstream D3/G0) — this same
+     * endpoint drives both the ordinary Invoice Settings screen and the
+     * onboarding `CompleteProfilePage.tsx`, and the backend flips
+     * `tenants.profile_completed` alongside whichever of these three fields it
+     * receives. `RequireProfileComplete` reads that flag straight out of the
+     * cached `/me` response, so without this the guard wouldn't stop
+     * redirecting until some unrelated action happened to refetch `/me`.
+     */
     updateInvoiceSettings: builder.mutation<InvoiceSettings, UpdateInvoiceSettingsInput>({
       query: (body) => ({ url: "/invoice-settings", method: "PATCH", body }),
       transformResponse: (response: InvoiceSettingsResponseEnvelope) => response.data,
-      invalidatesTags: [{ type: "InvoiceSettings", id: "SINGLETON" }],
+      invalidatesTags: [{ type: "InvoiceSettings", id: "SINGLETON" }, "Me"],
     }),
   }),
 });

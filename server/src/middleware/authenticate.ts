@@ -18,6 +18,23 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     return;
   }
 
+  if (payload.actorType === "platform_admin") {
+    const platformAdmin = await db.query.platformAdmins.findFirst({ where: (t, { eq }) => eq(t.id, payload.sub) });
+    if (!platformAdmin || !platformAdmin.isActive) {
+      next(new HttpError(401, "UNAUTHORIZED", "Invalid or inactive account"));
+      return;
+    }
+
+    req.actor = {
+      id: platformAdmin.id,
+      tenantId: null,
+      actorType: "platform_admin",
+      retailerId: null,
+    };
+    next();
+    return;
+  }
+
   const actorRow =
     payload.actorType === "user"
       ? await db.query.users.findFirst({ where: (t, { eq }) => eq(t.id, payload.sub) })

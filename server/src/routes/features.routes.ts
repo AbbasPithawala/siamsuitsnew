@@ -64,17 +64,17 @@ featuresRouter.get("/features", authenticate, async (req, res, next) => {
   try {
     const query = listFeaturesQuerySchema.parse(req.query);
     if (query.productId) {
-      const list = await featuresService.listFeatures(req.actor!.tenantId, { productId: query.productId });
+      const list = await featuresService.listFeatures(req.actor!.tenantId!, { productId: query.productId });
       res.status(200).json({ data: list });
       return;
     }
 
     const pagination = resolveOptionalPagination(query);
     if (pagination) {
-      const { data, total } = await featuresService.listFeatures(req.actor!.tenantId, {}, pagination);
+      const { data, total } = await featuresService.listFeatures(req.actor!.tenantId!, {}, pagination);
       res.status(200).json(paginatedResult(data, total, pagination.page, pagination.pageSize));
     } else {
-      const data = await featuresService.listFeatures(req.actor!.tenantId);
+      const data = await featuresService.listFeatures(req.actor!.tenantId!);
       res.status(200).json({ data });
     }
   } catch (err) {
@@ -88,7 +88,7 @@ featuresRouter.get("/features", authenticate, async (req, res, next) => {
 
 featuresRouter.get("/features/:id", authenticate, async (req, res, next) => {
   try {
-    const feature = await featuresService.getFeature(req.actor!.tenantId, requireParam(req, "id"));
+    const feature = await featuresService.getFeature(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: feature });
   } catch (err) {
     next(err);
@@ -102,7 +102,7 @@ featuresRouter.post(
   validateBody(createFeatureSchema),
   async (req, res, next) => {
     try {
-      const feature = await featuresService.createFeature(req.actor!.tenantId, req.body);
+      const feature = await featuresService.createFeature(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: feature });
     } catch (err) {
       next(err);
@@ -117,7 +117,7 @@ featuresRouter.patch(
   validateBody(updateFeatureSchema),
   async (req, res, next) => {
     try {
-      const feature = await featuresService.updateFeature(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const feature = await featuresService.updateFeature(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(200).json({ data: feature });
     } catch (err) {
       next(err);
@@ -127,7 +127,7 @@ featuresRouter.patch(
 
 featuresRouter.delete("/features/:id", authenticate, requirePermission("catalog.features.manage"), async (req, res, next) => {
   try {
-    await featuresService.softDeleteFeature(req.actor!.tenantId, requireParam(req, "id"));
+    await featuresService.softDeleteFeature(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -141,7 +141,7 @@ featuresRouter.put(
   validateBody(productsLinkSchema),
   async (req, res, next) => {
     try {
-      const feature = await featuresService.setFeatureProducts(req.actor!.tenantId, requireParam(req, "id"), req.body.productIds);
+      const feature = await featuresService.setFeatureProducts(req.actor!.tenantId!, requireParam(req, "id"), req.body.productIds);
       res.status(200).json({ data: feature });
     } catch (err) {
       next(err);
@@ -156,7 +156,7 @@ featuresRouter.put(
   validateBody(featuresLinkSchema),
   async (req, res, next) => {
     try {
-      const features = await featuresService.setProductFeatures(req.actor!.tenantId, requireParam(req, "productId"), req.body.featureIds);
+      const features = await featuresService.setProductFeatures(req.actor!.tenantId!, requireParam(req, "productId"), req.body.featureIds);
       res.status(200).json({ data: features });
     } catch (err) {
       next(err);
@@ -171,7 +171,7 @@ featuresRouter.post(
   validateBody(createStyleSchema),
   async (req, res, next) => {
     try {
-      const style = await featuresService.createStyle(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const style = await featuresService.createStyle(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(201).json({ data: style });
     } catch (err) {
       next(err);
@@ -186,7 +186,7 @@ featuresRouter.patch(
   validateBody(updateStyleSchema),
   async (req, res, next) => {
     try {
-      const style = await featuresService.updateStyle(req.actor!.tenantId, requireParam(req, "styleId"), req.body);
+      const style = await featuresService.updateStyle(req.actor!.tenantId!, requireParam(req, "styleId"), req.body);
       res.status(200).json({ data: style });
     } catch (err) {
       next(err);
@@ -196,7 +196,7 @@ featuresRouter.patch(
 
 featuresRouter.delete("/styles/:styleId", authenticate, requirePermission("catalog.features.manage"), async (req, res, next) => {
   try {
-    await featuresService.softDeleteStyle(req.actor!.tenantId, requireParam(req, "styleId"));
+    await featuresService.softDeleteStyle(req.actor!.tenantId!, requireParam(req, "styleId"));
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -210,7 +210,7 @@ featuresRouter.post(
   validateBody(createStyleOptionSchema),
   async (req, res, next) => {
     try {
-      const option = await featuresService.createStyleOption(req.actor!.tenantId, requireParam(req, "styleId"), req.body);
+      const option = await featuresService.createStyleOption(req.actor!.tenantId!, requireParam(req, "styleId"), req.body);
       res.status(201).json({ data: option });
     } catch (err) {
       next(err);
@@ -225,7 +225,7 @@ featuresRouter.patch(
   validateBody(updateStyleOptionSchema),
   async (req, res, next) => {
     try {
-      const option = await featuresService.updateStyleOption(req.actor!.tenantId, requireParam(req, "optionId"), req.body);
+      const option = await featuresService.updateStyleOption(req.actor!.tenantId!, requireParam(req, "optionId"), req.body);
       res.status(200).json({ data: option });
     } catch (err) {
       next(err);
@@ -239,7 +239,7 @@ featuresRouter.delete(
   requirePermission("catalog.features.manage"),
   async (req, res, next) => {
     try {
-      await featuresService.softDeleteStyleOption(req.actor!.tenantId, requireParam(req, "optionId"));
+      await featuresService.softDeleteStyleOption(req.actor!.tenantId!, requireParam(req, "optionId"));
       res.status(204).send();
     } catch (err) {
       next(err);

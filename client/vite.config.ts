@@ -9,5 +9,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/setupTests.ts"],
     globals: true,
+  }, 
+   server: {
+    // Allows all external hosts to connect to your dev server
+    allowedHosts: true,
   },
 });

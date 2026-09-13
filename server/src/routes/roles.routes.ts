@@ -26,7 +26,7 @@ export const rolesRouter = Router();
 rolesRouter.get("/roles", authenticate, async (req, res, next) => {
   try {
     const { page, pageSize } = listRolesQuerySchema.parse(req.query);
-    const { data, total } = await rolesService.listRoles(req.actor!.tenantId, { page, pageSize });
+    const { data, total } = await rolesService.listRoles(req.actor!.tenantId!, { page, pageSize });
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -39,7 +39,7 @@ rolesRouter.get("/roles", authenticate, async (req, res, next) => {
 
 rolesRouter.get("/roles/:id", authenticate, async (req, res, next) => {
   try {
-    const role = await rolesService.getRole(req.actor!.tenantId, requireParam(req, "id"));
+    const role = await rolesService.getRole(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: role });
   } catch (err) {
     next(err);
@@ -53,7 +53,7 @@ rolesRouter.post(
   validateBody(createRoleSchema),
   async (req, res, next) => {
     try {
-      const role = await rolesService.createRole(req.actor!.tenantId, req.body);
+      const role = await rolesService.createRole(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: role });
     } catch (err) {
       next(err);
@@ -68,7 +68,7 @@ rolesRouter.patch(
   validateBody(updateRoleSchema),
   async (req, res, next) => {
     try {
-      const role = await rolesService.updateRole(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const role = await rolesService.updateRole(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(200).json({ data: role });
     } catch (err) {
       next(err);
@@ -78,7 +78,7 @@ rolesRouter.patch(
 
 rolesRouter.delete("/roles/:id", authenticate, requirePermission("rbac.roles.manage"), async (req, res, next) => {
   try {
-    await rolesService.softDeleteRole(req.actor!.tenantId, requireParam(req, "id"));
+    await rolesService.softDeleteRole(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -92,7 +92,7 @@ rolesRouter.post(
   validateBody(assignPermissionSchema),
   async (req, res, next) => {
     try {
-      const permissions = await rolesService.addPermission(req.actor!.tenantId, requireParam(req, "roleId"), req.body.permissionId);
+      const permissions = await rolesService.addPermission(req.actor!.tenantId!, requireParam(req, "roleId"), req.body.permissionId);
       res.status(201).json({ data: permissions });
     } catch (err) {
       next(err);
@@ -106,7 +106,7 @@ rolesRouter.delete(
   requirePermission("rbac.roles.manage"),
   async (req, res, next) => {
     try {
-      await rolesService.removePermission(req.actor!.tenantId, requireParam(req, "roleId"), requireParam(req, "permissionId"));
+      await rolesService.removePermission(req.actor!.tenantId!, requireParam(req, "roleId"), requireParam(req, "permissionId"));
       res.status(204).send();
     } catch (err) {
       next(err);

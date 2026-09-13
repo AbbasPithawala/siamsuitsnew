@@ -20,7 +20,7 @@ export const manufacturingRouter = Router();
  */
 manufacturingRouter.get("/manufacturing/components/:componentId", authenticate, async (req, res, next) => {
   try {
-    const detail = await manufacturingService.getComponentDetail(req.actor!.tenantId, requireParam(req, "componentId"));
+    const detail = await manufacturingService.getComponentDetail(req.actor!.tenantId!, requireParam(req, "componentId"));
     res.status(200).json({ data: detail });
   } catch (err) {
     next(err);
@@ -34,7 +34,7 @@ manufacturingRouter.post(
   validateBody(assignStepSchema),
   async (req, res, next) => {
     try {
-      const result = await manufacturingService.assignNextStep(req.actor!.tenantId, requireParam(req, "componentId"), req.body.tailorId);
+      const result = await manufacturingService.assignNextStep(req.actor!.tenantId!, requireParam(req, "componentId"), req.body.tailorId);
       res.status(201).json({ data: result });
     } catch (err) {
       next(err);
@@ -48,7 +48,7 @@ manufacturingRouter.post(
   requirePermission("factory.jobs.complete"),
   async (req, res, next) => {
     try {
-      const step = await manufacturingService.completeStep(req.actor!.tenantId, requireParam(req, "jobId"));
+      const step = await manufacturingService.completeStep(req.actor!.tenantId!, requireParam(req, "jobId"));
       res.status(200).json({ data: step });
     } catch (err) {
       next(err);

@@ -17,13 +17,15 @@ const updateInvoiceSettingsSchema = z.object({
  * settings endpoint this app has no other use for yet. Reads gated by `invoices.view` (needed
  * to preview the current letterhead before editing it — comparably sensitive to any other
  * invoice-adjacent read); writes by `invoices.manage`, same split every other invoicing route
- * in this file's sibling `invoices.routes.ts` uses.
+ * in this file's sibling `invoices.routes.ts` uses. Phase 11 D3: the `PATCH` here doubles as the
+ * first-login "complete your profile" step — a real letterhead update also flips
+ * `tenants.profile_completed` to true (see `tenantSettings.service.ts`).
  */
 export const tenantSettingsRouter = Router();
 
 tenantSettingsRouter.get("/invoice-settings", authenticate, requirePermission("invoices.view"), async (req, res, next) => {
   try {
-    const tenant = await tenantSettingsService.getTenantSettings(req.actor!.tenantId);
+    const tenant = await tenantSettingsService.getTenantSettings(req.actor!.tenantId!);
     res.status(200).json({ data: tenant });
   } catch (err) {
     next(err);
@@ -37,7 +39,7 @@ tenantSettingsRouter.patch(
   validateBody(updateInvoiceSettingsSchema),
   async (req, res, next) => {
     try {
-      const tenant = await tenantSettingsService.updateTenantSettings(req.actor!.tenantId, req.body);
+      const tenant = await tenantSettingsService.updateTenantSettings(req.actor!.tenantId!, req.body);
       res.status(200).json({ data: tenant });
     } catch (err) {
       next(err);

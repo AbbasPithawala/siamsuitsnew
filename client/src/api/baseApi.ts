@@ -37,13 +37,18 @@ export interface Me {
   id: string;
   name: string;
   username: string;
-  actorType: "user" | "tailor";
-  tenantId: string;
-  /** Non-null only for a `retailer_users`-linked user (Workstream E Group 1) — null for staff and for `actorType: "tailor"`. */
+  actorType: "user" | "tailor" | "platform_admin";
+  /** `null` only for `actorType: "platform_admin"` — a platform admin has no tenant (PHASE_11_TASKS.md Workstream A). */
+  tenantId: string | null;
+  /** Non-null only for a `retailer_users`-linked user (Workstream E Group 1) — null for staff, tailors, and platform admins. */
   retailerId: string | null;
   permissions: string[];
-  /** Header branding (`AppShell.tsx`) — the retailer's own logo when `retailerId` is set, else the tenant's letterhead logo; a raw upload path, resolve with `resolveUploadUrl` before rendering. Always `null` for `actorType: "tailor"`. */
+  /** Header branding (`AppShell.tsx`) — the retailer's own logo when `retailerId` is set, else the tenant's letterhead logo; a raw upload path, resolve with `resolveUploadUrl` before rendering. Always `null` for `actorType: "tailor" | "platform_admin"`. */
   logo: string | null;
+  /** `true` only for a `user` who hasn't changed a temp/reset password yet — always `false` for tailors/platform admins (PHASE_11_TASKS.md Workstream D). */
+  mustChangePassword: boolean;
+  /** The caller's own tenant's onboarding-profile-completion flag — always `true` (inapplicable-but-harmless) for tailors/platform admins. */
+  profileCompleted: boolean;
 }
 
 interface MeResponseEnvelope {
@@ -93,11 +98,26 @@ export const baseApi = createApi({
     "InvoiceSettings",
     "ShippingBox",
     "CustomerMeasurementProfile",
+    "Me",
+    "TenantRequest",
+    "PlatformTenant",
   ],
   endpoints: (builder) => ({
+    /**
+     * `providesTags: ["Me"]` exists specifically so `PATCH /me/password`
+     * (`authApi.ts`'s `changePassword`) and the onboarding-broadened
+     * `PATCH /invoice-settings` (`invoiceSettingsApi.ts`'s `updateInvoiceSettings`,
+     * PHASE_11_TASKS.md Workstream D3/G0) can `invalidatesTags: ["Me"]` to force
+     * this query to refetch immediately after either action — both flip a flag
+     * (`mustChangePassword`/`profileCompleted`) that `RequireProfileComplete`
+     * reads straight out of this same cached response, so a stale cache entry
+     * here would otherwise keep redirecting a user who has already cleared the
+     * condition.
+     */
     me: builder.query<Me, void>({
       query: () => "/me",
       transformResponse: (response: MeResponseEnvelope) => response.data,
+      providesTags: ["Me"],
     }),
   }),
 });

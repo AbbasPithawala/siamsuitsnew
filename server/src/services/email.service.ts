@@ -52,3 +52,48 @@ export async function sendPdfEmail(input: SendPdfEmailInput): Promise<void> {
     attachments: [{ filename: input.attachmentFilename, content: input.attachment }],
   });
 }
+
+export interface SendTenantWelcomeEmailInput {
+  to: string;
+  tenantSlug: string;
+  username: string;
+  tempPassword: string;
+}
+
+/**
+ * PHASE_11_TASKS.md Workstream C Group 1 (C4): called by the approve route in its own
+ * `try/catch` after `provisionTenant()` has already committed — a `503 EMAIL_NOT_CONFIGURED`
+ * here must never roll back or fail the approval itself.
+ */
+export async function sendTenantWelcomeEmail(input: SendTenantWelcomeEmailInput): Promise<void> {
+  const loginUrl = env.CLIENT_APP_URL ? `${env.CLIENT_APP_URL.replace(/\/$/, "")}/login` : "your Siam Suits login page";
+  const text = [
+    `Welcome to Siam Suits! Your account has been provisioned.`,
+    ``,
+    `Tenant: ${input.tenantSlug}`,
+    `Username: ${input.username}`,
+    `Temporary password: ${input.tempPassword}`,
+    `Login: ${loginUrl}`,
+    ``,
+    `You'll be asked to change this password the first time you log in.`,
+  ].join("\n");
+
+  const html = [
+    `<p>Welcome to Siam Suits! Your account has been provisioned.</p>`,
+    `<ul>`,
+    `<li><strong>Tenant:</strong> ${input.tenantSlug}</li>`,
+    `<li><strong>Username:</strong> ${input.username}</li>`,
+    `<li><strong>Temporary password:</strong> ${input.tempPassword}</li>`,
+    `<li><strong>Login:</strong> ${loginUrl}</li>`,
+    `</ul>`,
+    `<p>You'll be asked to change this password the first time you log in.</p>`,
+  ].join("\n");
+
+  await getTransporter().sendMail({
+    from: env.SMTP_FROM ?? env.SMTP_USER,
+    to: input.to,
+    subject: "Your Siam Suits account is ready",
+    text,
+    html,
+  });
+}

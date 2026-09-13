@@ -8,6 +8,9 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"require('fs').cpSync('src/assets','dist/assets',{recursive:true})\"",
+    "build:client": "npm run build --prefix ../client",
+    "build:all": "npm run build:client && npm run build",
+    "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -16,6 +19,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed/index.ts",
+    "db:seed:platform": "tsx src/db/seed/platformAdmin.ts",
     "db:studio": "drizzle-kit studio",
     "etl:production": "tsx src/db/etl/production.ts",
     "backfill:phase9-group0": "tsx src/db/seed/phase9-group0-catalog-backfill.ts"

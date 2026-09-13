@@ -27,7 +27,7 @@ export const extraPaymentCategoriesRouter = Router();
 extraPaymentCategoriesRouter.get("/extra-payment-categories", authenticate, async (req, res, next) => {
   try {
     const { page, pageSize } = listExtraPaymentCategoriesQuerySchema.parse(req.query);
-    const { data, total } = await extraPaymentCategoriesService.listExtraPaymentCategories(req.actor!.tenantId, { page, pageSize });
+    const { data, total } = await extraPaymentCategoriesService.listExtraPaymentCategories(req.actor!.tenantId!, { page, pageSize });
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -40,7 +40,7 @@ extraPaymentCategoriesRouter.get("/extra-payment-categories", authenticate, asyn
 
 extraPaymentCategoriesRouter.get("/extra-payment-categories/:id", authenticate, async (req, res, next) => {
   try {
-    const category = await extraPaymentCategoriesService.getExtraPaymentCategory(req.actor!.tenantId, requireParam(req, "id"));
+    const category = await extraPaymentCategoriesService.getExtraPaymentCategory(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: category });
   } catch (err) {
     next(err);
@@ -54,7 +54,7 @@ extraPaymentCategoriesRouter.post(
   validateBody(createExtraPaymentCategorySchema),
   async (req, res, next) => {
     try {
-      const category = await extraPaymentCategoriesService.createExtraPaymentCategory(req.actor!.tenantId, req.body);
+      const category = await extraPaymentCategoriesService.createExtraPaymentCategory(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: category });
     } catch (err) {
       next(err);
@@ -70,7 +70,7 @@ extraPaymentCategoriesRouter.patch(
   async (req, res, next) => {
     try {
       const category = await extraPaymentCategoriesService.updateExtraPaymentCategory(
-        req.actor!.tenantId,
+        req.actor!.tenantId!,
         requireParam(req, "id"),
         req.body
       );
@@ -87,7 +87,7 @@ extraPaymentCategoriesRouter.delete(
   requirePermission("factory.extra_payments.manage"),
   async (req, res, next) => {
     try {
-      await extraPaymentCategoriesService.softDeleteExtraPaymentCategory(req.actor!.tenantId, requireParam(req, "id"));
+      await extraPaymentCategoriesService.softDeleteExtraPaymentCategory(req.actor!.tenantId!, requireParam(req, "id"));
       res.status(204).send();
     } catch (err) {
       next(err);

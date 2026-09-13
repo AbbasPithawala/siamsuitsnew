@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Draggable from "react-draggable";
 import { toPng } from "html-to-image";
 import Alert from "@mui/material/Alert";
@@ -17,6 +17,13 @@ import Typography from "@mui/material/Typography";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { getApiErrorMessage } from "../../api/errorUtils";
 import { resolveUploadUrl, useUploadFileMutation } from "../uploads/uploadsApi";
+import {
+  JacketGarmentLayout,
+  PantGarmentLayout,
+  ShirtGarmentLayout,
+  VestGarmentLayout,
+  resolveLegacyGarmentLayout,
+} from "./legacyManualSizeGarments";
 
 interface ManualSizeLabel {
   id: string;
@@ -74,7 +81,9 @@ export interface ManualSizeEditorProps {
   onClose: () => void;
   /** Dialog title context — e.g. "Jacket (Suit Jacket)". */
   title: string;
-  /** `SuperProductComponent.product.measurementDiagramImage` — `null` renders a "no diagram set" message instead of the annotation canvas. */
+  /** `SuperProductComponent.product.name` — resolved through `resolveLegacyGarmentLayout` to pick a hardcoded legacy garment layout (jacket/pant/shirt/vest) when one exists for this exact product name; falls back to the generic single-diagram canvas otherwise. */
+  productName: string;
+  /** `SuperProductComponent.product.measurementDiagramImage` — only used by the generic fallback canvas (no legacy layout matched `productName`); `null` there renders a "no diagram set" message instead. */
   diagramImageUrl: string | null;
   /** Called with the rasterized-and-uploaded image's URL once the admin saves — the caller (e.g. `OrderBuilderPage.tsx`) writes it into the relevant draft's `manualSizeImage`; this component has no save action of its own beyond producing that URL. */
   onSave: (url: string) => void;
@@ -85,21 +94,33 @@ const CANVAS_HEIGHT = 620;
 
 /**
  * PHASE_10_TASKS.md Workstream E Group 6.3c — generic Manual Size annotation
- * editor: unlike legacy's `editOrderWithManualSize.jsx` (one hardcoded JSX
- * block per garment/product name, `<img src={Jacket} .../>` etc.), this
- * renders whichever `diagramImageUrl` its caller passes — no branching on
- * product/super-product identity anywhere in this file.
+ * editor, since extended to also reproduce legacy's hardcoded per-garment
+ * overlay fields exactly (`legacyManualSizeGarments.tsx`): unlike the rest of
+ * this rewrite's "generalized products" architecture, `editOrderWithManualSize.jsx`
+ * hardcoded one specific JSX layout per garment *name* (jacket/pant/shirt/vest),
+ * each with its own bundled diagram images and, for jacket, three fixed Thai
+ * dropdown fields (shoulder support / fabric lining / tailor) plus four fixed
+ * "type here" input boxes positioned at exact pixel offsets — not data the
+ * admin could otherwise enter anywhere else in this system. Reproducing that
+ * required literally the same per-garment-name branching legacy used, kept
+ * isolated in `legacyManualSizeGarments.tsx` so it doesn't leak into the rest
+ * of the order-building flow: any product name outside that fixed set (i.e.
+ * every custom product an admin creates through the generalized catalog)
+ * still gets the fully generic `diagramImageUrl`-driven canvas below.
  *
  * Free-text and number labels are added via one text field (legacy's
  * `newitem`/`keyPress` "Enter" flow), dragged into place with
  * `react-draggable` (legacy's real `Draggable`/`updatePos` mechanism,
  * reproduced 1:1 including default-position offsets), and deleted via each
- * label's own "x" button. On Save, the whole annotated canvas (background
- * image + every positioned label) is rasterized client-side via
- * `html-to-image`'s `toPng` (legacy's `takeScreenShot`), uploaded through the
- * existing generic `POST /api/uploads` (`useUploadFileMutation`, already
- * used by `StylingAccordion.tsx`'s reference-image upload — no new upload
- * endpoint), and the resulting URL is handed back to the caller via `onSave`.
+ * label's own "x" button — this part applies identically on top of *either*
+ * canvas, exactly like legacy re-includes the same drag mechanism inside
+ * every one of its per-garment blocks. On Save, the whole annotated canvas
+ * (background image(s) + any overlay fields + every positioned label) is
+ * rasterized client-side via `html-to-image`'s `toPng` (legacy's
+ * `takeScreenShot`), uploaded through the existing generic `POST /api/uploads`
+ * (`useUploadFileMutation`, already used by `StylingAccordion.tsx`'s
+ * reference-image upload — no new upload endpoint), and the resulting URL is
+ * handed back to the caller via `onSave`.
  *
  * Re-opening this dialog always starts from a blank label set (matching
  * legacy's own behavior — `items` never round-trips out of a previously
@@ -108,12 +129,36 @@ const CANVAS_HEIGHT = 620;
  * shown as a small preview only, not decoded back into labels to keep
  * editing.
  */
-export function ManualSizeEditor({ open, onClose, title, diagramImageUrl, onSave }: ManualSizeEditorProps) {
+export function ManualSizeEditor({ open, onClose, title, productName, diagramImageUrl, onSave }: ManualSizeEditorProps) {
   const [labels, setLabels] = useState<ManualSizeLabel[]>([]);
   const [draftText, setDraftText] = useState("");
   const [uploadFile, { isLoading: isSaving }] = useUploadFileMutation();
   const [error, setError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const legacyLayout = resolveLegacyGarmentLayout(productName);
+  const hasCanvas = legacyLayout !== null || Boolean(diagramImageUrl);
+
+  // react-draggable (v4) finds its DOM node via the now-removed
+  // `ReactDOM.findDOMNode` unless given an explicit `nodeRef` — under React
+  // 19 that lookup returns null, so the very first drag throws "<DraggableCore>
+  // not mounted on DragStart!". A per-label ref is the standard fix
+  // (https://github.com/react-grid-layout/react-draggable#draggable-with-nested-elements),
+  // but hooks can't run inside `.map()`, and this project's lint config
+  // forbids mutating a `useRef`/`useMemo` value after the fact
+  // (`react-hooks/refs`, `react-hooks/immutability`) — the usual
+  // get-or-create-lazily pattern trips both. Instead, a fresh, fully-built
+  // `Map` is derived from `labels` every render via `useMemo`; slightly more
+  // allocation than caching across renders, but this dialog only ever holds
+  // a handful of labels, and it's the only variant that's actually
+  // read-only from render's perspective.
+  const labelNodeRefs = useMemo(() => {
+    const map = new Map<string, React.RefObject<HTMLDivElement | null>>();
+    for (const label of labels) {
+      map.set(label.id, { current: null });
+    }
+    return map;
+  }, [labels]);
 
   function handleAddLabel() {
     const raw = draftText.trim();
@@ -160,8 +205,16 @@ export function ManualSizeEditor({ open, onClose, title, diagramImageUrl, onSave
     }
   }
 
+  const isWideLayout = legacyLayout === "jacket";
+
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth={isWideLayout ? false : "md"}
+      fullWidth={!isWideLayout}
+      {...(isWideLayout ? { sx: { "& .MuiDialog-paper": { width: "95vw", maxWidth: "1700px" } } } : {})}
+    >
       <DialogTitle>
         Manual Size — {title}
         <IconButton aria-label="Close" onClick={handleClose} sx={{ position: "absolute", right: 8, top: 8 }}>
@@ -169,7 +222,7 @@ export function ManualSizeEditor({ open, onClose, title, diagramImageUrl, onSave
         </IconButton>
       </DialogTitle>
       <DialogContent>
-        {!diagramImageUrl ? (
+        {!hasCanvas ? (
           <Alert severity="info">
             This product has no measurement diagram set — an admin can add one from Manage Product on the Products
             page ("Measurement Diagram Image URL").
@@ -190,51 +243,68 @@ export function ManualSizeEditor({ open, onClose, title, diagramImageUrl, onSave
               </Button>
             </Stack>
 
-            <Box
-              ref={canvasRef}
-              sx={{
-                position: "relative",
-                width: CANVAS_WIDTH,
-                height: CANVAS_HEIGHT,
-                mx: "auto",
-                border: "1px solid #ddd",
-                backgroundImage: `url(${resolveUploadUrl(diagramImageUrl)})`,
-                backgroundSize: "contain",
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "center",
-                backgroundColor: "#fff",
-                overflow: "hidden",
-              }}
-            >
-              {labels.map((label) => (
-                <Draggable
-                  key={label.id}
-                  defaultPosition={{ x: label.x, y: label.y }}
-                  onStop={(_event, data) => handleUpdatePosition(label.id, data.x, data.y)}
-                  bounds="parent"
-                >
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                      px: 1,
-                      py: 0.25,
-                      bgcolor: "#e0e0df",
-                      border: "1px solid #999",
-                      borderRadius: 1,
-                      cursor: "move",
-                      fontSize: 14,
-                    }}
-                  >
-                    <LabelContent label={label} />
-                    <IconButton size="small" aria-label={`Delete label ${label.raw}`} onClick={() => handleDeleteLabel(label.id)} sx={{ p: 0.25 }}>
-                      <CloseIcon sx={{ fontSize: 12 }} />
-                    </IconButton>
-                  </Box>
-                </Draggable>
-              ))}
+            <Box sx={{ overflow: "auto" }}>
+              <Box
+                ref={canvasRef}
+                sx={
+                  legacyLayout
+                    ? { position: "relative", width: "fit-content", mx: "auto", border: "1px solid #ddd", bgcolor: "#fff" }
+                    : {
+                        position: "relative",
+                        width: CANVAS_WIDTH,
+                        height: CANVAS_HEIGHT,
+                        mx: "auto",
+                        border: "1px solid #ddd",
+                        backgroundImage: `url(${resolveUploadUrl(diagramImageUrl!)})`,
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                        backgroundColor: "#fff",
+                        overflow: "hidden",
+                      }
+                }
+              >
+                {legacyLayout === "jacket" && <JacketGarmentLayout />}
+                {legacyLayout === "pant" && <PantGarmentLayout />}
+                {legacyLayout === "shirt" && <ShirtGarmentLayout />}
+                {legacyLayout === "vest" && <VestGarmentLayout />}
+
+                {labels.map((label) => {
+                  const nodeRef = labelNodeRefs.get(label.id)!;
+                  return (
+                    <Draggable
+                      key={label.id}
+                      nodeRef={nodeRef}
+                      defaultPosition={{ x: label.x, y: label.y }}
+                      onStop={(_event, data) => handleUpdatePosition(label.id, data.x, data.y)}
+                      bounds="parent"
+                    >
+                      <Box
+                        ref={nodeRef}
+                        sx={{
+                          position: "absolute",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          px: 1,
+                          py: 0.25,
+                          bgcolor: "#e0e0df",
+                          border: "1px solid #999",
+                          borderRadius: 1,
+                          cursor: "move",
+                          fontSize: 14,
+                          zIndex: 999,
+                        }}
+                      >
+                        <LabelContent label={label} />
+                        <IconButton size="small" aria-label={`Delete label ${label.raw}`} onClick={() => handleDeleteLabel(label.id)} sx={{ p: 0.25 }}>
+                          <CloseIcon sx={{ fontSize: 12 }} />
+                        </IconButton>
+                      </Box>
+                    </Draggable>
+                  );
+                })}
+              </Box>
             </Box>
 
             <Typography variant="body2" color="text.secondary">
@@ -247,7 +317,7 @@ export function ManualSizeEditor({ open, onClose, title, diagramImageUrl, onSave
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Cancel</Button>
-        <Button variant="contained" onClick={handleSave} disabled={!diagramImageUrl || isSaving}>
+        <Button variant="contained" onClick={handleSave} disabled={!hasCanvas || isSaving}>
           {isSaving ? "Saving…" : "Save"}
         </Button>
       </DialogActions>

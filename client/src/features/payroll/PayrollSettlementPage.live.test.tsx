@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { baseApi } from "../../api/baseApi";
 import type { AuthTokenSliceState } from "../../api/baseApi";
+import { createLimitedUserInTenant } from "../../routes/testSupport/permissionFixtures";
 import { PayrollSettlementPage } from "./PayrollSettlementPage";
 
 /**
@@ -31,12 +32,12 @@ function uniqueSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function fetchSeedToken(): Promise<string | null> {
+async function fetchToken(credentials: { tenant: string; username: string; password: string }): Promise<string | null> {
   try {
     const res = await fetch(`${apiBaseUrl}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(SEED_CREDENTIALS),
+      body: JSON.stringify(credentials),
     });
     if (!res.ok) return null;
     const body = (await res.json()) as { data: { token: string } };
@@ -46,7 +47,19 @@ async function fetchSeedToken(): Promise<string | null> {
   }
 }
 
-const seededToken = await fetchSeedToken();
+const seededToken = await fetchToken(SEED_CREDENTIALS);
+
+/**
+ * PHASE_10_TASKS.md Workstream E Group 5: `admin` (Owner) no longer holds
+ * `orders.create`, so the real `POST /orders` fixture call below needs a
+ * token that does. Minted once, in the same `siam-suits` tenant as every
+ * other fixture here (not a fresh tenant — see `createLimitedUserInTenant`'s
+ * own doc comment). Rendering `PayrollSettlementPage` itself (`renderPage`,
+ * still `admin`'s token via `buildTestStore`) and every other setup call is
+ * unaffected — `admin` still holds everything else this file needs.
+ */
+const orderCreatorFixture = seededToken ? await createLimitedUserInTenant("siam-suits", ["orders.create"]) : null;
+const orderCreatorToken = orderCreatorFixture ? await fetchToken(orderCreatorFixture) : null;
 
 async function apiRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${apiBaseUrl}${path}`, {
@@ -100,6 +113,12 @@ const createdCategoryIds: string[] = [];
 afterAll(async () => {
   if (!seededToken) return;
   const token = seededToken;
+
+  if (orderCreatorFixture) {
+    await orderCreatorFixture.cleanup().catch((err: unknown) =>
+      console.error("Failed to clean up the orders.create fixture user:", err)
+    );
+  }
 
   const { deleteSettlementFixtures } = await import("./testSupport/payrollDbCleanup");
   const { hardDeleteOrders, countOrdersByIds } = await import("../orders/testSupport/orderDbCleanup");
@@ -219,7 +238,10 @@ describe.skipIf(!seededToken)("PayrollSettlementPage (live siam/server integrati
       });
       createdCustomerIds.push(customer.data.id);
 
-      const order = await apiRequest<{ data: { id: string } }>("/orders", token, {
+      if (!orderCreatorToken) {
+        throw new Error("Expected an orders.create-holding fixture token to have been minted for this file");
+      }
+      const order = await apiRequest<{ data: { id: string; orderNumber: string } }>("/orders", orderCreatorToken, {
         method: "POST",
         body: JSON.stringify({
           retailerId: retailer.data.id,
@@ -249,6 +271,7 @@ describe.skipIf(!seededToken)("PayrollSettlementPage (live siam/server integrati
         body: JSON.stringify({ processId: process.data.id }),
       });
 
+      const categoryName = `Live Settle Extra Payment ${suffix}`;
       const category = await apiRequest<{ data: { id: string } }>("/extra-payment-categories", token, {
         method: "POST",
         body: JSON.stringify({
@@ -256,7 +279,7 @@ describe.skipIf(!seededToken)("PayrollSettlementPage (live siam/server integrati
           processId: process.data.id,
           featureId: feature.data.id,
           styleId: style.data.id,
-          name: `Live Settle Extra Payment ${suffix}`,
+          name: categoryName,
           cost: "15.00",
         }),
       });
@@ -292,9 +315,16 @@ describe.skipIf(!seededToken)("PayrollSettlementPage (live siam/server integrati
 
       const jobRow = (await screen.findByText(new RegExp(`${productName} \\(Piece\\)`), {}, NETWORK_WAIT)).closest("tr");
       expect(jobRow).not.toBeNull();
-      await within(jobRow as HTMLElement).findByText("THB 100.00", {}, NETWORK_WAIT);
-      await within(jobRow as HTMLElement).findByText("THB 20.00", {}, NETWORK_WAIT);
-      await within(jobRow as HTMLElement).findByText("THB 15.00", {}, NETWORK_WAIT);
+      // `PayrollSettlementPage.tsx`'s unpaid-jobs table mirrors legacy
+      // `ManageJobs.jsx`'s own column layout (Group 8 follow-up) — a single
+      // combined "Cost" column (`jobDisplayTotal`: process fee + styling +
+      // approved-and-unpaid extra payments = 100 + 20 + 15 = 135.00) and a
+      // "Type" column ("Extra"/"Normal"), not separate Cost/Styling/Pending-
+      // extra-payment columns. Never asserted against the settlement
+      // confirmation's own server-computed `subTotal` below — that's a
+      // narrower, lower-stakes per-row display sum, not the real total.
+      await within(jobRow as HTMLElement).findByText("THB 135.00", {}, NETWORK_WAIT);
+      await within(jobRow as HTMLElement).findByText("Extra", {}, NETWORK_WAIT);
       await user.click(within(jobRow as HTMLElement).getByRole("checkbox"));
 
       await user.type(screen.getByLabelText("Rent"), "10");
@@ -312,10 +342,21 @@ describe.skipIf(!seededToken)("PayrollSettlementPage (live siam/server integrati
       await screen.findByText("THB 10.00", {}, NETWORK_WAIT);
       await screen.findByText("THB 5.00", {}, NETWORK_WAIT);
       await screen.findByText("THB 100.00", {}, NETWORK_WAIT);
-      await screen.findByText("1 job(s) settled and marked paid.", {}, NETWORK_WAIT);
+      // The old generic "N job(s) settled and marked paid." summary line was
+      // replaced by a real per-job breakdown table (Group 8 follow-up, same
+      // commit that reshaped the unpaid-jobs table above) — order number,
+      // item, and this job's own cost+styling amount (100 + 20 = 120.00; the
+      // settled-job table doesn't fold in the extra payment, unlike the
+      // unpaid-jobs table's combined `jobDisplayTotal` column above).
+      const settledJobRow = (await screen.findByRole("cell", { name: order.data.orderNumber }, NETWORK_WAIT)).closest("tr") as HTMLElement;
+      await within(settledJobRow).findByText(new RegExp(`${productName} \\(Piece\\)`));
+      await within(settledJobRow).findByText("THB 120.00");
 
-      // The previously-dead flags, now visibly reflected.
-      await screen.findByText("THB 15.00", {}, NETWORK_WAIT); // paid extra payment chip
+      // The previously-dead flags, now visibly reflected. The paid-extra-payment
+      // line is no longer a bare "THB 15.00" chip (Group 8 follow-up reshaped it
+      // into a sentence naming the category too) — the cleared-advance chip is
+      // still exactly the original bare-amount `Chip` format.
+      await screen.findByText(new RegExp(`THB 15\\.00 added for ${categoryName}`), {}, NETWORK_WAIT);
       await screen.findByText("THB 50.00 — Cleared", {}, NETWORK_WAIT); // cleared advance chip
 
       // The settled job dropped out of the unpaid-jobs list — a fresh read

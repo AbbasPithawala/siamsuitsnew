@@ -5,7 +5,7 @@ import Typography from "@mui/material/Typography";
 import type { SuperProduct, SuperProductComponent } from "../catalog/superProductsApi";
 import {
   LineItemMeasurementsPanel,
-  useLineItemMeasurementsCompleteness,
+  useLineItemMeasurementsEntered,
   createEmptyLineItemMeasurementsDraft,
 } from "./LineItemMeasurementsPanel";
 import type { LineItemComponentMeasurementDraft, LineItemMeasurementsDraft } from "./LineItemMeasurementsPanel";
@@ -200,8 +200,8 @@ export function OrderCartStep({
               components={focusedSuperProduct.components}
               draft={focusedItem.measurementsDraft}
               customerId={customerId}
-              excludeOrderId={excludeOrderId}
               onChange={(componentId, next) => onChangeMeasurements(focusedItem.id, componentId, next)}
+              {...(excludeOrderId !== undefined ? { excludeOrderId } : {})}
               {...(onOpenManualSize
                 ? { onOpenManualSize: (component: SuperProductComponent) => onOpenManualSize(focusedItem.id, component) }
                 : {})}
@@ -253,7 +253,7 @@ interface LineItemRowProps {
 
 /**
  * Its own component (not inlined in the `.map()` above) specifically so its
- * two completeness hooks (`useLineItemMeasurementsCompleteness`/
+ * two completeness hooks (`useLineItemMeasurementsEntered`/
  * `useLineItemStylingCompleteness`) are called unconditionally once per
  * mounted row instance — calling a hook a variable number of times inside one
  * parent component's own body (once per line item, a count that changes as
@@ -271,7 +271,7 @@ function LineItemRow({
   onQuantityChange,
   onDelete,
 }: LineItemRowProps) {
-  const measurementsComplete = useLineItemMeasurementsCompleteness(superProduct.components, item.measurementsDraft);
+  const measurementsComplete = useLineItemMeasurementsEntered(superProduct.components, item.measurementsDraft);
   const stylingComplete = useLineItemStylingCompleteness(superProduct.components, item.stylingDrafts);
   const quantity = item.stylingDrafts.length;
 

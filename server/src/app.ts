@@ -1,9 +1,14 @@
+import path from "node:path";
 import express, { type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
 import cors from "cors";
+import { env } from "./config/env";
 import { authRouter } from "./routes/auth.routes";
 import { meRouter } from "./routes/me.routes";
 import { tailorRouter } from "./routes/tailor.routes";
+import { platformAuthRouter } from "./routes/platformAuth.routes";
+import { tenantRequestsRouter } from "./routes/tenantRequests.routes";
+import { platformTenantsRouter } from "./routes/platformTenants.routes";
 import { productsRouter } from "./routes/products.routes";
 import { superProductsRouter } from "./routes/superProducts.routes";
 import { processesRouter } from "./routes/processes.routes";
@@ -49,6 +54,9 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/tailor", tailorRouter);
+app.use("/api/platform", platformAuthRouter);
+app.use("/api/platform", tenantRequestsRouter);
+app.use("/api/platform", platformTenantsRouter);
 app.use("/api", meRouter);
 app.use("/api", productsRouter);
 app.use("/api", superProductsRouter);
@@ -74,6 +82,16 @@ app.use("/api", invoicesRouter);
 app.use("/api", tenantSettingsRouter);
 app.use("/api", shippingRouter);
 app.use("/api", uploadsRouter);
+
+if (env.CLIENT_DIST_PATH) {
+  const clientDistPath = path.resolve(env.CLIENT_DIST_PATH);
+  app.use(express.static(clientDistPath));
+  // SPA fallback: any non-API GET that didn't match a static asset above goes to
+  // index.html so react-router can handle client-side routes on a hard refresh/deep link.
+  app.get(/^(?!\/api|\/uploads).*/, (_req, res) => {
+    res.sendFile(path.join(clientDistPath, "index.html"));
+  });
+}
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: { message: `Not found: ${req.method} ${req.path}`, code: "NOT_FOUND" } });

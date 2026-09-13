@@ -61,7 +61,7 @@ export const invoicesRouter = Router();
 invoicesRouter.get("/invoices", authenticate, requirePermission("invoices.view"), async (req, res, next) => {
   try {
     const { page, pageSize, ...filter } = listInvoicesQuerySchema.parse(req.query);
-    const { data, total } = await invoicesService.listInvoices(req.actor!.tenantId, filter, { page, pageSize }, req.actor!.retailerId);
+    const { data, total } = await invoicesService.listInvoices(req.actor!.tenantId!, filter, { page, pageSize }, req.actor!.retailerId);
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -74,7 +74,7 @@ invoicesRouter.get("/invoices", authenticate, requirePermission("invoices.view")
 
 invoicesRouter.get("/invoices/:id", authenticate, requirePermission("invoices.view"), async (req, res, next) => {
   try {
-    const invoice = await invoicesService.getInvoice(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const invoice = await invoicesService.getInvoice(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(200).json({ data: invoice });
   } catch (err) {
     next(err);
@@ -88,7 +88,7 @@ invoicesRouter.post(
   validateBody(createInvoiceSchema),
   async (req, res, next) => {
     try {
-      const invoice = await invoicesService.createInvoice(req.actor!.tenantId, req.body);
+      const invoice = await invoicesService.createInvoice(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: invoice });
     } catch (err) {
       next(err);
@@ -103,7 +103,7 @@ invoicesRouter.patch(
   validateBody(updateInvoiceStatusSchema),
   async (req, res, next) => {
     try {
-      const invoice = await invoicesService.updateInvoiceStatus(req.actor!.tenantId, requireParam(req, "id"), req.body.status, req.actor!.retailerId);
+      const invoice = await invoicesService.updateInvoiceStatus(req.actor!.tenantId!, requireParam(req, "id"), req.body.status, req.actor!.retailerId);
       res.status(200).json({ data: invoice });
     } catch (err) {
       next(err);
@@ -118,7 +118,7 @@ invoicesRouter.get(
   requirePermission("invoices.manage"),
   async (req, res, next) => {
     try {
-      const orders = await invoicesService.listInvoiceableOrders(req.actor!.tenantId, requireParam(req, "id"));
+      const orders = await invoicesService.listInvoiceableOrders(req.actor!.tenantId!, requireParam(req, "id"));
       res.status(200).json({ data: orders });
     } catch (err) {
       next(err);
@@ -129,7 +129,7 @@ invoicesRouter.get(
 /** Legacy `InvoiceHistory.jsx`'s "View" dialog's order list (S.No/Order No/View). */
 invoicesRouter.get("/invoices/:id/orders", authenticate, requirePermission("invoices.view"), async (req, res, next) => {
   try {
-    const orders = await invoicesService.getInvoiceOrders(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const orders = await invoicesService.getInvoiceOrders(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(200).json({ data: orders });
   } catch (err) {
     next(err);
@@ -139,7 +139,7 @@ invoicesRouter.get("/invoices/:id/orders", authenticate, requirePermission("invo
 /** Legacy `InvoiceHistory.jsx`'s "View Invoice Summary" — server-rendered, persisted PDF (per PHASE_10_TASKS.md's invoicing follow-up) rather than legacy's client-side `jsPDF`. */
 invoicesRouter.post("/invoices/:id/pdf", authenticate, requirePermission("invoices.view"), async (req, res, next) => {
   try {
-    const path = await invoicePdfService.generateRetailerInvoicePdf(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    const path = await invoicePdfService.generateRetailerInvoicePdf(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(201).json({ data: { path } });
   } catch (err) {
     next(err);
@@ -149,7 +149,7 @@ invoicesRouter.post("/invoices/:id/pdf", authenticate, requirePermission("invoic
 /** Legacy `InvoiceHistory.jsx`'s admin-only "Resend" (`handleSendMail`) — regenerates the grouped PDF and emails it to the retailer's configured recipients. */
 invoicesRouter.post("/invoices/:id/send-email", authenticate, requirePermission("invoices.manage"), async (req, res, next) => {
   try {
-    await invoicePdfService.sendRetailerInvoiceEmail(req.actor!.tenantId, requireParam(req, "id"), req.actor!.retailerId);
+    await invoicePdfService.sendRetailerInvoiceEmail(req.actor!.tenantId!, requireParam(req, "id"), req.actor!.retailerId);
     res.status(200).json({ data: { sent: true } });
   } catch (err) {
     next(err);

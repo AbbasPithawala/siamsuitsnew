@@ -20,6 +20,16 @@ export const tenants = pgTable("tenants", {
   logo: text("logo"),
   address: text("address"),
   invoiceFooterText: text("invoice_footer_text"),
+  /**
+   * Hybrid-onboarding flag (Phase 11): true for every tenant that existed before this
+   * column was added (hand-written backfill migration, not the schema default below —
+   * see `0022_*`'s asymmetric `DEFAULT true` then `SET DEFAULT false`) and for a
+   * freshly-provisioned tenant that was pre-filled by a superadmin at approval time;
+   * false forces the new owner through `RequireProfileComplete`'s onboarding flow on
+   * first login. The column-level default here (`false`) only applies going forward,
+   * to tenants inserted after that migration ran.
+   */
+  profileCompleted: boolean("profile_completed").notNull().default(false),
   ...timestampColumns,
   ...softDeleteColumn,
 }, (table) => ({
@@ -34,6 +44,8 @@ export const users = pgTable("users", {
   username: text("username").notNull(),
   passwordHash: text("password_hash").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  /** Set on a freshly-provisioned owner's temp password; cleared on any successful change (self-service or forced). */
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   ...timestampColumns,
   ...softDeleteColumn,
 }, (table) => ({

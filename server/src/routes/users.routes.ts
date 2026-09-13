@@ -41,7 +41,7 @@ export const usersRouter = Router();
 usersRouter.get("/users", authenticate, async (req, res, next) => {
   try {
     const { page, pageSize } = listUsersQuerySchema.parse(req.query);
-    const { data, total } = await usersService.listUsers(req.actor!.tenantId, { page, pageSize });
+    const { data, total } = await usersService.listUsers(req.actor!.tenantId!, { page, pageSize });
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -54,7 +54,7 @@ usersRouter.get("/users", authenticate, async (req, res, next) => {
 
 usersRouter.get("/users/:id", authenticate, async (req, res, next) => {
   try {
-    const user = await usersService.getUser(req.actor!.tenantId, requireParam(req, "id"));
+    const user = await usersService.getUser(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: user });
   } catch (err) {
     next(err);
@@ -68,7 +68,7 @@ usersRouter.post(
   validateBody(createUserSchema),
   async (req, res, next) => {
     try {
-      const user = await usersService.createUser(req.actor!.tenantId, req.body);
+      const user = await usersService.createUser(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: user });
     } catch (err) {
       next(err);
@@ -83,7 +83,7 @@ usersRouter.patch(
   validateBody(updateUserSchema),
   async (req, res, next) => {
     try {
-      const user = await usersService.updateUser(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const user = await usersService.updateUser(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(200).json({ data: user });
     } catch (err) {
       next(err);
@@ -93,7 +93,7 @@ usersRouter.patch(
 
 usersRouter.delete("/users/:id", authenticate, requirePermission("tenant.users.manage"), async (req, res, next) => {
   try {
-    await usersService.softDeleteUser(req.actor!.tenantId, requireParam(req, "id"));
+    await usersService.softDeleteUser(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -107,7 +107,7 @@ usersRouter.post(
   validateBody(assignRoleSchema),
   async (req, res, next) => {
     try {
-      const roles = await usersService.assignRole(req.actor!.tenantId, requireParam(req, "userId"), req.body.roleId);
+      const roles = await usersService.assignRole(req.actor!.tenantId!, requireParam(req, "userId"), req.body.roleId);
       res.status(201).json({ data: roles });
     } catch (err) {
       next(err);
@@ -121,7 +121,7 @@ usersRouter.delete(
   requirePermission("tenant.users.manage"),
   async (req, res, next) => {
     try {
-      await usersService.unassignRole(req.actor!.tenantId, requireParam(req, "userId"), requireParam(req, "roleId"));
+      await usersService.unassignRole(req.actor!.tenantId!, requireParam(req, "userId"), requireParam(req, "roleId"));
       res.status(204).send();
     } catch (err) {
       next(err);

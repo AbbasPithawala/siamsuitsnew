@@ -25,7 +25,7 @@ extraPaymentsRouter.get(
       const filter: extraPaymentsService.ExtraPaymentListFilter = {};
       if (status) filter.status = status;
       if (typeof req.query.tailorId === "string") filter.tailorId = req.query.tailorId;
-      const extraPayments = await extraPaymentsService.listExtraPayments(req.actor!.tenantId, filter);
+      const extraPayments = await extraPaymentsService.listExtraPayments(req.actor!.tenantId!, filter);
       res.status(200).json({ data: extraPayments });
     } catch (err) {
       next(err);
@@ -40,7 +40,7 @@ extraPaymentsRouter.post(
   validateBody(createExtraPaymentSchema),
   async (req, res, next) => {
     try {
-      const extraPayment = await extraPaymentsService.createExtraPayment(req.actor!.tenantId, requireParam(req, "jobId"), req.body.categoryId);
+      const extraPayment = await extraPaymentsService.createExtraPayment(req.actor!.tenantId!, requireParam(req, "jobId"), req.body.categoryId);
       res.status(201).json({ data: extraPayment });
     } catch (err) {
       next(err);
@@ -55,7 +55,7 @@ extraPaymentsRouter.delete(
   requirePermission("factory.extra_payments.manage"),
   async (req, res, next) => {
     try {
-      await extraPaymentsService.removeExtraPayment(req.actor!.tenantId, requireParam(req, "jobId"), requireParam(req, "categoryId"));
+      await extraPaymentsService.removeExtraPayment(req.actor!.tenantId!, requireParam(req, "jobId"), requireParam(req, "categoryId"));
       res.status(204).send();
     } catch (err) {
       next(err);
@@ -69,7 +69,7 @@ extraPaymentsRouter.patch(
   requirePermission("factory.extra_payments.approve"),
   async (req, res, next) => {
     try {
-      const extraPayment = await extraPaymentsService.approveExtraPayment(req.actor!.tenantId, requireParam(req, "id"));
+      const extraPayment = await extraPaymentsService.approveExtraPayment(req.actor!.tenantId!, requireParam(req, "id"));
       res.status(200).json({ data: extraPayment });
     } catch (err) {
       next(err);
@@ -83,7 +83,7 @@ extraPaymentsRouter.patch(
   requirePermission("factory.extra_payments.approve"),
   async (req, res, next) => {
     try {
-      const extraPayment = await extraPaymentsService.rejectExtraPayment(req.actor!.tenantId, requireParam(req, "id"));
+      const extraPayment = await extraPaymentsService.rejectExtraPayment(req.actor!.tenantId!, requireParam(req, "id"));
       res.status(200).json({ data: extraPayment });
     } catch (err) {
       next(err);

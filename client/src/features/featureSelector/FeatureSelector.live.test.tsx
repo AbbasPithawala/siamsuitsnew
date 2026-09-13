@@ -220,6 +220,68 @@ async function createAdditionalStylesFixture(token: string): Promise<AdditionalS
   };
 }
 
+interface AutoAdvanceFixture {
+  productId: string;
+  firstFeatureName: string;
+  secondFeatureName: string;
+  cleanup: () => Promise<void>;
+}
+
+/**
+ * Two throwaway `choice` features on a private, never-shared product, each with a single leaf
+ * style (no sub-options) — proves the tab-bar's auto-advance-on-final-selection behavior
+ * deterministically. Deliberately NOT the shared, real `VEST_PRODUCT_ID` fixture the tab-bar
+ * *rendering* test above still uses (that one only needs *some* choice features to exist,
+ * order-agnostic, so it's fine against real, external data): this test hardcodes which tab comes
+ * next, and the real seeded catalog's own `feature_products.sequence_order` for vest's features
+ * has drifted to distinct, non-tied values over time (confirmed directly against the live
+ * Postgres `feature_products` table — "front button"/"vest pocket"/"vest back" are `0`/`1`/`2`,
+ * not the tied-at-0-broken-by-name state this test used to depend on), an external mutation this
+ * test file doesn't control and can't reliably clean up after. Both fixture features are named so
+ * their alphabetical order matches the intended tab order: both tie at the DB's real
+ * `sequence_order` default (`createFeature` never sets it explicitly, see
+ * `features.service.ts#createFeature`), and `listFeaturesInTx` tie-breaks ties by feature name.
+ */
+async function createAutoAdvanceFixture(token: string): Promise<AutoAdvanceFixture> {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const firstFeatureName = `Fixture AutoAdvance A ${suffix}`;
+  const secondFeatureName = `Fixture AutoAdvance B ${suffix}`;
+
+  const product = (await apiJson<{ data: { id: string } }>(token, "/products", {
+    method: "POST",
+    body: JSON.stringify({ name: `feature-selector-autoadvance-${suffix}` }),
+  })).data;
+
+  const firstFeature = (await apiJson<{ data: { id: string } }>(token, "/features", {
+    method: "POST",
+    body: JSON.stringify({ name: firstFeatureName, type: "choice", productIds: [product.id] }),
+  })).data;
+  await apiFetch(token, `/features/${firstFeature.id}/styles`, {
+    method: "POST",
+    body: JSON.stringify({ name: "First Style" }),
+  });
+
+  const secondFeature = (await apiJson<{ data: { id: string } }>(token, "/features", {
+    method: "POST",
+    body: JSON.stringify({ name: secondFeatureName, type: "choice", productIds: [product.id] }),
+  })).data;
+  await apiFetch(token, `/features/${secondFeature.id}/styles`, {
+    method: "POST",
+    body: JSON.stringify({ name: "Second Style" }),
+  });
+
+  return {
+    productId: product.id,
+    firstFeatureName,
+    secondFeatureName,
+    async cleanup() {
+      await apiFetch(token, `/features/${firstFeature.id}`, { method: "DELETE" });
+      await apiFetch(token, `/features/${secondFeature.id}`, { method: "DELETE" });
+      await apiFetch(token, `/products/${product.id}`, { method: "DELETE" });
+    },
+  };
+}
+
 function buildTestStore() {
   return configureStore({
     reducer: {
@@ -295,34 +357,44 @@ describe.skipIf(!seededToken)("FeatureSelector (live siam/server integration)", 
     expect(screen.queryByText(/show additional styles/i)).not.toBeInTheDocument();
   });
 
-  it("fires onChange with a correctly shaped FeatureValue when a style is picked, and auto-advances to the next tab", async () => {
-    const handleChange = vi.fn();
-    renderSelector(VEST_PRODUCT_ID, handleChange);
-    const user = userEvent.setup();
+  describe("auto-advance to the next tab (fixture, immune to the shared vest product's real sequence_order drift)", () => {
+    let fixture: AutoAdvanceFixture;
 
-    await screen.findByRole("tab", { name: /front button/i });
-    expect(screen.getByRole("tab", { name: /front button/i })).toHaveAttribute("aria-selected", "true");
+    beforeAll(async () => {
+      fixture = await createAutoAdvanceFixture(seededToken as string);
+    });
 
-    // Scoped to the active tab panel — Piping now also renders real `<button>` style tiles of
-    // its own (its own inline swatch-grid section, not a tab), so an unscoped button query
-    // would no longer reliably grab a front-button style first.
-    const tabPanel = screen.getByRole("tabpanel");
-    const [firstStyleButton] = await within(tabPanel).findAllByRole("button");
-    await user.click(firstStyleButton as HTMLElement);
+    afterAll(async () => {
+      await fixture.cleanup();
+    });
 
-    await waitFor(() => expect(handleChange).toHaveBeenCalled());
-    const lastCall = handleChange.mock.calls.at(-1)?.[0] as FeatureValue[];
-    expect(lastCall).toHaveLength(1);
-    const [entry] = lastCall;
-    expect(entry?.styleOptionId).toBeUndefined();
-    expect(entry?.featureId).toEqual(expect.any(String));
-    expect(entry?.styleId).toEqual(expect.any(String));
+    it("fires onChange with a correctly shaped FeatureValue when a style is picked, and auto-advances to the next tab", async () => {
+      const handleChange = vi.fn();
+      renderSelector(fixture.productId, handleChange);
+      const user = userEvent.setup();
 
-    // Leaf style (no sub-options) → a "final" selection → advances to the next tab. Tied
-    // `sequence_order` ties break on feature name (`features.service.ts`'s `listFeaturesInTx`)
-    // — "vest back" sorts before "vest pocket", so that's the real next tab, not "vest pocket".
-    await waitFor(() => expect(screen.getByRole("tab", { name: /vest back/i })).toHaveAttribute("aria-selected", "true"));
-    expect(screen.queryByRole("tab", { name: /front button/i })).toHaveAttribute("aria-selected", "false");
+      const firstTabPattern = new RegExp(fixture.firstFeatureName, "i");
+      const secondTabPattern = new RegExp(fixture.secondFeatureName, "i");
+
+      await screen.findByRole("tab", { name: firstTabPattern });
+      expect(screen.getByRole("tab", { name: firstTabPattern })).toHaveAttribute("aria-selected", "true");
+
+      const tabPanel = screen.getByRole("tabpanel");
+      const [firstStyleButton] = await within(tabPanel).findAllByRole("button");
+      await user.click(firstStyleButton as HTMLElement);
+
+      await waitFor(() => expect(handleChange).toHaveBeenCalled());
+      const lastCall = handleChange.mock.calls.at(-1)?.[0] as FeatureValue[];
+      expect(lastCall).toHaveLength(1);
+      const [entry] = lastCall;
+      expect(entry?.styleOptionId).toBeUndefined();
+      expect(entry?.featureId).toEqual(expect.any(String));
+      expect(entry?.styleId).toEqual(expect.any(String));
+
+      // Leaf style (no sub-options) → a "final" selection → advances to the next tab.
+      await waitFor(() => expect(screen.getByRole("tab", { name: secondTabPattern })).toHaveAttribute("aria-selected", "true"));
+      expect(screen.queryByRole("tab", { name: firstTabPattern })).toHaveAttribute("aria-selected", "false");
+    });
   });
 
   it("never renders Shoulder Type or Monogram Position as ordinary tabs or headings (real render-slot data, jacket)", async () => {

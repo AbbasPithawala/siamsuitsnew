@@ -24,6 +24,8 @@ export function getTenantSettings(tenantId: string) {
 }
 
 export function updateTenantSettings(tenantId: string, input: UpdateTenantSettingsInput) {
+  const isRealUpdate = input.logo !== undefined || input.address !== undefined || input.invoiceFooterText !== undefined;
+
   return withTenant(tenantId, async (tx) => {
     const [updated] = await tx
       .update(tenants)
@@ -31,6 +33,10 @@ export function updateTenantSettings(tenantId: string, input: UpdateTenantSettin
         ...(input.logo !== undefined ? { logo: input.logo || null } : {}),
         ...(input.address !== undefined ? { address: input.address || null } : {}),
         ...(input.invoiceFooterText !== undefined ? { invoiceFooterText: input.invoiceFooterText || null } : {}),
+        // Phase 11 D3: any real letterhead update also satisfies first-login onboarding
+        // completion — monotonic, never un-completes a profile, and a no-op call (nothing
+        // to set) leaves the flag untouched rather than spuriously flipping it.
+        ...(isRealUpdate ? { profileCompleted: true } : {}),
         updatedAt: new Date(),
       })
       .where(eq(tenants.id, tenantId))

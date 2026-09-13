@@ -34,7 +34,7 @@ tailorPortalRouter.post(
   requireTailorActor,
   async (req, res, next) => {
     try {
-      const result = await assignNextStep(req.actor!.tenantId, requireParam(req, "componentId"), req.actor!.id);
+      const result = await assignNextStep(req.actor!.tenantId!, requireParam(req, "componentId"), req.actor!.id);
       res.status(201).json({ data: result });
     } catch (err) {
       next(err);
@@ -44,7 +44,7 @@ tailorPortalRouter.post(
 
 tailorPortalRouter.post("/tailor-portal/jobs/:jobId/complete", authenticate, requireTailorActor, async (req, res, next) => {
   try {
-    const step = await completeStep(req.actor!.tenantId, requireParam(req, "jobId"), req.actor!.id);
+    const step = await completeStep(req.actor!.tenantId!, requireParam(req, "jobId"), req.actor!.id);
     res.status(200).json({ data: step });
   } catch (err) {
     next(err);
@@ -59,7 +59,7 @@ tailorPortalRouter.post(
   async (req, res, next) => {
     try {
       const extraPayment = await createExtraPayment(
-        req.actor!.tenantId,
+        req.actor!.tenantId!,
         requireParam(req, "jobId"),
         req.body.categoryId,
         req.actor!.id
@@ -77,7 +77,7 @@ tailorPortalRouter.delete(
   requireTailorActor,
   async (req, res, next) => {
     try {
-      await removeExtraPayment(req.actor!.tenantId, requireParam(req, "jobId"), requireParam(req, "categoryId"), req.actor!.id);
+      await removeExtraPayment(req.actor!.tenantId!, requireParam(req, "jobId"), requireParam(req, "categoryId"), req.actor!.id);
       res.status(204).send();
     } catch (err) {
       next(err);
@@ -87,7 +87,7 @@ tailorPortalRouter.delete(
 
 tailorPortalRouter.get("/tailor-portal/settlements", authenticate, requireTailorActor, async (req, res, next) => {
   try {
-    const settlements = await listSettlements(req.actor!.tenantId, req.actor!.id);
+    const settlements = await listSettlements(req.actor!.tenantId!, req.actor!.id);
     res.status(200).json({ data: settlements });
   } catch (err) {
     next(err);
@@ -96,7 +96,7 @@ tailorPortalRouter.get("/tailor-portal/settlements", authenticate, requireTailor
 
 tailorPortalRouter.get("/tailor-portal/settlements/:id", authenticate, requireTailorActor, async (req, res, next) => {
   try {
-    const result = await getSettlement(req.actor!.tenantId, req.actor!.id, requireParam(req, "id"));
+    const result = await getSettlement(req.actor!.tenantId!, req.actor!.id, requireParam(req, "id"));
     res.status(200).json({ data: result });
   } catch (err) {
     next(err);
@@ -105,7 +105,7 @@ tailorPortalRouter.get("/tailor-portal/settlements/:id", authenticate, requireTa
 
 tailorPortalRouter.post("/tailor-portal/settlements/:id/pdf", authenticate, requireTailorActor, async (req, res, next) => {
   try {
-    const path = await generateSettlementPdf(req.actor!.tenantId, req.actor!.id, requireParam(req, "id"));
+    const path = await generateSettlementPdf(req.actor!.tenantId!, req.actor!.id, requireParam(req, "id"));
     res.status(201).json({ data: { path } });
   } catch (err) {
     next(err);
@@ -117,7 +117,7 @@ tailorPortalRouter.get("/tailor-portal/extra-payments", authenticate, requireTai
     const status = statusQuerySchema.parse(req.query.status);
     const filter: { status?: "pending" | "approved" | "rejected"; tailorId: string } = { tailorId: req.actor!.id };
     if (status) filter.status = status;
-    const extraPayments = await listExtraPayments(req.actor!.tenantId, filter);
+    const extraPayments = await listExtraPayments(req.actor!.tenantId!, filter);
     res.status(200).json({ data: extraPayments });
   } catch (err) {
     next(err);

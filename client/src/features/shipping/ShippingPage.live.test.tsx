@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { baseApi } from "../../api/baseApi";
 import type { AuthTokenSliceState } from "../../api/baseApi";
+import { createLimitedUserInTenant } from "../../routes/testSupport/permissionFixtures";
 import { ShippingPage } from "./ShippingPage";
 
 /**
@@ -47,6 +48,33 @@ async function fetchSeedToken(): Promise<string | null> {
 }
 
 const seededToken = await fetchSeedToken();
+
+/**
+ * PHASE_10_TASKS.md Workstream E Group 5: `admin` (Owner) no longer holds
+ * `orders.create`, so the real `POST /orders` fixture call below needs a
+ * token that does. Minted once, in the same `siam-suits` tenant as every
+ * other fixture here (not a fresh tenant — see `createLimitedUserInTenant`'s
+ * own doc comment). Rendering `ShippingPage` itself (`renderPage`, still
+ * `admin`'s token via `buildTestStore`) and every other setup call is
+ * unaffected — `admin` still holds everything else this file needs.
+ */
+const orderCreatorFixture = seededToken ? await createLimitedUserInTenant("siam-suits", ["orders.create"]) : null;
+const orderCreatorToken = orderCreatorFixture ? await fetchToken(orderCreatorFixture) : null;
+
+async function fetchToken(credentials: { tenant: string; username: string; password: string }): Promise<string | null> {
+  try {
+    const res = await fetch(`${apiBaseUrl}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(credentials),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data: { token: string } };
+    return body.data.token;
+  } catch {
+    return null;
+  }
+}
 
 async function apiRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${apiBaseUrl}${path}`, {
@@ -98,6 +126,12 @@ const createdTailorIds: string[] = [];
 afterAll(async () => {
   if (!seededToken) return;
   const token = seededToken;
+
+  if (orderCreatorFixture) {
+    await orderCreatorFixture.cleanup().catch((err: unknown) =>
+      console.error("Failed to clean up the orders.create fixture user:", err)
+    );
+  }
 
   const { hardDeleteShippingBoxes, countShippingBoxesByIds } = await import("./testSupport/shippingDbCleanup");
   const { deleteJobsAndExtraPayments } = await import("../manufacturing/testSupport/manufacturingDbCleanup");
@@ -194,7 +228,10 @@ describe.skipIf(!seededToken)("ShippingPage (live siam/server integration)", () 
       });
       createdCustomerIds.push(customer.data.id);
 
-      const order = await apiRequest<{ data: { id: string } }>("/orders", token, {
+      if (!orderCreatorToken) {
+        throw new Error("Expected an orders.create-holding fixture token to have been minted for this file");
+      }
+      const order = await apiRequest<{ data: { id: string } }>("/orders", orderCreatorToken, {
         method: "POST",
         body: JSON.stringify({
           retailerId: retailer.data.id,
@@ -263,8 +300,10 @@ describe.skipIf(!seededToken)("ShippingPage (live siam/server integration)", () 
       await within(panel).findByText("Packed components (0)", {}, NETWORK_WAIT);
 
       // Pack the fully-manufactured component: preview proactively confirms
-      // it's ready, then the add succeeds.
-      await user.type(screen.getByLabelText("Order item component ID"), completeComponentId);
+      // it's ready, then the add succeeds. Scoped to `panel` — the page's
+      // separate "Print Item Slip" panel has its own field with the exact
+      // same label, so an unscoped `screen.getByLabelText` matches both.
+      await user.type(within(panel).getByLabelText("Order item component ID"), completeComponentId);
       await user.click(screen.getByRole("button", { name: "Look up" }));
 
       await screen.findByText(new RegExp(`${completeSlotLabel} — ${productName}`), {}, NETWORK_WAIT);
@@ -280,7 +319,7 @@ describe.skipIf(!seededToken)("ShippingPage (live siam/server integration)", () 
       // Attempt the incomplete component: preview proactively warns, and the
       // real server rejection is surfaced clearly (not silently allowed, not
       // a raw failure dump) when "Add to box" is clicked anyway.
-      await user.type(screen.getByLabelText("Order item component ID"), incompleteComponentId);
+      await user.type(within(panel).getByLabelText("Order item component ID"), incompleteComponentId);
       await user.click(screen.getByRole("button", { name: "Look up" }));
 
       await screen.findByText(new RegExp(`${incompleteSlotLabel} — ${productName}`), {}, NETWORK_WAIT);
@@ -304,7 +343,9 @@ describe.skipIf(!seededToken)("ShippingPage (live siam/server integration)", () 
       await user.click(screen.getByRole("button", { name: "Close box" }));
       await within(panel).findByText("Closed", {}, NETWORK_WAIT);
       expect(screen.queryByRole("button", { name: "Close box" })).not.toBeInTheDocument();
-      expect(screen.queryByLabelText("Order item component ID")).not.toBeInTheDocument();
+      // Scoped to `panel` — the page's separate "Print Item Slip" panel keeps
+      // its own same-labeled field regardless of this box's closed state.
+      expect(within(panel).queryByLabelText("Order item component ID")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Remove .* from box/ })).not.toBeInTheDocument();
 
       const afterClose = await apiRequest<{ data: { isClosed: boolean; items: { orderItemComponentId: string }[] } }>(

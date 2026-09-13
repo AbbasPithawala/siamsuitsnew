@@ -41,7 +41,7 @@ payrollRouter.get(
   requirePermission("factory.payroll.settle"),
   async (req, res, next) => {
     try {
-      const list = await payrollService.listUnpaidCompletedJobs(req.actor!.tenantId, requireParam(req, "tailorId"));
+      const list = await payrollService.listUnpaidCompletedJobs(req.actor!.tenantId!, requireParam(req, "tailorId"));
       res.status(200).json({ data: list });
     } catch (err) {
       next(err);
@@ -56,7 +56,7 @@ payrollRouter.post(
   validateBody(createAdvanceSchema),
   async (req, res, next) => {
     try {
-      const result = await payrollService.createAdvancePayment(req.actor!.tenantId, requireParam(req, "tailorId"), req.body.amount);
+      const result = await payrollService.createAdvancePayment(req.actor!.tenantId!, requireParam(req, "tailorId"), req.body.amount);
       res.status(201).json({ data: result });
     } catch (err) {
       next(err);
@@ -71,7 +71,7 @@ payrollRouter.post(
   validateBody(createSettlementSchema),
   async (req, res, next) => {
     try {
-      const settlement = await payrollService.createSettlement(req.actor!.tenantId, requireParam(req, "tailorId"), req.body);
+      const settlement = await payrollService.createSettlement(req.actor!.tenantId!, requireParam(req, "tailorId"), req.body);
       res.status(201).json({ data: settlement });
     } catch (err) {
       next(err);
@@ -85,7 +85,7 @@ payrollRouter.get(
   requirePermission("factory.payroll.settle"),
   async (req, res, next) => {
     try {
-      const result = await payrollService.getSettlement(req.actor!.tenantId, requireParam(req, "tailorId"), requireParam(req, "id"));
+      const result = await payrollService.getSettlement(req.actor!.tenantId!, requireParam(req, "tailorId"), requireParam(req, "id"));
       res.status(200).json({ data: result });
     } catch (err) {
       next(err);
@@ -100,7 +100,7 @@ payrollRouter.get(
   requirePermission("factory.payroll.settle"),
   async (req, res, next) => {
     try {
-      const settlements = await payrollService.listSettlements(req.actor!.tenantId, requireParam(req, "tailorId"));
+      const settlements = await payrollService.listSettlements(req.actor!.tenantId!, requireParam(req, "tailorId"));
       res.status(200).json({ data: settlements });
     } catch (err) {
       next(err);
@@ -115,7 +115,7 @@ payrollRouter.post(
   requirePermission("factory.payroll.settle"),
   async (req, res, next) => {
     try {
-      const path = await generateSettlementPdf(req.actor!.tenantId, requireParam(req, "tailorId"), requireParam(req, "id"));
+      const path = await generateSettlementPdf(req.actor!.tenantId!, requireParam(req, "tailorId"), requireParam(req, "id"));
       res.status(201).json({ data: { path } });
     } catch (err) {
       next(err);
@@ -136,7 +136,7 @@ payrollRouter.post(
   requirePermission("factory.payroll.settle"),
   async (req, res, next) => {
     try {
-      const path = await generateJobSlipPdf(req.actor!.tenantId, requireParam(req, "jobId"));
+      const path = await generateJobSlipPdf(req.actor!.tenantId!, requireParam(req, "jobId"));
       res.status(201).json({ data: { path } });
     } catch (err) {
       next(err);

@@ -11,7 +11,8 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
  * difference) a `me.actorType === "user"` staff session is bounced to
  * `/dashboard` instead of rendering the tailor portal, mirroring
  * `RequireAuth.tsx`'s reverse check for a tailor session hitting staff
- * routes.
+ * routes. Same for a `platform_admin` session, bounced to the platform
+ * panel (same gap/fix reasoning as `RequireAuth.tsx`'s own doc comment).
  */
 export function RequireTailorAuth() {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -27,6 +28,9 @@ export function RequireTailorAuth() {
   }
   if (me?.actorType === "user") {
     return <Navigate to="/dashboard" replace />;
+  }
+  if (me?.actorType === "platform_admin") {
+    return <Navigate to="/platform/tenant-requests" replace />;
   }
   if (me) {
     return <Outlet />;

@@ -1,14 +1,23 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./RequireAuth";
+import { RequireProfileComplete } from "./RequireProfileComplete";
 import { RequirePermission } from "./RequirePermission";
 import { RequireTailorAuth } from "./RequireTailorAuth";
+import { RequirePlatformAdminAuth } from "./RequirePlatformAdminAuth";
 import { LoginRoute } from "./LoginRoute";
 import { TailorLoginRoute } from "./TailorLoginRoute";
+import { PlatformAdminLoginRoute } from "./PlatformAdminLoginRoute";
 import { AppShell } from "../components/shell/AppShell";
 import { TailorPortalShell } from "../components/tailorShell/TailorPortalShell";
+import { PlatformAdminShell } from "../components/platformShell/PlatformAdminShell";
 import { TailorJobsPage } from "../features/tailorPortal/TailorJobsPage";
 import { TailorPaymentHistoryPage } from "../features/tailorPortal/TailorPaymentHistoryPage";
 import { TailorExtraPaymentsPage } from "../features/tailorPortal/TailorExtraPaymentsPage";
+import { RequestAccessPage } from "../features/requestAccess/RequestAccessPage";
+import { ChangePasswordPage } from "../features/onboarding/ChangePasswordPage";
+import { CompleteProfilePage } from "../features/onboarding/CompleteProfilePage";
+import { TenantRequestsPage } from "../features/platformAdmin/TenantRequestsPage";
+import { TenantsPage as PlatformTenantsPage } from "../features/platformAdmin/TenantsPage";
 import { DashboardPage } from "./placeholders/DashboardPage";
 import { FeaturesPage } from "../features/catalog/FeaturesPage";
 import { FittingsPage } from "../features/catalog/FittingsPage";
@@ -49,6 +58,26 @@ export function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/tailor/login" element={<TailorLoginRoute />} />
+      <Route path="/platform/login" element={<PlatformAdminLoginRoute />} />
+      {/*
+        PHASE_11_TASKS.md Workstream E — public tenant-signup page. No guard at
+        all (not RequireAuth, not anything): reachable whether or not a token
+        exists, since there's nothing to log into yet at this point.
+      */}
+      <Route path="/request-access" element={<RequestAccessPage />} />
+      {/*
+        PHASE_11_TASKS.md Workstream F Groups 0-2 — platform admin panel, a third
+        guard/shell pair mirroring the tailor portal block below exactly:
+        platform admins have no permission system either (`requirePlatformAdmin.ts`'s
+        own rule, mirroring `requireTailorActor.ts`), so `RequirePlatformAdminAuth`
+        alone (no `RequirePermission`) is the whole gate.
+      */}
+      <Route element={<RequirePlatformAdminAuth />}>
+        <Route element={<PlatformAdminShell />}>
+          <Route path="/platform/tenant-requests" element={<TenantRequestsPage />} />
+          <Route path="/platform/tenants" element={<PlatformTenantsPage />} />
+        </Route>
+      </Route>
       {/*
         Tailor self-service portal (see MEMORY/plan doc "Tailor Portal") — a deliberately
         separate guard/shell pair from the staff `RequireAuth`/`AppShell` block below, not
@@ -67,8 +96,21 @@ export function AppRoutes() {
         </Route>
       </Route>
       <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
+        {/*
+          PHASE_11_TASKS.md Workstream G — `/change-password` and
+          `/onboarding/complete-profile` render inside `RequireAuth` (a real
+          session is still required) but deliberately NOT inside
+          `RequireProfileComplete` just below: a page whose whole purpose is
+          clearing `mustChangePassword`/`profileCompleted` can't itself be
+          gated by that same condition, or no session could ever reach it.
+          Same sibling relationship `RequireTailorAuth`/`RequireAuth` already
+          have to each other.
+        */}
+        <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route path="/onboarding/complete-profile" element={<CompleteProfilePage />} />
+        <Route element={<RequireProfileComplete />}>
+          <Route element={<AppShell />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
           <Route
             path="/retailers"
             element={
@@ -458,6 +500,7 @@ export function AppRoutes() {
             in-page fallback for direct navigation.
           */}
           <Route path="/retailer/profile" element={<RetailerProfilePage />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/orders" replace />} />

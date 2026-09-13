@@ -27,7 +27,7 @@ authRouter.post("/login", async (req, res, next) => {
 
     const passwordOk = user ? await verifyPassword(body.password, user.passwordHash) : false;
 
-    if (!tenant || !user || !user.isActive || !passwordOk) {
+    if (!tenant || !tenant.isActive || !user || !user.isActive || !passwordOk) {
       throw new HttpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
     }
 

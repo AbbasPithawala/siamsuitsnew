@@ -40,7 +40,7 @@ export const tailorsRouter = Router();
 tailorsRouter.get("/tailors", authenticate, async (req, res, next) => {
   try {
     const { page, pageSize } = listTailorsQuerySchema.parse(req.query);
-    const { data, total } = await tailorsService.listTailors(req.actor!.tenantId, { page, pageSize });
+    const { data, total } = await tailorsService.listTailors(req.actor!.tenantId!, { page, pageSize });
     res.status(200).json(paginatedResult(data, total, page, pageSize));
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -53,7 +53,7 @@ tailorsRouter.get("/tailors", authenticate, async (req, res, next) => {
 
 tailorsRouter.get("/tailors/:id", authenticate, async (req, res, next) => {
   try {
-    const tailor = await tailorsService.getTailor(req.actor!.tenantId, requireParam(req, "id"));
+    const tailor = await tailorsService.getTailor(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: tailor });
   } catch (err) {
     next(err);
@@ -67,7 +67,7 @@ tailorsRouter.post(
   validateBody(createTailorSchema),
   async (req, res, next) => {
     try {
-      const tailor = await tailorsService.createTailor(req.actor!.tenantId, req.body);
+      const tailor = await tailorsService.createTailor(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: tailor });
     } catch (err) {
       next(err);
@@ -82,7 +82,7 @@ tailorsRouter.patch(
   validateBody(updateTailorSchema),
   async (req, res, next) => {
     try {
-      const tailor = await tailorsService.updateTailor(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const tailor = await tailorsService.updateTailor(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(200).json({ data: tailor });
     } catch (err) {
       next(err);
@@ -92,7 +92,7 @@ tailorsRouter.patch(
 
 tailorsRouter.delete("/tailors/:id", authenticate, requirePermission("factory.tailors.manage"), async (req, res, next) => {
   try {
-    await tailorsService.softDeleteTailor(req.actor!.tenantId, requireParam(req, "id"));
+    await tailorsService.softDeleteTailor(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(204).send();
   } catch (err) {
     next(err);
@@ -106,7 +106,7 @@ tailorsRouter.post(
   validateBody(certifyTailorSchema),
   async (req, res, next) => {
     try {
-      const certifications = await tailorsService.certifyTailor(req.actor!.tenantId, requireParam(req, "tailorId"), req.body.processId);
+      const certifications = await tailorsService.certifyTailor(req.actor!.tenantId!, requireParam(req, "tailorId"), req.body.processId);
       res.status(201).json({ data: certifications });
     } catch (err) {
       next(err);
@@ -120,7 +120,7 @@ tailorsRouter.delete(
   requirePermission("factory.tailors.manage"),
   async (req, res, next) => {
     try {
-      await tailorsService.decertifyTailor(req.actor!.tenantId, requireParam(req, "tailorId"), requireParam(req, "processId"));
+      await tailorsService.decertifyTailor(req.actor!.tenantId!, requireParam(req, "tailorId"), requireParam(req, "processId"));
       res.status(204).send();
     } catch (err) {
       next(err);

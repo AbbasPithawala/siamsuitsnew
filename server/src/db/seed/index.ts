@@ -1,7 +1,7 @@
 import { db } from "../index";
-import { permissions, roles, rolePermissions, tenants, users, userRoles } from "../schema/index";
+import { permissions, roles, rolePermissions } from "../schema/index";
 import { permissionCatalog } from "./permissions";
-import { hashPassword } from "../../services/auth.service";
+import { provisionTenant } from "../../services/provisioning.service";
 import { and, eq } from "drizzle-orm";
 import {
   seedRenderSlotFeatures,
@@ -30,97 +30,30 @@ async function seed() {
     }
   }
 
-  console.log("Seeding default tenant...");
-  let tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.slug, "siam-suits"),
+  // PHASE_11_TASKS.md Workstream C Group 0: this used to inline its own tenant/Owner-role/
+  // admin-user creation (idempotent check-then-create); now delegates to the same
+  // `provisionTenant()` a live approve-tenant-request route calls, dogfooding the extraction
+  // for real dev/CI setup rather than only type-checking it in isolation.
+  // `tempPassword`/`mustChangePassword` are passed explicitly so this seed's well-known dev
+  // behavior (byte-for-byte: same admin username/password, no forced first-login) doesn't
+  // silently change (PHASE_11_TASKS.md Decision C2).
+  console.log("Provisioning default tenant + Owner role + admin user...");
+  const { tenant, ownerUser: adminUser } = await provisionTenant({
+    businessName: "Siam Suits",
+    slug: "siam-suits",
+    ownerName: "Admin",
+    ownerEmail: "admin@siam-suits.local",
+    ownerUsername: "admin",
+    tempPassword: SEED_ADMIN_PASSWORD,
+    mustChangePassword: false,
   });
-  if (!tenant) {
-    [tenant] = await db
-      .insert(tenants)
-      .values({ name: "Siam Suits", slug: "siam-suits", plan: "standard" })
-      .returning();
-  }
-  if (!tenant) {
-    throw new Error("Failed to create default tenant");
-  }
+  console.log(`Tenant "${tenant.slug}" ready; admin user "${adminUser.username}" ready (password "${SEED_ADMIN_PASSWORD}").`);
 
-  console.log("Seeding default Owner role...");
-  // Matched by (tenantId, name) — not tenantId alone. With enough other roles accumulated
-  // on this tenant (test roles, "Retailer", etc.), an unfiltered `findFirst` isn't
-  // guaranteed to return the actual Owner role, since Postgres makes no row-order
-  // guarantee without `ORDER BY`.
-  let ownerRole = await db.query.roles.findFirst({
+  const ownerRole = await db.query.roles.findFirst({
     where: and(eq(roles.tenantId, tenant.id), eq(roles.name, "Owner")),
   });
   if (!ownerRole) {
-    [ownerRole] = await db.insert(roles).values({ tenantId: tenant.id, name: "Owner", isSystem: true }).returning();
-  } else if (!ownerRole.isSystem) {
-    // Backfill for a role seeded before `isSystem` existed (PHASE_8_TASKS.md Group 3).
-    [ownerRole] = await db.update(roles).set({ isSystem: true }).where(eq(roles.id, ownerRole.id)).returning();
-  }
-  if (!ownerRole) {
-    throw new Error("Failed to create Owner role");
-  }
-
-  // PHASE_10_TASKS.md Workstream E Group 5 decision (2026-08-19): the tenant Owner manages
-  // the shop but does not place orders themselves — only the Retailer role does
-  // (`orders.create`). Owner keeps every other permission, including `orders.edit` once
-  // Group 6 introduces it — this is a single named carve-out from "all permissions", not a
-  // move to an explicit allowlist, so Owner still auto-gains any future permission. A
-  // separate cross-tenant "super admin" concept (managing tenants themselves) was raised
-  // but explicitly deferred — not implemented here.
-  const ownerExcludedPermissionKeys = ["orders.create"];
-
-  const allPermissions = await db.query.permissions.findMany();
-  for (const permission of allPermissions) {
-    if (ownerExcludedPermissionKeys.includes(permission.key)) {
-      continue;
-    }
-    const existingLink = await db.query.rolePermissions.findFirst({
-      where: (rp, { and, eq }) => and(eq(rp.roleId, ownerRole!.id), eq(rp.permissionId, permission.id)),
-    });
-    if (!existingLink) {
-      await db.insert(rolePermissions).values({ roleId: ownerRole.id, permissionId: permission.id });
-    }
-  }
-
-  // Reconcile (not just top-up): the pre-Group-5 seed granted Owner literally every
-  // permission, so a real dev/prod Owner role likely already holds `orders.create` from
-  // before this decision — strip it, mirroring the Retailer role's own reconciliation below.
-  const ownerExcludedPermissionRows = await db.query.permissions.findMany({
-    where: (p, { inArray }) => inArray(p.key, ownerExcludedPermissionKeys),
-  });
-  const ownerExcludedPermissionIds = new Set(ownerExcludedPermissionRows.map((p) => p.id));
-  const currentOwnerLinks = await db.query.rolePermissions.findMany({ where: eq(rolePermissions.roleId, ownerRole.id) });
-  const ownerExtraLinks = currentOwnerLinks.filter((link) => ownerExcludedPermissionIds.has(link.permissionId));
-  for (const link of ownerExtraLinks) {
-    await db.delete(rolePermissions).where(eq(rolePermissions.id, link.id));
-  }
-  if (ownerExtraLinks.length > 0) {
-    console.log(`Removed ${ownerExtraLinks.length} excluded permission grant(s) (orders.create) from the Owner role.`);
-  }
-
-  console.log("Seeding default admin user...");
-  let adminUser = await db.query.users.findFirst({
-    where: and(eq(users.tenantId, tenant.id), eq(users.username, "admin")),
-  });
-  if (!adminUser) {
-    const passwordHash = await hashPassword(SEED_ADMIN_PASSWORD);
-    [adminUser] = await db
-      .insert(users)
-      .values({ tenantId: tenant.id, name: "Admin", username: "admin", passwordHash })
-      .returning();
-    console.log(`Created admin user "admin" with password "${SEED_ADMIN_PASSWORD}" — change this after first login.`);
-  }
-  if (!adminUser) {
-    throw new Error("Failed to create admin user");
-  }
-
-  const existingAdminRoleLink = await db.query.userRoles.findFirst({
-    where: and(eq(userRoles.userId, adminUser.id), eq(userRoles.roleId, ownerRole.id)),
-  });
-  if (!existingAdminRoleLink) {
-    await db.insert(userRoles).values({ userId: adminUser.id, roleId: ownerRole.id });
+    throw new Error("Expected provisionTenant() to have created the Owner role");
   }
 
   // PHASE_10_TASKS.md Workstream E Group 3 — a real, tenant-configurable "Retailer" role

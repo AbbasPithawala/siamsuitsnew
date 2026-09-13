@@ -18,6 +18,14 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
  * permissions here (`requirePermission.ts`'s own rule) and would just hit
  * `RequirePermission` walls everywhere; `RequireTailorAuth` is the mirror
  * of this check for `/tailor/...` routes.
+ *
+ * Same reasoning for `me.actorType === "platform_admin"`, redirected to the
+ * platform admin panel — found as a real gap while building
+ * `RequirePlatformAdminAuth` (PHASE_11_TASKS.md Wave 4): without this branch
+ * a platform-admin token would fall straight into `if (me) return <Outlet />`
+ * below and render staff pages it has no business seeing (it holds zero
+ * `permissions`, per `me.routes.ts`'s `platform_admin` branch, but nothing
+ * upstream of `RequirePermission` was stopping it from reaching them).
  */
 export function RequireAuth() {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -33,6 +41,9 @@ export function RequireAuth() {
   }
   if (me?.actorType === "tailor") {
     return <Navigate to="/tailor/jobs" replace />;
+  }
+  if (me?.actorType === "platform_admin") {
+    return <Navigate to="/platform/tenant-requests" replace />;
   }
   if (me) {
     return <Outlet />;

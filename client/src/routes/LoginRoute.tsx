@@ -14,7 +14,8 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
  * A stored tailor session hitting `/login` (the staff login page) goes to
  * its own portal, not `/orders` — a tailor has no permissions there. This
  * mirrors `TailorLoginRoute`'s reverse check for a staff session hitting
- * `/tailor/login`.
+ * `/tailor/login`. Same for a stored platform-admin session, sent to the
+ * platform panel instead.
  */
 export function LoginRoute() {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -27,6 +28,9 @@ export function LoginRoute() {
 
   if (token && me?.actorType === "tailor") {
     return <Navigate to="/tailor/jobs" replace />;
+  }
+  if (token && me?.actorType === "platform_admin") {
+    return <Navigate to="/platform/tenant-requests" replace />;
   }
   if (token && me) {
     return <Navigate to="/orders" replace />;

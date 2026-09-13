@@ -243,11 +243,13 @@ export function OrderBuilderPage() {
       for (const spComponent of superProduct.components) {
         const match = firstItem.components.find((c) => c.slotLabel === spComponent.slotLabel);
         if (match) {
-          measurementsDraft[spComponent.id] = {
+          const componentMeasurementsDraft: LineItemComponentMeasurementDraft = {
             measurements: match.measurements.map(toMeasurementValue),
             measurementNote: match.measurementNote ?? "",
             features: [],
           };
+          if (match.manualSizeImage) componentMeasurementsDraft.manualSizeImage = match.manualSizeImage;
+          measurementsDraft[spComponent.id] = componentMeasurementsDraft;
         }
       }
 
@@ -779,7 +781,7 @@ export function OrderBuilderPage() {
                 onChangeQuantity={handleChangeQuantity}
                 onChangeMeasurements={handleChangeMeasurements}
                 onChangeStyling={handleChangeStyling}
-                excludeOrderId={editOrderId}
+                {...(editOrderId !== undefined ? { excludeOrderId: editOrderId } : {})}
                 {...(isEditMode
                   ? { onOpenManualSize: (lineItemId: string, component: SuperProductComponent) => setManualSizeTarget({ lineItemId, component }) }
                   : {})}
@@ -860,6 +862,7 @@ export function OrderBuilderPage() {
           open
           onClose={() => setManualSizeTarget(null)}
           title={`${manualSizeTarget.component.slotLabel} (${manualSizeTarget.component.product.name})`}
+          productName={manualSizeTarget.component.product.name}
           diagramImageUrl={manualSizeTarget.component.product.measurementDiagramImage}
           onSave={(url) => {
             const { lineItemId, component } = manualSizeTarget;

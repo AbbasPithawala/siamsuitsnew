@@ -37,6 +37,7 @@ import {
   paymentSettlementJobs,
 } from "./manufacturing";
 import { retailerInvoices, retailerInvoiceOrders, orderInvoices, orderInvoiceLines, shippingBoxes, shippingBoxItems } from "./invoicing";
+import { platformAdmins, tenantRequests } from "./platform";
 
 /**
  * All cross-file relations live in this one module (rather than alongside each table) to
@@ -359,4 +360,16 @@ export const shippingBoxItemsRelations = relations(shippingBoxItems, ({ one }) =
     fields: [shippingBoxItems.orderItemComponentId],
     references: [orderItemComponents.id],
   }),
+}));
+
+export const platformAdminsRelations = relations(platformAdmins, ({ many }) => ({
+  reviewedRequests: many(tenantRequests),
+}));
+
+export const tenantRequestsRelations = relations(tenantRequests, ({ one }) => ({
+  reviewedByPlatformAdmin: one(platformAdmins, {
+    fields: [tenantRequests.reviewedByPlatformAdminId],
+    references: [platformAdmins.id],
+  }),
+  createdTenant: one(tenants, { fields: [tenantRequests.createdTenantId], references: [tenants.id] }),
 }));

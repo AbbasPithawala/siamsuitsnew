@@ -17,7 +17,7 @@ export const measurementProfilesRouter = Router();
 measurementProfilesRouter.get("/customers/:customerId/measurement-profiles/:productId", authenticate, async (req, res, next) => {
   try {
     const profile = await measurementProfilesService.getCustomerMeasurementProfile(
-      req.actor!.tenantId,
+      req.actor!.tenantId!,
       requireParam(req, "customerId"),
       requireParam(req, "productId")
     );
@@ -45,7 +45,7 @@ measurementProfilesRouter.get("/customers/:customerId/measurement-baseline/:prod
       return;
     }
     const baseline = await measurementProfilesService.getMeasurementBaseline(
-      req.actor!.tenantId,
+      req.actor!.tenantId!,
       requireParam(req, "customerId"),
       requireParam(req, "productId"),
       parsed.data.excludeOrderId

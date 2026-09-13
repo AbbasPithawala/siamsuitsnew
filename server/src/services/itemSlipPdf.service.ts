@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import QRCode from "qrcode";
 import { withTenant } from "../db/withTenant";
-import { orders, orderItems, orderItemComponents, customers, products } from "../db/schema/index";
+import { orders, orderItems, orderItemComponents, customers, products, superProducts } from "../db/schema/index";
 import { HttpError } from "../utils/http-error";
 import { requireOwnedComponent } from "./manufacturing.service";
 import { storageBackend } from "./storage.service";
@@ -88,12 +88,14 @@ export async function resolveItemSlipData(tenantId: string, orderItemComponentId
     const order = await tx.query.orders.findFirst({ where: eq(orders.id, orderItem.orderId) });
     if (!order) throw new HttpError(404, "COMPONENT_NOT_FOUND", `Order item component ${orderItemComponentId} not found`);
 
-    const [customer, product] = await Promise.all([
+    const [customer, product, superProduct] = await Promise.all([
       tx.query.customers.findFirst({ where: eq(customers.id, order.customerId) }),
       tx.query.products.findFirst({ where: eq(products.id, component.productId) }),
+      tx.query.superProducts.findFirst({ where: eq(superProducts.id, orderItem.superProductId) }),
     ]);
     if (!customer) throw new HttpError(404, "CUSTOMER_NOT_FOUND", `Customer ${order.customerId} not found`);
     if (!product) throw new HttpError(404, "PRODUCT_NOT_FOUND", `Product ${component.productId} not found`);
+    if (!superProduct) throw new HttpError(404, "PRODUCT_NOT_FOUND", `Super product ${orderItem.superProductId} not found`);
 
     const orderItemRows = await tx.query.orderItems.findMany({
       where: eq(orderItems.orderId, order.id),
@@ -117,7 +119,7 @@ export async function resolveItemSlipData(tenantId: string, orderItemComponentId
     return {
       orderNumber: order.orderNumber,
       customerName: customerFullName(customer),
-      itemText: `${itemNumber} / ${itemQuantity} ${titleCase(product.name)}`,
+      itemText: `${itemNumber} / ${itemQuantity} ${titleCase(superProduct.name)}`,
       orderId: order.id,
     };
   });

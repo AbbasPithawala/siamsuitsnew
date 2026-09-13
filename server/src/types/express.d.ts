@@ -5,7 +5,7 @@ declare global {
     interface Request {
       actor?: {
         id: string;
-        tenantId: string;
+        tenantId: string | null;
         actorType: ActorType;
         retailerId: string | null;
       };

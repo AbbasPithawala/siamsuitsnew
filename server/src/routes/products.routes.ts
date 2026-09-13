@@ -33,10 +33,10 @@ productsRouter.get("/products", authenticate, async (req, res, next) => {
     const query = listProductsQuerySchema.parse(req.query);
     const pagination = resolveOptionalPagination(query);
     if (pagination) {
-      const { data, total } = await productsService.listProducts(req.actor!.tenantId, pagination);
+      const { data, total } = await productsService.listProducts(req.actor!.tenantId!, pagination);
       res.status(200).json(paginatedResult(data, total, pagination.page, pagination.pageSize));
     } else {
-      const data = await productsService.listProducts(req.actor!.tenantId);
+      const data = await productsService.listProducts(req.actor!.tenantId!);
       res.status(200).json({ data });
     }
   } catch (err) {
@@ -50,7 +50,7 @@ productsRouter.get("/products", authenticate, async (req, res, next) => {
 
 productsRouter.get("/products/:id", authenticate, async (req, res, next) => {
   try {
-    const product = await productsService.getProduct(req.actor!.tenantId, requireParam(req, "id"));
+    const product = await productsService.getProduct(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(200).json({ data: product });
   } catch (err) {
     next(err);
@@ -64,7 +64,7 @@ productsRouter.post(
   validateBody(createProductSchema),
   async (req, res, next) => {
     try {
-      const product = await productsService.createProduct(req.actor!.tenantId, req.body);
+      const product = await productsService.createProduct(req.actor!.tenantId!, req.body);
       res.status(201).json({ data: product });
     } catch (err) {
       next(err);
@@ -79,7 +79,7 @@ productsRouter.patch(
   validateBody(updateProductSchema),
   async (req, res, next) => {
     try {
-      const product = await productsService.updateProduct(req.actor!.tenantId, requireParam(req, "id"), req.body);
+      const product = await productsService.updateProduct(req.actor!.tenantId!, requireParam(req, "id"), req.body);
       res.status(200).json({ data: product });
     } catch (err) {
       next(err);
@@ -89,7 +89,7 @@ productsRouter.patch(
 
 productsRouter.delete("/products/:id", authenticate, requirePermission("catalog.products.manage"), async (req, res, next) => {
   try {
-    await productsService.softDeleteProduct(req.actor!.tenantId, requireParam(req, "id"));
+    await productsService.softDeleteProduct(req.actor!.tenantId!, requireParam(req, "id"));
     res.status(204).send();
   } catch (err) {
     next(err);

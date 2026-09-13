@@ -109,7 +109,7 @@ describe("itemSlipPdf.service", () => {
     const orderedComponentIds = order.items.map((item) => item.components[0]!.id);
     componentIds.push(...orderedComponentIds);
 
-    const expectedItemName = titleCase(`SlipTestProduct-${suffix}`);
+    const expectedItemName = titleCase(`SlipTestSuper-${suffix}`);
 
     const first = await resolveItemSlipData(tenantId, orderedComponentIds[0]!);
     expect(first.itemText).toBe(`1 / 3 ${expectedItemName}`);
@@ -122,6 +122,61 @@ describe("itemSlipPdf.service", () => {
 
     const third = await resolveItemSlipData(tenantId, orderedComponentIds[2]!);
     expect(third.itemText).toBe(`3 / 3 ${expectedItemName}`);
+  });
+
+  it("uses the super product's own name, not each component's individual product name, for a multi-component bundle", async () => {
+    const [jacketProduct] = await db.insert(products).values({ tenantId, name: `SlipTestJacket-${suffix}` }).returning();
+    const [pantProduct] = await db.insert(products).values({ tenantId, name: `SlipTestPant-${suffix}` }).returning();
+    if (!jacketProduct || !pantProduct) throw new Error("Failed to create test jacket/pant products");
+
+    const [bundleSuperProduct] = await db.insert(superProducts).values({ tenantId, name: `SlipTestThreePiece-${suffix}` }).returning();
+    if (!bundleSuperProduct) throw new Error("Failed to create test bundle super product");
+
+    const [jacketComponent] = await db
+      .insert(superProductComponents)
+      .values({ superProductId: bundleSuperProduct.id, productId: jacketProduct.id, slotLabel: "Jacket", sequence: 1 })
+      .returning();
+    const [pantComponent] = await db
+      .insert(superProductComponents)
+      .values({ superProductId: bundleSuperProduct.id, productId: pantProduct.id, slotLabel: "Pant", sequence: 2 })
+      .returning();
+    if (!jacketComponent || !pantComponent) throw new Error("Failed to create test jacket/pant super product components");
+
+    let order: Awaited<ReturnType<typeof createOrder>> | null = null;
+    try {
+      order = await createOrder(tenantId, {
+        retailerId,
+        customerId,
+        items: [
+          {
+            superProductId: bundleSuperProduct.id,
+            components: [{ superProductComponentId: jacketComponent.id }, { superProductComponentId: pantComponent.id }],
+          },
+        ],
+      });
+      const orderedComponentIds = order.items[0]!.components.map((c) => c.id);
+
+      const expectedItemName = titleCase(`SlipTestThreePiece-${suffix}`);
+
+      const jacketSlip = await resolveItemSlipData(tenantId, orderedComponentIds[0]!);
+      expect(jacketSlip.itemText).toBe(`1 / 1 ${expectedItemName}`);
+
+      const pantSlip = await resolveItemSlipData(tenantId, orderedComponentIds[1]!);
+      expect(pantSlip.itemText).toBe(`1 / 1 ${expectedItemName}`);
+    } finally {
+      // Local, fully self-contained cleanup (not the shared `orderIds`/`componentIds`
+      // arrays the outer `afterAll` drains) — this order references its own throwaway
+      // jacket/pant products, which must be deleted here too, so the delete order has to
+      // go order-rows-first, products-last, same FK-dependency order as the outer `afterAll`.
+      if (order) {
+        await db.delete(orderItemComponents).where(eq(orderItemComponents.orderItemId, order.items[0]!.id));
+        await db.delete(orderItems).where(eq(orderItems.orderId, order.id));
+        await db.delete(orders).where(eq(orders.id, order.id));
+      }
+      await db.delete(superProductComponents).where(inArray(superProductComponents.id, [jacketComponent.id, pantComponent.id]));
+      await db.delete(superProducts).where(eq(superProducts.id, bundleSuperProduct.id));
+      await db.delete(products).where(inArray(products.id, [jacketProduct.id, pantProduct.id]));
+    }
   });
 
   it("404s cleanly for a bogus componentId", async () => {
