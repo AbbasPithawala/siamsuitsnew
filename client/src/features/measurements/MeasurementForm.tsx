@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { ChangeEvent } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -150,6 +150,15 @@ export function MeasurementForm({
   onFeaturesChange,
   changedMeasurementDefinitionIds,
 }: MeasurementFormProps) {
+  // A super product can legitimately place the same product in two component slots at once
+  // (e.g. two Shirt slots), so two `<MeasurementForm>` instances on the same page can share
+  // `productId` — and therefore the same Shoulder Type feature/style rows. Scoping the radio
+  // `id`/`name` by this instance's own `useId()` (rather than by style id alone) keeps each
+  // instance's DOM ids unique and its radios their own native group; without it, duplicate
+  // `id`s make every instance's `<label htmlFor>` resolve to the first instance's input in the
+  // DOM, and duplicate `name`s make the browser treat every instance as one shared radio group.
+  const shoulderTypeIdPrefix = useId();
+
   const { data: links, isLoading, isFetching, isError, error } = useProductMeasurementsQuery(productId);
   const { data: fittings } = useListFittingsForProductQuery(productId);
   const [triggerGetFitting, { isFetching: isFittingLoading }] = useLazyGetFittingQuery();
@@ -412,12 +421,12 @@ export function MeasurementForm({
           </Typography>
           <ul className="fabricselection_Common_NM">
             {shoulderTypeFeature.styles.map((style) => {
-              const inputId = `shoulder-type-${style.id}`;
+              const inputId = `shoulder-type-${shoulderTypeIdPrefix}-${style.id}`;
               return (
                 <li key={style.id}>
                   <input
                     type="radio"
-                    name={`shoulder-type-${shoulderTypeFeature.id}`}
+                    name={`shoulder-type-${shoulderTypeIdPrefix}-${shoulderTypeFeature.id}`}
                     id={inputId}
                     value={style.id}
                     checked={shoulderTypeSelection?.styleId === style.id}

@@ -238,6 +238,20 @@ function getLineItemRow(superProductId: string): HTMLElement {
   return screen.getByTestId(`line-item-row-${superProductId}`);
 }
 
+/**
+ * The Fabric & Styling panel now takes over `OrderCartStep`'s entire
+ * rendered output (`OrderCartStep.tsx`) instead of appearing inline below
+ * the table — the shared cart's product select/table doesn't render while
+ * it's open. Closes it, if open, before interacting with row cells or moving
+ * on.
+ */
+async function closeAnyOpenPanel(user: ReturnType<typeof userEvent.setup>) {
+  const closeButton = screen.queryByRole("button", { name: "Close" });
+  if (!closeButton) return;
+  await user.click(closeButton);
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument());
+}
+
 /** `unit-<index>-content` id per `StylingAccordion.tsx` — stays mounted (though visually collapsed) regardless of which unit's accordion is expanded, per `StylingAccordion.live.test.tsx`'s own established pattern. */
 function getUnitContent(index: number): HTMLElement {
   return document.getElementById(`unit-${index}-content`) as HTMLElement;
@@ -436,6 +450,7 @@ describe.skipIf(!seededToken)("Group Orders (live siam/server integration)", () 
       await waitFor(() => expect(within(vestRow).getByTestId("styling-status").textContent).toBe("Complete"), NETWORK_WAIT);
       await waitFor(() => expect(within(shirtRow).getByTestId("styling-status").textContent).toBe("Complete"), NETWORK_WAIT);
 
+      await closeAnyOpenPanel(user);
       const nextButton = screen.getByRole("button", { name: "Next: Add Customers" });
       await waitFor(() => expect(nextButton).toBeEnabled(), NETWORK_WAIT);
       await user.click(nextButton);

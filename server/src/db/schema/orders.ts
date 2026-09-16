@@ -11,8 +11,10 @@ export const customers = pgTable("customers", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name"),
   gender: text("gender"),
+  email: text("email"),
   contactNumber: text("contact_number"),
   image: text("image"),
+  imageNote: text("image_note"),
   ...timestampColumns,
   ...softDeleteColumn,
 });

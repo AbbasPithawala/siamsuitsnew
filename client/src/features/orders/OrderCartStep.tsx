@@ -125,6 +125,67 @@ export function OrderCartStep({
     ? superProducts.find((sp) => sp.id === focusedItem.superProductId)
     : undefined;
 
+  /*
+   * When a panel is focused, it takes over this component's entire rendered
+   * output (the product select + table don't render at all) rather than
+   * appearing as a modal/overlay — this stays plain, in-flow content inside
+   * `OrderBuilderPage`'s own `Box`, which itself renders inside the app
+   * shell's `<main>` (`AppShell.tsx`), so it can only ever fill that content
+   * area and never draws over the shell's fixed `AppBar`/sidebar `Drawer`
+   * the way a portaled full-screen `Dialog` would. This is a state swap, not
+   * real navigation — the browser back button has no part in it. "Close"
+   * simply clears `focused`, which brings the table right back, untouched.
+   */
+  if (focusedItem && focusedSuperProduct) {
+    return (
+      <Box>
+        <Typography variant="h6" gutterBottom>
+          {focusedSuperProduct.name} — {focused?.panel === "measurements" ? "Measurements" : "Fabric & Styling"}
+        </Typography>
+        <Button variant="outlined" onClick={() => setFocused(null)} sx={{ mb: 2 }}>
+          Close
+        </Button>
+        {focused?.panel === "measurements" ? (
+          <LineItemMeasurementsPanel
+            components={focusedSuperProduct.components}
+            draft={focusedItem.measurementsDraft}
+            customerId={customerId}
+            onChange={(componentId, next) => onChangeMeasurements(focusedItem.id, componentId, next)}
+            {...(excludeOrderId !== undefined ? { excludeOrderId } : {})}
+            {...(onOpenManualSize
+              ? { onOpenManualSize: (component: SuperProductComponent) => onOpenManualSize(focusedItem.id, component) }
+              : {})}
+          />
+        ) : (
+          // `key={focusedItem.id}`: only one `<StylingAccordion>` is ever mounted at
+          // this position (switching "focused" line items just changes its props, not
+          // its position in the tree), so without a key React reuses the same instance
+          // and its local `copyChecked`/`expandedUnit` state leaks across line items —
+          // a real reported bug: checking "copy previous" on one line item's unit 2
+          // left the checkbox pre-checked when a *different* line item was focused
+          // next. The key forces a remount (fresh local state) on every focus switch.
+          <StylingAccordion
+            key={focusedItem.id}
+            components={focusedSuperProduct.components}
+            quantity={focusedItem.stylingDrafts.length}
+            value={focusedItem.stylingDrafts}
+            onChange={(next) => onChangeStyling(focusedItem.id, next)}
+            onDeleteUnit={(index) => {
+              // Mirrors the qty stepper's own "minimum 1" floor (Group 7's
+              // own spec) — deleting a specific unit is equivalent to
+              // decrementing quantity by one, so it can't go below 1 either.
+              if (focusedItem.stylingDrafts.length <= 1) return;
+              onChangeStyling(
+                focusedItem.id,
+                focusedItem.stylingDrafts.filter((_, i) => i !== index)
+              );
+            }}
+          />
+        )}
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <div className="searchinput-inner">
@@ -189,51 +250,6 @@ export function OrderCartStep({
           </tr>
         </tbody>
       </table>
-
-      {focusedItem && focusedSuperProduct && (
-        <Box sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            {focusedSuperProduct.name} — {focused?.panel === "measurements" ? "Measurements" : "Fabric & Styling"}
-          </Typography>
-          {focused?.panel === "measurements" ? (
-            <LineItemMeasurementsPanel
-              components={focusedSuperProduct.components}
-              draft={focusedItem.measurementsDraft}
-              customerId={customerId}
-              onChange={(componentId, next) => onChangeMeasurements(focusedItem.id, componentId, next)}
-              {...(excludeOrderId !== undefined ? { excludeOrderId } : {})}
-              {...(onOpenManualSize
-                ? { onOpenManualSize: (component: SuperProductComponent) => onOpenManualSize(focusedItem.id, component) }
-                : {})}
-            />
-          ) : (
-            // `key={focusedItem.id}`: only one `<StylingAccordion>` is ever mounted at
-            // this position (switching "focused" line items just changes its props, not
-            // its position in the tree), so without a key React reuses the same instance
-            // and its local `copyChecked`/`expandedUnit` state leaks across line items —
-            // a real reported bug: checking "copy previous" on one line item's unit 2
-            // left the checkbox pre-checked when a *different* line item was focused
-            // next. The key forces a remount (fresh local state) on every focus switch.
-            <StylingAccordion
-              key={focusedItem.id}
-              components={focusedSuperProduct.components}
-              quantity={focusedItem.stylingDrafts.length}
-              value={focusedItem.stylingDrafts}
-              onChange={(next) => onChangeStyling(focusedItem.id, next)}
-              onDeleteUnit={(index) => {
-                // Mirrors the qty stepper's own "minimum 1" floor (Group 7's
-                // own spec) — deleting a specific unit is equivalent to
-                // decrementing quantity by one, so it can't go below 1 either.
-                if (focusedItem.stylingDrafts.length <= 1) return;
-                onChangeStyling(
-                  focusedItem.id,
-                  focusedItem.stylingDrafts.filter((_, i) => i !== index)
-                );
-              }}
-            />
-          )}
-        </Box>
-      )}
     </Box>
   );
 }

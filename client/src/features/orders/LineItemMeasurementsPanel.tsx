@@ -155,22 +155,24 @@ export function useLineItemMeasurementsCompleteness(
  * (as soon as the product's catalog merely loads) reads as done-when-it-isn't, which is the bug
  * this hook fixes.
  *
- * "Entered" means at least one measurement on at least one of the line item's components has a
- * real draft entry — never all of them (matching the same "don't force filling 10+ fields"
- * product decision `useLineItemMeasurementsCompleteness` documents), and never per-component
- * either (a multi-component Suit with only its jacket filled in still reads as progress, not
- * nothing). A component's `measurements` array only ever gains an entry when something wrote a
- * real, deliberate value to it — a user keystroke (`MeasurementForm.tsx`'s `handleFieldChange`,
- * including the explicit "0" `handleFieldBlur` writes for a field left blank on purpose), a
- * Manual Fit preset, or the customer measurement profile pre-fill effect below (which is itself
- * only ever seeded from that specific customer's own real past order) — never a placeholder, so
- * simple presence in the array is enough, no need to inspect `value`/`adjustmentValue` individually.
+ * "Entered" means every one of the line item's components has at least one measurement with a
+ * real draft entry — not every individual field within a component (matching the same "don't
+ * force filling 10+ fields" product decision `useLineItemMeasurementsCompleteness` documents),
+ * but every component must show real progress. A multi-component Suit with only its jacket
+ * filled in (shirt/trouser untouched) must still read "Missing" — reading "Complete" off a
+ * single component's progress alone is the exact bug this hook fixes. A component's
+ * `measurements` array only ever gains an entry when something wrote a real, deliberate value to
+ * it — a user keystroke (`MeasurementForm.tsx`'s `handleFieldChange`, including the explicit "0"
+ * `handleFieldBlur` writes for a field left blank on purpose), a Manual Fit preset, or the
+ * customer measurement profile pre-fill effect below (which is itself only ever seeded from that
+ * specific customer's own real past order) — never a placeholder, so simple presence in the array
+ * is enough per component, no need to inspect `value`/`adjustmentValue` individually.
  */
 export function useLineItemMeasurementsEntered(
   components: SuperProductComponent[],
   draft: LineItemMeasurementsDraft
 ): boolean {
-  return components.some((component) => (draft[component.id]?.measurements.length ?? 0) > 0);
+  return components.every((component) => (draft[component.id]?.measurements.length ?? 0) > 0);
 }
 
 /**

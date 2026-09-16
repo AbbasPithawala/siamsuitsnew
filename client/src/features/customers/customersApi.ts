@@ -20,8 +20,10 @@ export interface Customer {
   firstName: string;
   lastName: string | null;
   gender: string | null;
+  email: string | null;
   contactNumber: string | null;
   image: string | null;
+  imageNote: string | null;
 }
 
 export interface CustomerCreateInput {
@@ -29,8 +31,10 @@ export interface CustomerCreateInput {
   firstName: string;
   lastName?: string;
   gender?: string;
+  email?: string;
   contactNumber?: string;
   image?: string;
+  imageNote?: string;
 }
 
 export type CustomerUpdateInput = Partial<CustomerCreateInput>;

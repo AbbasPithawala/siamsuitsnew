@@ -3,7 +3,7 @@ import { withTenant } from "../db/withTenant";
 import type { Transaction } from "../db/withTenant";
 import { customers } from "../db/schema/index";
 import { HttpError } from "../utils/http-error";
-import { DEFAULT_PAGINATION, toLimitOffset } from "../utils/pagination";
+import { toLimitOffset } from "../utils/pagination";
 import type { PaginationParams } from "../utils/pagination";
 
 /** `retailers` carries `tenant_id` and an RLS policy, so resolving it through a `withTenant`-scoped `tx` already proves tenant ownership — see `catalog-helpers.ts` for the same pattern applied to catalog tables. */
@@ -36,8 +36,10 @@ export interface CreateCustomerInput {
   firstName: string;
   lastName?: string;
   gender?: string;
+  email?: string;
   contactNumber?: string;
   image?: string;
+  imageNote?: string;
 }
 
 export type UpdateCustomerInput = Partial<CreateCustomerInput>;
@@ -58,8 +60,20 @@ export function createCustomer(tenantId: string, input: CreateCustomerInput) {
  */
 export function listCustomers(
   tenantId: string,
+  filter?: { retailerId?: string | undefined },
+  pagination?: undefined,
+  actorRetailerId?: string | null
+): Promise<(typeof customers.$inferSelect)[]>;
+export function listCustomers(
+  tenantId: string,
+  filter: { retailerId?: string | undefined } | undefined,
+  pagination: PaginationParams,
+  actorRetailerId?: string | null
+): Promise<{ data: (typeof customers.$inferSelect)[]; total: number }>;
+export function listCustomers(
+  tenantId: string,
   filter: { retailerId?: string | undefined } = {},
-  pagination: PaginationParams = DEFAULT_PAGINATION,
+  pagination?: PaginationParams,
   actorRetailerId?: string | null
 ) {
   return withTenant(tenantId, async (tx) => {
@@ -69,8 +83,12 @@ export function listCustomers(
     const where = retailerId
       ? and(isNull(customers.deletedAt), eq(customers.retailerId, retailerId))
       : isNull(customers.deletedAt);
-    const { limit, offset } = toLimitOffset(pagination.page, pagination.pageSize);
 
+    if (!pagination) {
+      return tx.query.customers.findMany({ where, orderBy: (c, { asc }) => asc(c.firstName) });
+    }
+
+    const { limit, offset } = toLimitOffset(pagination.page, pagination.pageSize);
     const [data, [countRow]] = await Promise.all([
       tx.query.customers.findMany({ where, orderBy: (c, { asc }) => asc(c.firstName), limit, offset }),
       tx.select({ count: sql<number>`count(*)::int` }).from(customers).where(where),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -20,7 +20,6 @@ import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 // Named barrel import — see ProductsPage.tsx's comment on this project's
 // Vite dep optimizer mis-transforming `@mui/icons-material/X` deep imports.
@@ -33,6 +32,13 @@ import { useHasPermission } from "../auth/useHasPermission";
 import { ConfirmDeleteDialog } from "../catalog/ConfirmDeleteDialog";
 import { useListRetailersQuery } from "../retailers/retailersApi";
 import {
+  CustomerFormFields,
+  EMPTY_CUSTOMER_FORM_VALUE,
+  customerFormValueToCreateInput,
+  isCustomerFormValid,
+} from "./CustomerFormFields";
+import type { CustomerFormValue } from "./CustomerFormFields";
+import {
   useCreateCustomerMutation,
   useDeleteCustomerMutation,
   useListCustomersPaginatedQuery,
@@ -42,16 +48,11 @@ import type { Customer, CustomerCreateInput } from "./customersApi";
 
 const ALL_RETAILERS = "";
 
-interface CustomerFormState {
+interface CustomerFormState extends CustomerFormValue {
   retailerId: string;
-  firstName: string;
-  lastName: string;
-  gender: string;
-  contactNumber: string;
-  image: string;
 }
 
-const EMPTY_FORM: CustomerFormState = { retailerId: "", firstName: "", lastName: "", gender: "", contactNumber: "", image: "" };
+const EMPTY_FORM: CustomerFormState = { ...EMPTY_CUSTOMER_FORM_VALUE, retailerId: "" };
 
 function customerName(customer: Customer): string {
   return customer.lastName ? `${customer.firstName} ${customer.lastName}` : customer.firstName;
@@ -106,16 +107,22 @@ export function CustomersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerFormState>(EMPTY_FORM);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  // See `CustomerQuickCreateDialog.tsx`'s identical guard: `mutationState.isLoading` only
+  // disables the submit button once React commits a re-render, which a fast double-click (or a
+  // duplicate synthetic click) can outrun and cause two customers to be created from one click.
+  const submittingRef = useRef(false);
 
   const mutationState = editingId ? updateState : createState;
-  const isFormValid = form.firstName.trim().length > 0 && form.retailerId.length > 0;
+  const isFormValid = isCustomerFormValid(form) && form.retailerId.length > 0;
 
   const retailerNameById = new Map((retailers ?? []).map((retailer) => [retailer.id, retailer.name]));
 
   function openCreateDialog() {
     setEditingId(null);
     setForm({ ...EMPTY_FORM, retailerId: retailerFilter || "" });
+    setSubmitAttempted(false);
     setDialogOpen(true);
   }
 
@@ -126,23 +133,22 @@ export function CustomersPage() {
       firstName: customer.firstName,
       lastName: customer.lastName ?? "",
       gender: customer.gender ?? "",
+      email: customer.email ?? "",
       contactNumber: customer.contactNumber ?? "",
       image: customer.image ?? "",
+      imageNote: customer.imageNote ?? "",
     });
+    setSubmitAttempted(false);
     setDialogOpen(true);
   }
 
   async function handleSubmit() {
+    setSubmitAttempted(true);
+    if (!isFormValid) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
-      const input: CustomerCreateInput = { retailerId: form.retailerId, firstName: form.firstName.trim() };
-      const lastName = form.lastName.trim();
-      const gender = form.gender.trim();
-      const contactNumber = form.contactNumber.trim();
-      const image = form.image.trim();
-      if (lastName) input.lastName = lastName;
-      if (gender) input.gender = gender;
-      if (contactNumber) input.contactNumber = contactNumber;
-      if (image) input.image = image;
+      const input: CustomerCreateInput = { retailerId: form.retailerId, ...customerFormValueToCreateInput(form) };
 
       if (editingId) {
         await updateCustomer({ id: editingId, body: input }).unwrap();
@@ -152,6 +158,8 @@ export function CustomersPage() {
       setDialogOpen(false);
     } catch {
       // surfaced below via mutationState.error
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -264,36 +272,10 @@ export function CustomersPage() {
                 ))}
               </Select>
             </FormControl>
-            <TextField
-              label="First name"
-              required
-              fullWidth
-              value={form.firstName}
-              onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))}
-            />
-            <TextField
-              label="Last name"
-              fullWidth
-              value={form.lastName}
-              onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))}
-            />
-            <TextField
-              label="Gender"
-              fullWidth
-              value={form.gender}
-              onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value }))}
-            />
-            <TextField
-              label="Contact number"
-              fullWidth
-              value={form.contactNumber}
-              onChange={(event) => setForm((current) => ({ ...current, contactNumber: event.target.value }))}
-            />
-            <TextField
-              label="Image URL"
-              fullWidth
-              value={form.image}
-              onChange={(event) => setForm((current) => ({ ...current, image: event.target.value }))}
+            <CustomerFormFields
+              value={form}
+              onChange={(next) => setForm((current) => ({ ...current, ...next }))}
+              submitAttempted={submitAttempted}
             />
             {mutationState.error && (
               <Alert severity="error">{getApiErrorMessage(mutationState.error, "Failed to save customer.")}</Alert>

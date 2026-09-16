@@ -388,7 +388,7 @@ describe.skipIf(!seededToken)("MeasurementForm Shoulder Type render slot (live s
       const radio = screen.getByRole("radio", { name: style.name.trim() }) as HTMLInputElement;
       expect(radio).not.toBeChecked();
       if (style.image) {
-        const img = document.getElementById(`shoulder-type-${style.id}`)?.parentElement?.querySelector("img");
+        const img = radio.closest("li")?.querySelector("img");
         expect(img).not.toBeNull();
         expect(img?.getAttribute("src")).toBe(style.image);
       }

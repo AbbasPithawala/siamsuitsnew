@@ -205,9 +205,8 @@ describe.skipIf(!seededToken)("CustomersPage (live siam/server integration)", ()
       await selectInCombobox(dialog, "Retailer", retailer.name);
       await user.type(within(dialog).getByLabelText(/^First name/i), firstName);
       await user.type(within(dialog).getByLabelText(/^Last name/i), lastName);
-      await user.type(within(dialog).getByLabelText(/^Gender/i), "Female");
+      await selectInCombobox(dialog, "Gender", "Female");
       await user.type(within(dialog).getByLabelText(/^Contact number/i), "555-0100");
-      await user.type(within(dialog).getByLabelText(/^Image URL/i), "https://example.com/avatar.png");
       await user.click(within(dialog).getByRole("button", { name: "Add Customer" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), NETWORK_WAIT);
 
@@ -242,9 +241,7 @@ describe.skipIf(!seededToken)("CustomersPage (live siam/server integration)", ()
       const lastNameField = within(dialog).getByLabelText(/^Last name/i);
       await user.clear(lastNameField);
       await user.type(lastNameField, newLastName);
-      const genderField = within(dialog).getByLabelText(/^Gender/i);
-      await user.clear(genderField);
-      await user.type(genderField, "Other");
+      await selectInCombobox(dialog, "Gender", "Other");
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), NETWORK_WAIT);
 

@@ -206,6 +206,20 @@ async function waitForNoOpenListbox() {
 }
 
 /**
+ * `labelText` is `^`-anchored, not exact — MUI appends a rendered `" *"`
+ * asterisk to a required field's accessible name, same reasoning as
+ * `CustomersPage.live.test.tsx`'s identically-named helper (duplicated here
+ * rather than shared, given the small scope).
+ */
+async function selectInCombobox(container: HTMLElement, labelText: string, optionName: string) {
+  const combobox = within(container).getByLabelText(new RegExp(`^${labelText}`, "i"));
+  await userEvent.click(combobox);
+  const listbox = await screen.findByRole("listbox");
+  await userEvent.click(within(listbox).getByRole("option", { name: optionName }));
+  await waitForNoOpenListbox();
+}
+
+/**
  * Advances past the wizard's Retailer + Customer steps via a fresh
  * quick-created customer, leaving the (now cart-based) Products step active.
  * Returns the created customer's id (looked up by its unique generated name
@@ -229,12 +243,17 @@ async function advancePastRetailerAndCustomer(
   const dialog = await screen.findByRole("dialog");
   const customerFirstName = `Live Customer ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await user.type(within(dialog).getByLabelText(/^First name/i), customerFirstName);
+  await user.type(within(dialog).getByLabelText(/^Last name/i), "Wizard");
+  await selectInCombobox(dialog, "Gender", "Male");
   await user.click(within(dialog).getByRole("button", { name: "Create" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   // The customer picker is a real search dropdown (MUI `Autocomplete`, `OrderBuilderPage.tsx`'s
   // own doc comment) — a selected value renders as the search input's *value*, not as page
-  // text, so this has to be `findByDisplayValue`, not `findByText`.
-  await screen.findByDisplayValue(customerFirstName);
+  // text, so this has to be `findByDisplayValue`, not `findByText`. The display value is the
+  // full "First Last" name (`customerName` in `OrderBuilderPage.tsx`), not just the first name —
+  // `lastName` is now a required quick-create field (`CustomerFormFields.tsx`), so the created
+  // customer always has one.
+  await screen.findByDisplayValue(`${customerFirstName} Wizard`);
   await user.click(screen.getByRole("button", { name: "Next" }));
 
   const customersForRetailer = await apiRequest<{ data: { id: string; firstName: string }[] }>(
@@ -266,8 +285,24 @@ async function bumpQuantity(user: ReturnType<typeof userEvent.setup>, superProdu
   }
 }
 
-/** Opens the line item's Group 6 `<LineItemMeasurementsPanel>` (its Measurement cell) and returns the panel's own container (heading + panel, per `OrderBuilderPage.tsx`'s `<Box sx={{ mt: 3 }}>`). */
+/**
+ * The Measurement/Fabric & Styling panels now take over `OrderCartStep`'s
+ * entire rendered output (`OrderCartStep.tsx`) instead of appearing inline
+ * below the table — only one can be open at a time, and the product
+ * select/table (including every row's Measurement/Fabric & Styling cells)
+ * simply doesn't render while a panel is open. Closes whichever panel is
+ * currently open, if any, before a caller tries to click a row cell.
+ */
+async function closeAnyOpenPanel(user: ReturnType<typeof userEvent.setup>) {
+  const closeButton = screen.queryByRole("button", { name: "Close" });
+  if (!closeButton) return;
+  await user.click(closeButton);
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument());
+}
+
+/** Opens the line item's Group 6 `<LineItemMeasurementsPanel>` (its Measurement cell) and returns the panel's own container (heading + panel, per `OrderCartStep.tsx`'s panel takeover). */
 async function openMeasurementsPanel(user: ReturnType<typeof userEvent.setup>, superProductId: string, superProductName: string): Promise<HTMLElement> {
+  await closeAnyOpenPanel(user);
   const row = getLineItemRow(superProductId);
   await user.click(within(row).getByTestId("measurement-status"));
   const heading = await screen.findByText(`${superProductName} — Measurements`);
@@ -276,6 +311,7 @@ async function openMeasurementsPanel(user: ReturnType<typeof userEvent.setup>, s
 
 /** Opens the line item's Group 5 `<StylingAccordion>` (its Fabric & Styling cell) and returns the panel's own container. */
 async function openStylingPanel(user: ReturnType<typeof userEvent.setup>, superProductId: string, superProductName: string): Promise<HTMLElement> {
+  await closeAnyOpenPanel(user);
   const row = getLineItemRow(superProductId);
   await user.click(within(row).getByTestId("styling-status"));
   const heading = await screen.findByText(`${superProductName} — Fabric & Styling`);
@@ -511,6 +547,7 @@ describe.skipIf(!seededToken)("OrderBuilderPage (live siam/server integration)",
       const stylingPanel = await openStylingPanel(user, superProduct.id, superProduct.name);
       await pickFirstStyleForComponents(user, stylingPanel, ["Jacket", "Pant", "Vest"]);
 
+      await closeAnyOpenPanel(user);
       await user.click(screen.getByRole("button", { name: "Next" }));
 
       await screen.findByText("Summary");
@@ -593,6 +630,7 @@ describe.skipIf(!seededToken)("OrderBuilderPage (live siam/server integration)",
       const stylingPanel = await openStylingPanel(user, superProduct.id, superProduct.name);
       await pickFirstStyleForComponents(user, stylingPanel, ["Shirt"]);
 
+      await closeAnyOpenPanel(user);
       await user.click(screen.getByRole("button", { name: "Next" }));
 
       await screen.findByText("Summary");
@@ -666,6 +704,7 @@ describe.skipIf(!seededToken)("OrderBuilderPage (live siam/server integration)",
         method: "DELETE",
       });
 
+      await closeAnyOpenPanel(user);
       await user.click(screen.getByRole("button", { name: "Next" }));
       await screen.findByText("Summary");
       await clickPlaceOrder(user, store);
@@ -790,6 +829,7 @@ describe.skipIf(!seededToken)("OrderBuilderPage (live siam/server integration)",
         await completeAllStyleTabs(user, panel);
       }
 
+      await closeAnyOpenPanel(user);
       await user.click(screen.getByRole("button", { name: "Next" }));
       await screen.findByText("Summary");
       expect(screen.getByText(new RegExp(`${jacketSuperProduct.name} × 3`))).toBeInTheDocument();
@@ -938,6 +978,7 @@ describe.skipIf(!seededToken)("OrderBuilderPage (live siam/server integration)",
       const stylingPanel = await openStylingPanel(user, superProduct.id, superProduct.name);
       await completeAllStyleTabs(user, stylingPanel);
 
+      await closeAnyOpenPanel(user);
       await user.click(screen.getByRole("button", { name: "Next" }));
       await screen.findByText("Summary");
       placeOrderButton = screen.getByRole("button", { name: "Place Order" });
@@ -1013,6 +1054,7 @@ describe.skipIf(!seededToken)("OrderBuilderPage (live siam/server integration)",
       const stylingPanel = await openStylingPanel(user, superProduct.id, superProduct.name);
       await completeAllStyleTabsExceptFirst(user, stylingPanel);
 
+      await closeAnyOpenPanel(user);
       await user.click(screen.getByRole("button", { name: "Next" }));
       await screen.findByText("Summary");
 
@@ -1039,6 +1081,7 @@ describe.skipIf(!seededToken)("OrderBuilderPage (live siam/server integration)",
       const stylingPanelAgain = await openStylingPanel(user, superProduct.id, superProduct.name);
       await completeAllStyleTabs(user, stylingPanelAgain);
 
+      await closeAnyOpenPanel(user);
       await user.click(screen.getByRole("button", { name: "Next" }));
       await screen.findByText("Summary");
       await waitFor(() => expect(screen.getByRole("button", { name: "Place Order" })).toBeEnabled());

@@ -66,44 +66,6 @@ describe("pagination (PHASE_10_TASKS.md Workstream C)", () => {
   // ---- Group 1: mandatory-pagination endpoints ----
 
   describe("mandatory mode", () => {
-    it("GET /customers: paginates, composes with retailerId filter, defaults to page 1 of 25 when omitted", async () => {
-      const tenant = await createTenantWithUser([]);
-      const retailer = await createRetailer(tenant.tenantId, `Pg Cust Retailer ${randomUUID()}`);
-      const otherRetailer = await createRetailer(tenant.tenantId, `Pg Cust Other Retailer ${randomUUID()}`);
-      try {
-        // 5 customers on `retailer`, asc firstName order.
-        const names = ["A-1", "A-2", "A-3", "A-4", "A-5"];
-        await db.insert(customers).values(names.map((firstName) => ({ tenantId: tenant.tenantId, retailerId: retailer.id, firstName })));
-        // 1 customer on a different retailer — must never leak into `retailer`-filtered results.
-        await db.insert(customers).values({ tenantId: tenant.tenantId, retailerId: otherRetailer.id, firstName: "Z-Other" });
-
-        // Default (no page/pageSize): still page 1 of 25 — the whole point of mandatory mode.
-        const unfiltered = await getJson<Envelope<{ firstName: string }>>("/api/customers", tenant.token);
-        expect(unfiltered.status).toBe(200);
-        expect(unfiltered.body.pagination).toEqual({ page: 1, pageSize: 25, total: 6, totalPages: 1 });
-        expect(unfiltered.body.data).toHaveLength(6);
-
-        // Filter composes with pagination: only `retailer`'s 5 customers count/appear.
-        const page1 = await getJson<Envelope<{ firstName: string }>>(
-          `/api/customers?retailerId=${retailer.id}&page=1&pageSize=2`,
-          tenant.token
-        );
-        expect(page1.body.pagination).toEqual({ page: 1, pageSize: 2, total: 5, totalPages: 3 });
-        expect(page1.body.data.map((c) => c.firstName)).toEqual(["A-1", "A-2"]);
-
-        const page3 = await getJson<Envelope<{ firstName: string }>>(
-          `/api/customers?retailerId=${retailer.id}&page=3&pageSize=2`,
-          tenant.token
-        );
-        expect(page3.body.pagination).toEqual({ page: 3, pageSize: 2, total: 5, totalPages: 3 });
-        expect(page3.body.data.map((c) => c.firstName)).toEqual(["A-5"]);
-      } finally {
-        await db.delete(customers).where(eq(customers.tenantId, tenant.tenantId));
-        await db.delete(retailers).where(eq(retailers.tenantId, tenant.tenantId));
-        await tenant.cleanup();
-      }
-    });
-
     it("GET /retailers: paginates and defaults to page 1 of 25 when omitted", async () => {
       const tenant = await createTenantWithUser([]);
       try {
@@ -387,6 +349,45 @@ describe("pagination (PHASE_10_TASKS.md Workstream C)", () => {
   // ---- Group 2: opt-in-pagination endpoints ----
 
   describe("opt-in mode", () => {
+    it("GET /customers: omitting page/pageSize returns the full unpaginated list unchanged; explicit params paginate; retailerId filter composes with pagination", async () => {
+      const tenant = await createTenantWithUser([]);
+      const retailer = await createRetailer(tenant.tenantId, `Pg Cust Retailer ${randomUUID()}`);
+      const otherRetailer = await createRetailer(tenant.tenantId, `Pg Cust Other Retailer ${randomUUID()}`);
+      try {
+        // 5 customers on `retailer`, asc firstName order.
+        const names = ["A-1", "A-2", "A-3", "A-4", "A-5"];
+        await db.insert(customers).values(names.map((firstName) => ({ tenantId: tenant.tenantId, retailerId: retailer.id, firstName })));
+        // 1 customer on a different retailer — appears in the unfiltered list, but must never leak into `retailer`-filtered results.
+        await db.insert(customers).values({ tenantId: tenant.tenantId, retailerId: otherRetailer.id, firstName: "Z-Other" });
+
+        // Default (no page/pageSize): the full unpaginated list — the order-builder's own customer picker relies on this.
+        const unfiltered = await getJson<Envelope<{ firstName: string }>>("/api/customers", tenant.token);
+        expect(unfiltered.status).toBe(200);
+        expect(unfiltered.body.data.map((c) => c.firstName)).toEqual(["A-1", "A-2", "A-3", "A-4", "A-5", "Z-Other"]);
+        expect(unfiltered.body.pagination).toBeUndefined();
+        expect("pagination" in unfiltered.body).toBe(false);
+
+        // Filter composes with pagination: only `retailer`'s 5 customers count/appear.
+        const page1 = await getJson<Envelope<{ firstName: string }>>(
+          `/api/customers?retailerId=${retailer.id}&page=1&pageSize=2`,
+          tenant.token
+        );
+        expect(page1.body.pagination).toEqual({ page: 1, pageSize: 2, total: 5, totalPages: 3 });
+        expect(page1.body.data.map((c) => c.firstName)).toEqual(["A-1", "A-2"]);
+
+        const page3 = await getJson<Envelope<{ firstName: string }>>(
+          `/api/customers?retailerId=${retailer.id}&page=3&pageSize=2`,
+          tenant.token
+        );
+        expect(page3.body.pagination).toEqual({ page: 3, pageSize: 2, total: 5, totalPages: 3 });
+        expect(page3.body.data.map((c) => c.firstName)).toEqual(["A-5"]);
+      } finally {
+        await db.delete(customers).where(eq(customers.tenantId, tenant.tenantId));
+        await db.delete(retailers).where(eq(retailers.tenantId, tenant.tenantId));
+        await tenant.cleanup();
+      }
+    });
+
     it("GET /products: omitting page/pageSize returns the exact same full unpaginated list (no `pagination` key); explicit params paginate", async () => {
       const tenant = await createTenantWithUser([]);
       try {
