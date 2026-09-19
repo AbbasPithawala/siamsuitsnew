@@ -76,13 +76,17 @@ async function buildOrderGroup(tx: Transaction, tenantId: string, input: CreateO
 export async function createOrderGroup(
   tenantId: string,
   input: CreateOrderGroupInput,
+  actorRetailerId?: string | null,
   retriesLeft = 2
 ): Promise<Awaited<ReturnType<typeof buildOrderGroup>>> {
+  // Same override as `orders.service.ts`'s `createOrder`: a retailer-linked actor can only
+  // ever create a group order for its own retailer, regardless of what the client sent.
+  const effectiveInput = actorRetailerId ? { ...input, retailerId: actorRetailerId } : input;
   try {
-    return await withTenant(tenantId, (tx) => buildOrderGroup(tx, tenantId, input));
+    return await withTenant(tenantId, (tx) => buildOrderGroup(tx, tenantId, effectiveInput));
   } catch (err) {
     if (retriesLeft > 0 && isOrderNumberConflict(err)) {
-      return createOrderGroup(tenantId, input, retriesLeft - 1);
+      return createOrderGroup(tenantId, input, actorRetailerId, retriesLeft - 1);
     }
     throw err;
   }

@@ -1,7 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 import type { EnhancedStore } from "@reduxjs/toolkit";
 import { afterAll, describe, expect, it } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
@@ -110,9 +110,13 @@ interface CustomerFixture {
 async function createCustomerFixture(token: string, retailerId: string): Promise<CustomerFixture> {
   const suffix = uniqueSuffix();
   const firstName = `LiveGroupOrderCust-${suffix}`;
+  // A full profile (not just `firstName`) — `GroupOrderManageCustomerPanel.tsx`'s "Update
+  // Customer" button is gated by `isCustomerFormValid` (firstName/lastName/gender, same rule
+  // `CustomersPage.tsx`'s own admin Edit dialog already enforces), so picking this fixture via
+  // its Autocomplete must land on an already-valid form, not one blocked on missing fields.
   const created = await apiRequest<{ data: { id: string } }>("/customers", token, {
     method: "POST",
-    body: JSON.stringify({ retailerId, firstName }),
+    body: JSON.stringify({ retailerId, firstName, lastName: "Test", gender: "Other" }),
   });
   return { id: created.data.id, firstName };
 }
@@ -334,6 +338,36 @@ async function fillMeasurementValueForSlot(
   }
 }
 
+/**
+ * Fills in the currently-open Manage Customer screen
+ * (`GroupOrderManageCustomerPanel.tsx`) — a full-page panel that takes over
+ * the whole Customers step, not a `Dialog` — picks `customer` via the
+ * Autocomplete (pre-filling its profile form since `createCustomerFixture`
+ * below now seeds a full profile), fills the given Vest/Shirt measurement
+ * values, and clicks "Update Customer" to persist and return to the table.
+ * "Add Customer" already opens this screen directly for a fresh slot
+ * (`NewGroupOrderPage.tsx`'s `handleAddCustomer`); an already-managed row's
+ * own "Manage" status link reopens it the same way for edits.
+ */
+async function fillManageCustomerPanel(
+  user: ReturnType<typeof userEvent.setup>,
+  customer: CustomerFixture,
+  measurements: { vest: string; shirt: string }
+) {
+  const panel = await screen.findByTestId("manage-customer-panel", {}, NETWORK_WAIT);
+  await user.type(within(panel).getByLabelText("Search customers"), customer.firstName);
+  // MUI `Autocomplete` renders its option list via a React Portal to
+  // `document.body` by default — `within(panel)` can never see it, so this has to
+  // query unscoped (`screen`), by the real `option` role, not `within(panel)`/`getByText`.
+  // The fixture now carries a full name ("<firstName> Test"), so the option's accessible
+  // name is more than just `firstName` — matched as a substring via regex.
+  await user.click(await screen.findByRole("option", { name: new RegExp(customer.firstName) }, NETWORK_WAIT));
+  await fillMeasurementValueForSlot(user, panel, "Vest", measurements.vest);
+  await fillMeasurementValueForSlot(user, panel, "Shirt", measurements.shirt);
+  await user.click(within(panel).getByRole("button", { name: "Update Customer" }));
+  await waitFor(() => expect(screen.queryByTestId("manage-customer-panel")).not.toBeInTheDocument(), NETWORK_WAIT);
+}
+
 const NETWORK_WAIT = { timeout: 15000 };
 
 const createdOrderIds: string[] = [];
@@ -442,15 +476,35 @@ describe.skipIf(!seededToken)("Group Orders (live siam/server integration)", () 
       // (only) unit is already expanded by `expandedUnit`'s real default (`useState(0)`) —
       // no compensating click needed, and clicking "Item 1" here now would just toggle it
       // straight back closed.
+      // Vest's own Fabric & Styling panel is still open at this point (it "takes over"
+      // `OrderCartStep`'s entire rendered output while open — the row table, shirt's row
+      // included, doesn't render until it's closed, same as `OrderBuilderPage.live.test.tsx`'s
+      // own `openStylingPanel` helper already accounts for via this identical call).
+      await closeAnyOpenPanel(user);
+      // Re-queried live (not the `vestRow` const captured above) — `OrderCartStep`'s panel
+      // "takes over" its entire rendered output while open, unmounting the row table (`vestRow`'s
+      // own DOM node included) the instant shirt's panel opens below, so a `waitFor` against that
+      // now-detached reference would poll a frozen snapshot forever instead of the live row.
+      await waitFor(
+        () => expect(within(getLineItemRow(vestSuperProduct.id)).getByTestId("styling-status").textContent).toBe("Complete"),
+        NETWORK_WAIT
+      );
+
       const shirtRow = getLineItemRow(shirtSuperProduct.id);
       await user.click(within(shirtRow).getByTestId("styling-status"));
       await screen.findByText(`${shirtSuperProduct.name} — Fabric & Styling`);
       await completeAllStyleTabsFirst(user, getUnitContent(0));
 
-      await waitFor(() => expect(within(vestRow).getByTestId("styling-status").textContent).toBe("Complete"), NETWORK_WAIT);
-      await waitFor(() => expect(within(shirtRow).getByTestId("styling-status").textContent).toBe("Complete"), NETWORK_WAIT);
-
       await closeAnyOpenPanel(user);
+      // Same "re-query live, don't reuse a pre-panel DOM reference" reasoning as above.
+      await waitFor(
+        () => expect(within(getLineItemRow(vestSuperProduct.id)).getByTestId("styling-status").textContent).toBe("Complete"),
+        NETWORK_WAIT
+      );
+      await waitFor(
+        () => expect(within(getLineItemRow(shirtSuperProduct.id)).getByTestId("styling-status").textContent).toBe("Complete"),
+        NETWORK_WAIT
+      );
       const nextButton = screen.getByRole("button", { name: "Next: Add Customers" });
       await waitFor(() => expect(nextButton).toBeEnabled(), NETWORK_WAIT);
       await user.click(nextButton);
@@ -458,32 +512,43 @@ describe.skipIf(!seededToken)("Group Orders (live siam/server integration)", () 
       // Customers step: each customer only enters their OWN measurements against the identical shared cart above.
       await screen.findByText(new RegExp(`Customers in this group for ${retailer.name}`));
 
-      await user.click(screen.getByRole("button", { name: "Add Customer" }));
-      const card0 = await screen.findByTestId("group-customer-card-0", {}, NETWORK_WAIT);
-      await user.type(within(card0).getByLabelText("Search customers"), customer1.firstName);
-      // MUI `Autocomplete` renders its option list via a React Portal to
-      // `document.body` by default — `within(card0)` can never see it, so this has to
-      // query unscoped (`screen`), by the real `option` role, not `within(card0)`/`getByText`.
-      await user.click(await screen.findByRole("option", { name: customer1.firstName }, NETWORK_WAIT));
-      const card0AfterCustomer = screen.getByTestId("group-customer-card-0");
-      await fillMeasurementValueForSlot(user, card0AfterCustomer, "Vest", "40");
-      await fillMeasurementValueForSlot(user, card0AfterCustomer, "Shirt", "16");
-      await waitFor(
-        () => expect(within(card0AfterCustomer).getByTestId("group-customer-status").textContent).toBe("Complete"),
-        NETWORK_WAIT
-      );
+      // "Number of Customers" (client-only, no backend field — see `NewGroupOrderPage.tsx`'s
+      // own doc comment) defaults to 2, matching legacy's own `customer_quantity` default —
+      // exactly what this test needs, and already gates "Add Customer"/"Place Group Order" below.
+      expect(screen.getByLabelText("Number of Customers")).toHaveValue(2);
 
       await user.click(screen.getByRole("button", { name: "Add Customer" }));
-      const card1 = await screen.findByTestId("group-customer-card-1", {}, NETWORK_WAIT);
-      await user.type(within(card1).getByLabelText("Search customers"), customer2.firstName);
-      await user.click(await screen.findByRole("option", { name: customer2.firstName }, NETWORK_WAIT));
-      const card1AfterCustomer = screen.getByTestId("group-customer-card-1");
-      await fillMeasurementValueForSlot(user, card1AfterCustomer, "Vest", "42");
-      await fillMeasurementValueForSlot(user, card1AfterCustomer, "Shirt", "17");
-      await waitFor(
-        () => expect(within(card1AfterCustomer).getByTestId("group-customer-status").textContent).toBe("Complete"),
-        NETWORK_WAIT
-      );
+      await fillManageCustomerPanel(user, customer1, { vest: "40", shirt: "16" });
+      const row0 = screen.getByTestId("group-customer-row-0");
+      await waitFor(() => expect(within(row0).getByTestId("group-customer-status").textContent).toBe("Manage"), NETWORK_WAIT);
+      expect(within(row0).getByText(new RegExp(customer1.firstName))).toBeInTheDocument();
+
+      // Still room for a second slot (1 row < numberOfCustomers 2).
+      expect(screen.getByRole("button", { name: "Add Customer" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Add Customer" }));
+      await fillManageCustomerPanel(user, customer2, { vest: "42", shirt: "17" });
+      const row1 = screen.getByTestId("group-customer-row-1");
+      await waitFor(() => expect(within(row1).getByTestId("group-customer-status").textContent).toBe("Manage"), NETWORK_WAIT);
+      expect(within(row1).getByText(new RegExp(customer2.firstName))).toBeInTheDocument();
+
+      // Number of Customers (2) reached — "Add Customer" gates off exactly like legacy's own
+      // `showAddCustomerButton` (`customers.length < customer_quantity`).
+      expect(screen.queryByRole("button", { name: "Add Customer" })).not.toBeInTheDocument();
+
+      // Decreasing "Number of Customers" below 2 (legacy's own hard minimum) is rejected —
+      // same real `handleCustomerQuantity` rule — and never removes either row above. A single
+      // atomic `fireEvent.change` (not `user.clear` + `user.type`) is deliberate: this field is
+      // fully controlled and reverts to its last-valid value the instant a rejected edit is
+      // rejected, so driving it keystroke-by-keystroke would land the second keystroke against
+      // the already-reverted "2" (typing "1" after a reverted-to-"2" field inserts "1" next to
+      // it, e.g. "12" — a valid increase, not the rejection this asserts).
+      const numberOfCustomersInput = screen.getByLabelText("Number of Customers");
+      fireEvent.change(numberOfCustomersInput, { target: { value: "1" } });
+      await screen.findByText(/cannot be less than 2/i, {}, NETWORK_WAIT);
+      expect(screen.getByTestId("group-customer-row-0")).toBeInTheDocument();
+      expect(screen.getByTestId("group-customer-row-1")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add Customer" })).not.toBeInTheDocument();
 
       const placeButton = screen.getByRole("button", { name: "Place Group Order" });
       await waitFor(() => expect(placeButton).toBeEnabled(), NETWORK_WAIT);
@@ -562,8 +627,10 @@ describe.skipIf(!seededToken)("Group Orders (live siam/server integration)", () 
       await screen.findByRole("heading", { name: `Group Order ${groupOrderNumber}` }, NETWORK_WAIT);
       await screen.findByText(new RegExp(`Retailer: ${retailer.name}`), {}, NETWORK_WAIT);
 
-      const customer1Cell = await screen.findByText(customer1.firstName, {}, NETWORK_WAIT);
-      const customer2Cell = await screen.findByText(customer2.firstName, {}, NETWORK_WAIT);
+      // `GroupOrderDetailPage.tsx` renders the full "firstName lastName" — `createCustomerFixture`
+      // now seeds a real `lastName`/`gender`, so this matches by substring rather than exact text.
+      const customer1Cell = await screen.findByText(new RegExp(customer1.firstName), {}, NETWORK_WAIT);
+      const customer2Cell = await screen.findByText(new RegExp(customer2.firstName), {}, NETWORK_WAIT);
       const childRow1 = customer1Cell.closest("tr") as HTMLElement;
       const childRow2 = customer2Cell.closest("tr") as HTMLElement;
       expect(childRow1).not.toBe(childRow2);

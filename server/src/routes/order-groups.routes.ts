@@ -57,7 +57,7 @@ orderGroupsRouter.post(
   validateBody(createOrderGroupSchema),
   async (req, res, next) => {
     try {
-      const group = await orderGroupsService.createOrderGroup(req.actor!.tenantId!, req.body);
+      const group = await orderGroupsService.createOrderGroup(req.actor!.tenantId!, req.body, req.actor!.retailerId);
       res.status(201).json({ data: group });
     } catch (err) {
       next(err);

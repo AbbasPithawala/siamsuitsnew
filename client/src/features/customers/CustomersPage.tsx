@@ -24,6 +24,7 @@ import Typography from "@mui/material/Typography";
 // Named barrel import — see ProductsPage.tsx's comment on this project's
 // Vite dep optimizer mis-transforming `@mui/icons-material/X` deep imports.
 import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from "@mui/icons-material";
+import { useMeQuery } from "../../api/baseApi";
 import { getApiErrorMessage } from "../../api/errorUtils";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { PaginationControls } from "../../components/PaginationControls";
@@ -79,7 +80,13 @@ function customerName(customer: Customer): string {
  */
 export function CustomersPage() {
   const canManage = useHasPermission("customers.manage");
-  const { data: retailers } = useListRetailersQuery();
+  const { data: me } = useMeQuery();
+  // A retailer-linked session can only ever manage its own customers (server-side row-level
+  // isolation force-overrides any client-supplied retailerId on reads) — so the retailer
+  // picker/filter is meaningless for that session and hidden entirely, matching
+  // `OrderListPage.tsx`'s/`OrderBuilderPage.tsx`'s identical retailer-lock pattern.
+  const isRetailerLinked = Boolean(me?.retailerId);
+  const { data: retailers } = useListRetailersQuery(undefined, { skip: isRetailerLinked });
   const [retailerFilter, setRetailerFilter] = useState<string>(ALL_RETAILERS);
   const pagination = usePagination();
 
@@ -121,7 +128,7 @@ export function CustomersPage() {
 
   function openCreateDialog() {
     setEditingId(null);
-    setForm({ ...EMPTY_FORM, retailerId: retailerFilter || "" });
+    setForm({ ...EMPTY_FORM, retailerId: isRetailerLinked ? me!.retailerId! : retailerFilter || "" });
     setSubmitAttempted(false);
     setDialogOpen(true);
   }
@@ -184,22 +191,24 @@ export function CustomersPage() {
         )}
       </Stack>
 
-      <FormControl size="small" sx={{ mb: 2, minWidth: 240 }}>
-        <InputLabel id="customer-retailer-filter-label">Filter by retailer</InputLabel>
-        <Select
-          labelId="customer-retailer-filter-label"
-          label="Filter by retailer"
-          value={retailerFilter}
-          onChange={handleRetailerFilterChange}
-        >
-          <MenuItem value={ALL_RETAILERS}>All retailers</MenuItem>
-          {retailers?.map((retailer) => (
-            <MenuItem key={retailer.id} value={retailer.id}>
-              {retailer.name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      {!isRetailerLinked && (
+        <FormControl size="small" sx={{ mb: 2, minWidth: 240 }}>
+          <InputLabel id="customer-retailer-filter-label">Filter by retailer</InputLabel>
+          <Select
+            labelId="customer-retailer-filter-label"
+            label="Filter by retailer"
+            value={retailerFilter}
+            onChange={handleRetailerFilterChange}
+          >
+            <MenuItem value={ALL_RETAILERS}>All retailers</MenuItem>
+            {retailers?.map((retailer) => (
+              <MenuItem key={retailer.id} value={retailer.id}>
+                {retailer.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
 
       {isError && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -215,7 +224,7 @@ export function CustomersPage() {
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
-                <TableCell>Retailer</TableCell>
+                {!isRetailerLinked && <TableCell>Retailer</TableCell>}
                 <TableCell>Gender</TableCell>
                 <TableCell>Contact</TableCell>
                 {canManage && <TableCell align="right">Actions</TableCell>}
@@ -224,7 +233,7 @@ export function CustomersPage() {
             <TableBody>
               {customers?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={canManage ? 5 : 4}>
+                  <TableCell colSpan={(isRetailerLinked ? 3 : 4) + (canManage ? 1 : 0)}>
                     <Typography color="text.secondary">No customers yet.</Typography>
                   </TableCell>
                 </TableRow>
@@ -232,7 +241,7 @@ export function CustomersPage() {
               {customers?.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell>{customerName(customer)}</TableCell>
-                  <TableCell>{retailerNameById.get(customer.retailerId) ?? "—"}</TableCell>
+                  {!isRetailerLinked && <TableCell>{retailerNameById.get(customer.retailerId) ?? "—"}</TableCell>}
                   <TableCell>{customer.gender ?? "—"}</TableCell>
                   <TableCell>{customer.contactNumber ?? "—"}</TableCell>
                   {canManage && (
@@ -257,21 +266,23 @@ export function CustomersPage() {
         <DialogTitle>{editingId ? "Edit Customer" : "Add Customer"}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <FormControl required fullWidth>
-              <InputLabel id="customer-retailer-label">Retailer</InputLabel>
-              <Select
-                labelId="customer-retailer-label"
-                label="Retailer"
-                value={form.retailerId}
-                onChange={(event: SelectChangeEvent) => setForm((current) => ({ ...current, retailerId: event.target.value }))}
-              >
-                {retailers?.map((retailer) => (
-                  <MenuItem key={retailer.id} value={retailer.id}>
-                    {retailer.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {!isRetailerLinked && (
+              <FormControl required fullWidth>
+                <InputLabel id="customer-retailer-label">Retailer</InputLabel>
+                <Select
+                  labelId="customer-retailer-label"
+                  label="Retailer"
+                  value={form.retailerId}
+                  onChange={(event: SelectChangeEvent) => setForm((current) => ({ ...current, retailerId: event.target.value }))}
+                >
+                  {retailers?.map((retailer) => (
+                    <MenuItem key={retailer.id} value={retailer.id}>
+                      {retailer.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
             <CustomerFormFields
               value={form}
               onChange={(next) => setForm((current) => ({ ...current, ...next }))}

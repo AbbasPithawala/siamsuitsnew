@@ -44,10 +44,17 @@ export interface CreateCustomerInput {
 
 export type UpdateCustomerInput = Partial<CreateCustomerInput>;
 
-export function createCustomer(tenantId: string, input: CreateCustomerInput) {
+/**
+ * `actorRetailerId`, when non-null (a retailer-linked session), forces the effective
+ * `retailerId` to the actor's own id, ignoring whatever the client passed in
+ * `input.retailerId` — a retailer can only ever create customers for itself. Same override
+ * rule as `listCustomers`'s `actorRetailerId`, just applied to a write instead of a filter.
+ */
+export function createCustomer(tenantId: string, input: CreateCustomerInput, actorRetailerId?: string | null) {
   return withTenant(tenantId, async (tx) => {
-    await requireRetailer(tx, input.retailerId);
-    const [customer] = await tx.insert(customers).values({ tenantId, ...input }).returning();
+    const retailerId = actorRetailerId ?? input.retailerId;
+    await requireRetailer(tx, retailerId);
+    const [customer] = await tx.insert(customers).values({ tenantId, ...input, retailerId }).returning();
     return customer;
   });
 }
@@ -102,15 +109,17 @@ export async function getCustomer(tenantId: string, id: string, actorRetailerId?
   return withTenant(tenantId, (tx) => requireCustomer(tx, id, actorRetailerId));
 }
 
+/** Same override as `createCustomer`: a retailer-linked actor can't reassign its own customer to another retailer, so `input.retailerId` is forced back to `actorRetailerId` whenever the actor is retailer-linked. */
 export async function updateCustomer(tenantId: string, id: string, input: UpdateCustomerInput, actorRetailerId?: string | null) {
   return withTenant(tenantId, async (tx) => {
     await requireCustomer(tx, id, actorRetailerId);
 
-    if (input.retailerId) await requireRetailer(tx, input.retailerId);
+    const nextInput = actorRetailerId ? { ...input, retailerId: actorRetailerId } : input;
+    if (nextInput.retailerId) await requireRetailer(tx, nextInput.retailerId);
 
     const [updated] = await tx
       .update(customers)
-      .set({ ...input, updatedAt: new Date() })
+      .set({ ...nextInput, updatedAt: new Date() })
       .where(eq(customers.id, id))
       .returning();
     return updated;

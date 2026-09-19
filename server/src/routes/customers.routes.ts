@@ -69,7 +69,7 @@ customersRouter.post(
   validateBody(createCustomerSchema),
   async (req, res, next) => {
     try {
-      const customer = await customersService.createCustomer(req.actor!.tenantId!, req.body);
+      const customer = await customersService.createCustomer(req.actor!.tenantId!, req.body, req.actor!.retailerId);
       res.status(201).json({ data: customer });
     } catch (err) {
       next(err);

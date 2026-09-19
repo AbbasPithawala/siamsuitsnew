@@ -145,7 +145,7 @@ ordersRouter.post(
       if (req.body.isRush) await assertPermission(req.actor!.id, "orders.rush");
       if (req.body.repeatOfOrderId) await assertPermission(req.actor!.id, "orders.repeat");
 
-      const order = await ordersService.createOrder(req.actor!.tenantId!, req.body);
+      const order = await ordersService.createOrder(req.actor!.tenantId!, req.body, req.actor!.retailerId);
       res.status(201).json({ data: order });
     } catch (err) {
       next(err);

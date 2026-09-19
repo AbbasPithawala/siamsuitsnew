@@ -87,19 +87,23 @@ export function FeatureSelector({ productId, value, onChange }: FeatureSelectorP
 
   return (
     <Box className="fabric-left" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      {textFeatures.map((feature) => (
-        <Box key={feature.id}>
-          <Typography variant="h6" className="title-fabrics" gutterBottom>
-            {feature.thaiName ? `${feature.name} (${feature.thaiName})` : feature.name}
-          </Typography>
-          <InlineFeatureField
-            feature={feature}
-            value={value}
-            updateFeature={updateFeature}
-            monogramPositionFeature={monogramPositionFeature}
-          />
+      {textFeatures.length > 0 && (
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+          {textFeatures.map((feature) => (
+            <Box key={feature.id} sx={{ flex: "1 1 200px", minWidth: 200 }}>
+              <Typography variant="h6" className="title-fabrics" gutterBottom>
+                {feature.thaiName ? `${feature.name} (${feature.thaiName})` : feature.name}
+              </Typography>
+              <InlineFeatureField
+                feature={feature}
+                value={value}
+                updateFeature={updateFeature}
+                monogramPositionFeature={monogramPositionFeature}
+              />
+            </Box>
+          ))}
         </Box>
-      ))}
+      )}
 
       {pipingFeature && (
         <Box>
@@ -242,9 +246,28 @@ function ChoiceTabBar({ features, value, updateFeature }: ChoiceTabBarProps) {
     <Box className="form-group frontbutton-info">
       <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
         <Tabs variant="scrollable" value={boundedIndex} onChange={(_event, newValue: number) => setTabIndex(newValue)}>
-          {features.map((feature) => (
-            <Tab key={feature.id} label={feature.name.toUpperCase()} />
-          ))}
+          {features.map((feature) => {
+            const entry = value.find((v) => v.featureId === feature.id);
+            const isComplete =
+              entry?.styleId !== undefined && isFinalChoiceSelection(feature, { styleId: entry.styleId, styleOptionId: entry.styleOptionId });
+            return (
+              <Tab
+                key={feature.id}
+                label={feature.name.toUpperCase()}
+                sx={
+                  isComplete
+                    ? {
+                        color: "success.contrastText",
+                        bgcolor: "success.main",
+                        borderRadius: 1,
+                        mx: 0.5,
+                        "&.Mui-selected": { color: "success.contrastText" },
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
         </Tabs>
       </Box>
       {activeFeature && (

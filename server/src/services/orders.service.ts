@@ -588,12 +588,21 @@ export async function buildOrder(tx: Transaction, tenantId: string, input: Creat
  * the same moment) without building a dedicated sequence table for what is, in practice,
  * low-frequency admin traffic.
  */
-export async function createOrder(tenantId: string, input: CreateOrderInput, retriesLeft = 2): Promise<Awaited<ReturnType<typeof buildOrder>>> {
+export async function createOrder(
+  tenantId: string,
+  input: CreateOrderInput,
+  actorRetailerId?: string | null,
+  retriesLeft = 2
+): Promise<Awaited<ReturnType<typeof buildOrder>>> {
+  // A retailer-linked actor can only ever order for its own retailer (same rule the order
+  // builder UI already enforces client-side) — force it here too so the route can't be
+  // bypassed to create an order under a different retailer.
+  const effectiveInput = actorRetailerId ? { ...input, retailerId: actorRetailerId } : input;
   try {
-    return await withTenant(tenantId, (tx) => buildOrder(tx, tenantId, input));
+    return await withTenant(tenantId, (tx) => buildOrder(tx, tenantId, effectiveInput));
   } catch (err) {
     if (retriesLeft > 0 && isOrderNumberConflict(err)) {
-      return createOrder(tenantId, input, retriesLeft - 1);
+      return createOrder(tenantId, input, actorRetailerId, retriesLeft - 1);
     }
     throw err;
   }
@@ -788,6 +797,12 @@ export async function setOrderStatus(tenantId: string, orderId: string, status: 
  */
 export async function reassignOrderRetailer(tenantId: string, orderId: string, retailerId: string, actorRetailerId?: string | null) {
   return withTenant(tenantId, async (tx) => {
+    // A retailer-linked actor can only ever act on its own orders (enforced by `requireOrder`
+    // below), and reassigning to a *different* retailer would hand the order away — an action
+    // only staff/admin (actorRetailerId null) should be able to take.
+    if (actorRetailerId && retailerId !== actorRetailerId) {
+      throw new HttpError(403, "FORBIDDEN", "A retailer cannot reassign an order to a different retailer");
+    }
     const order = await requireOrder(tx, orderId, actorRetailerId);
     await requireRetailer(tx, retailerId);
     const [updated] = await tx

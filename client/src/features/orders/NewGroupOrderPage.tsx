@@ -1,13 +1,11 @@
 import { useCallback, useState } from "react";
 import Alert from "@mui/material/Alert";
-import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
 import FormControl from "@mui/material/FormControl";
+import IconButton from "@mui/material/IconButton";
 import InputLabel from "@mui/material/InputLabel";
-import ListItemText from "@mui/material/ListItemText";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
 import Select from "@mui/material/Select";
@@ -16,12 +14,18 @@ import Stack from "@mui/material/Stack";
 import Step from "@mui/material/Step";
 import StepLabel from "@mui/material/StepLabel";
 import Stepper from "@mui/material/Stepper";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 // Named barrel import — see OrderBuilderPage.tsx's/ProductsPage.tsx's comment
 // on this project's Vite dep optimizer mis-transforming `@mui/icons-material/X`
 // deep imports.
-import { CheckCircle as CheckCircleIcon } from "@mui/icons-material";
+import { CheckCircle as CheckCircleIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { useMeQuery } from "../../api/baseApi";
 import { getApiErrorMessage } from "../../api/errorUtils";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
@@ -31,18 +35,29 @@ import type { SuperProduct } from "../catalog/superProductsApi";
 import { useListCustomersByRetailerQuery } from "../customers/customersApi";
 import type { Customer } from "../customers/customersApi";
 import { useListRetailersQuery } from "../retailers/retailersApi";
-import { CustomerQuickCreateDialog } from "./CustomerQuickCreateDialog";
+import { GroupOrderManageCustomerPanel } from "./GroupOrderManageCustomerPanel";
 import { LineItemCompletenessProbe } from "./LineItemCompletenessProbe";
 import { OrderCartStep, createLineItemDraft } from "./OrderCartStep";
 import type { LineItemDraft } from "./OrderCartStep";
-import { LineItemMeasurementsPanel, createEmptyLineItemMeasurementsDraft } from "./LineItemMeasurementsPanel";
-import type { LineItemComponentMeasurementDraft, LineItemMeasurementsDraft } from "./LineItemMeasurementsPanel";
+import { createEmptyLineItemMeasurementsDraft } from "./LineItemMeasurementsPanel";
+import type {
+  LineItemComponentMeasurementDraft,
+  LineItemMeasurementsDraft,
+} from "./LineItemMeasurementsPanel";
 import type { ProductMeasurementLink } from "../measurements/measurementsApi";
 import { emptyUnitStylingDraft } from "./StylingAccordion";
 import type { UnitStylingDraft } from "./StylingAccordion";
-import { buildOrderItemsFromLineItems, seedSharedMeasurementsForNewLineItem, withSharedMeasurementsSynced } from "./orderItemBuilder";
+import {
+  buildOrderItemsFromLineItems,
+  seedSharedMeasurementsForNewLineItem,
+  withSharedMeasurementsSynced,
+} from "./orderItemBuilder";
 import { useCreateOrderGroupMutation } from "./orderGroupsApi";
-import type { CreateOrderGroupInput, CreateOrderGroupOrderInput, OrderGroupDetail } from "./orderGroupsApi";
+import type {
+  CreateOrderGroupInput,
+  CreateOrderGroupOrderInput,
+  OrderGroupDetail,
+} from "./orderGroupsApi";
 
 function customerName(customer: Customer): string {
   return [customer.firstName, customer.lastName].filter(Boolean).join(" ");
@@ -76,7 +91,10 @@ function seedMeasurementsByLineItem(
   return seeded;
 }
 
-function createGroupCustomerDraft(lineItems: LineItemDraft[], superProducts: SuperProduct[]): GroupCustomerDraft {
+function createGroupCustomerDraft(
+  lineItems: LineItemDraft[],
+  superProducts: SuperProduct[]
+): GroupCustomerDraft {
   return {
     key: crypto.randomUUID(),
     customerId: null,
@@ -88,6 +106,9 @@ const STEP_LABELS = ["Retailer", "Shared Cart", "Customers"];
 const RETAILER_STEP = 0;
 const CART_STEP = 1;
 const CUSTOMERS_STEP = 2;
+
+/** Matches legacy `NewOrder.jsx`'s own `customer_quantity` default/min (`handleCustomerQuantity` rejects anything below 2). */
+const MIN_NUMBER_OF_CUSTOMERS = 2;
 
 /**
  * New Group Order — corrected model (this file previously modeled a group
@@ -135,13 +156,27 @@ const CUSTOMERS_STEP = 2;
  * gate the Shared Cart step's own styling-completeness requirement AND, per
  * customer, on the Customers step.
  *
- * **The Customers step deliberately reuses this app's already-established
- * "Paper card list, chip status, remove button" idiom** (the same shape the
- * old per-child-order cards, and `OrderCartStep`'s own row-status pattern,
- * already use) rather than introducing a literal `<table>` — legacy
- * `Customers.jsx`'s real behavior was a name/status/actions list, which is
- * what these cards already render; not a second, drifting layout primitive
- * for the same information.
+ * **The Customers step is a compact table (S.No / Customer Name / Manage
+ * status-link / Delete), matching legacy `Group/customers/Customers.jsx`'s
+ * real name/status/actions list shape** — built with this codebase's own
+ * established `Table`/`TableHead`/`TableBody`/`TableRow`/`TableCell` pattern
+ * (`CustomersPage.tsx`), not the always-expanded `Paper` card list this step
+ * used before (confirmed wrong against legacy and the real user directly: a
+ * group order can have many customers, and an always-expanded card per one
+ * doesn't scale the way legacy's compact list does). "Add Customer" opens
+ * `GroupOrderManageCustomerPanel` straight away for the new slot, and an
+ * already-managed row's own "Manage"/"Missing" link reopens it — legacy
+ * `Group/newCustomer/NewCustomer.jsx`'s real combined shape: search/pick an
+ * existing customer OR register a new one, plus that slot's shared-line-item
+ * measurement forms, plus one Save/Update button — replacing the old split
+ * "separate quick-create dialog + always-inline measurements" flow. A full-
+ * page takeover (`GroupOrderManageCustomerPanel.tsx`'s own doc comment), not
+ * a `Dialog` popup — the real requested shape, matching every other page in
+ * this app. A client-side-only "Number of Customers" field (default/min 2, matching
+ * legacy's `customer_quantity`) gates how many rows can exist — no backend
+ * field for it exists (`POST /order-groups` takes only `retailerId` +
+ * `orders[]`, `orderGroupsApi.ts`), so it's pure UI state here, exactly like
+ * legacy's own client-only `handleCustomerQuantity` gate.
  *
  * **Gating**: page-level `RequirePermission permission="orders.group.create"`
  * in `AppRoutes.tsx`, unchanged.
@@ -155,7 +190,9 @@ export function NewGroupOrderPage() {
     Record<string, Record<string, ProductMeasurementLink[]>>
   >({});
   const [customers, setCustomers] = useState<GroupCustomerDraft[]>([]);
-  const [quickCreateTargetKey, setQuickCreateTargetKey] = useState<string | null>(null);
+  const [numberOfCustomers, setNumberOfCustomers] = useState(MIN_NUMBER_OF_CUSTOMERS);
+  const [customerQuantityError, setCustomerQuantityError] = useState<string | null>(null);
+  const [manageTargetKey, setManageTargetKey] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [createdGroup, setCreatedGroup] = useState<OrderGroupDetail | null>(null);
   const [appliedMeRetailerId, setAppliedMeRetailerId] = useState<string | null>(null);
@@ -163,12 +200,24 @@ export function NewGroupOrderPage() {
   const canManageCustomers = useHasPermission("customers.manage");
 
   const { data: me } = useMeQuery();
-  const { data: retailers, isLoading: retailersLoading, isError: retailersError, error: retailersErrorObj } =
-    useListRetailersQuery();
-  const { data: customerOptions, isLoading: customersLoading, isError: customersErrorFlag, error: customersErrorObj } =
-    useListCustomersByRetailerQuery(retailerId ?? "", { skip: !retailerId });
-  const { data: superProducts, isLoading: superProductsLoading, isError: superProductsError, error: superProductsErrorObj } =
-    useListSuperProductsQuery();
+  const {
+    data: retailers,
+    isLoading: retailersLoading,
+    isError: retailersError,
+    error: retailersErrorObj,
+  } = useListRetailersQuery();
+  const {
+    data: customerOptions,
+    isLoading: customersLoading,
+    isError: customersErrorFlag,
+    error: customersErrorObj,
+  } = useListCustomersByRetailerQuery(retailerId ?? "", { skip: !retailerId });
+  const {
+    data: superProducts,
+    isLoading: superProductsLoading,
+    isError: superProductsError,
+    error: superProductsErrorObj,
+  } = useListSuperProductsQuery();
   const [createOrderGroup, createOrderGroupState] = useCreateOrderGroupMutation();
 
   const selectedRetailer = retailers?.find((retailer) => retailer.id === retailerId) ?? null;
@@ -186,6 +235,8 @@ export function NewGroupOrderPage() {
     setLineItemCompleteness({});
     setLineItemMeasurementLinks({});
     setCustomers([]);
+    setNumberOfCustomers(MIN_NUMBER_OF_CUSTOMERS);
+    setCustomerQuantityError(null);
     setActiveStep(CART_STEP);
   }
 
@@ -203,6 +254,8 @@ export function NewGroupOrderPage() {
     setLineItemCompleteness({});
     setLineItemMeasurementLinks({});
     setCustomers([]);
+    setNumberOfCustomers(MIN_NUMBER_OF_CUSTOMERS);
+    setCustomerQuantityError(null);
     setActiveStep(CART_STEP);
   }
 
@@ -266,41 +319,76 @@ export function NewGroupOrderPage() {
   }
 
   function handleChangeStyling(lineItemId: string, next: UnitStylingDraft[]) {
-    setLineItems((current) => current.map((item) => (item.id === lineItemId ? { ...item, stylingDrafts: next } : item)));
+    setLineItems((current) =>
+      current.map((item) => (item.id === lineItemId ? { ...item, stylingDrafts: next } : item))
+    );
   }
 
   /** Same rationale `OrderBuilderPage.tsx`'s identically-named callback documents — stable identity for `LineItemCompletenessProbe`'s effect dependency. */
   const handleLineItemCompletenessChange = useCallback((id: string, complete: boolean) => {
-    setLineItemCompleteness((current) => (current[id] === complete ? current : { ...current, [id]: complete }));
+    setLineItemCompleteness((current) =>
+      current[id] === complete ? current : { ...current, [id]: complete }
+    );
   }, []);
 
-  const handleLineItemLinksChange = useCallback((id: string, linksByComponentId: Record<string, ProductMeasurementLink[]>) => {
-    setLineItemMeasurementLinks((current) => ({ ...current, [id]: linksByComponentId }));
-  }, []);
+  const handleLineItemLinksChange = useCallback(
+    (id: string, linksByComponentId: Record<string, ProductMeasurementLink[]>) => {
+      setLineItemMeasurementLinks((current) => ({ ...current, [id]: linksByComponentId }));
+    },
+    []
+  );
 
+  /**
+   * Gated by the caller (the "Add Customer" button only renders while
+   * `customers.length < numberOfCustomers`, same as legacy's
+   * `showAddCustomerButton`) — this guard is just defense in depth.
+   *
+   * Immediately opens the new slot's own Manage Customer screen (rather than
+   * landing back on the table with a "Missing" row the admin has to click
+   * into separately) — the real requested flow: Add Customer -> Manage
+   * Customer screen -> Save returns to the table with that row filled in.
+   */
   function handleAddCustomer() {
-    setCustomers((current) => [...current, createGroupCustomerDraft(lineItems, superProducts ?? [])]);
+    if (customers.length >= numberOfCustomers) return;
+    const draft = createGroupCustomerDraft(lineItems, superProducts ?? []);
+    setCustomers((current) => [...current, draft]);
+    setManageTargetKey(draft.key);
   }
 
   function handleRemoveCustomer(key: string) {
     setCustomers((current) => current.filter((customer) => customer.key !== key));
   }
 
-  function handleSelectCustomer(key: string, customerId: string) {
+  /**
+   * Legacy `handleCustomerQuantity`'s exact two rejection rules: never below
+   * `MIN_NUMBER_OF_CUSTOMERS`, and never below the number of customer rows
+   * already added (must remove customers first) — surfaced the same way
+   * legacy's snackbar error does, via `customerQuantityError` below the
+   * field.
+   */
+  function handleChangeNumberOfCustomers(rawValue: string) {
+    const next = Number(rawValue);
+    if (!Number.isFinite(next)) return;
+    if (next < MIN_NUMBER_OF_CUSTOMERS) {
+      setCustomerQuantityError(
+        `Number of customers cannot be less than ${MIN_NUMBER_OF_CUSTOMERS}.`
+      );
+      return;
+    }
+    if (next < customers.length) {
+      setCustomerQuantityError("Cannot decrease the number of customers. Remove customers first.");
+      return;
+    }
+    setCustomerQuantityError(null);
+    setNumberOfCustomers(next);
+  }
+
+  /** Called by `GroupOrderManageCustomerPanel.onSaved` once a customer has been picked/registered/updated for this slot. */
+  function handleCustomerSaved(key: string, customerId: string) {
     setCustomers((current) =>
       current.map((customer) => (customer.key === key ? { ...customer, customerId } : customer))
     );
-  }
-
-  function handleClearCustomer(key: string) {
-    setCustomers((current) =>
-      current.map((customer) => (customer.key === key ? { ...customer, customerId: null } : customer))
-    );
-  }
-
-  function handleCustomerCreated(key: string, customer: Customer) {
-    handleSelectCustomer(key, customer.id);
-    setQuickCreateTargetKey(null);
+    setManageTargetKey(null);
   }
 
   function handleChangeCustomerMeasurements(
@@ -334,24 +422,34 @@ export function NewGroupOrderPage() {
     setLineItemCompleteness({});
     setLineItemMeasurementLinks({});
     setCustomers([]);
+    setNumberOfCustomers(MIN_NUMBER_OF_CUSTOMERS);
+    setCustomerQuantityError(null);
     setSubmitError(null);
     setCreatedGroup(null);
   }
 
-  const sharedCartComplete = lineItems.length > 0 && lineItems.every((item) => lineItemCompleteness[item.id] === true);
+  const sharedCartComplete =
+    lineItems.length > 0 && lineItems.every((item) => lineItemCompleteness[item.id] === true);
 
   function customerComplete(customer: GroupCustomerDraft): boolean {
     return customer.customerId !== null && sharedCartComplete;
   }
 
-  const canSubmit = retailerId !== null && sharedCartComplete && customers.length > 0 && customers.every(customerComplete);
+  const canSubmit =
+    retailerId !== null &&
+    sharedCartComplete &&
+    customers.length === numberOfCustomers &&
+    customers.every(customerComplete);
 
   async function handleSubmit() {
     if (!retailerId) return;
     setSubmitError(null);
 
     const orders: CreateOrderGroupOrderInput[] = customers
-      .filter((customer): customer is GroupCustomerDraft & { customerId: string } => customer.customerId !== null)
+      .filter(
+        (customer): customer is GroupCustomerDraft & { customerId: string } =>
+          customer.customerId !== null
+      )
       .map((customer) => {
         const perCustomerLineItems: LineItemDraft[] = lineItems.map((lineItem) => ({
           id: lineItem.id,
@@ -361,7 +459,11 @@ export function NewGroupOrderPage() {
         }));
         return {
           customerId: customer.customerId,
-          items: buildOrderItemsFromLineItems(perCustomerLineItems, superProducts ?? [], lineItemMeasurementLinks),
+          items: buildOrderItemsFromLineItems(
+            perCustomerLineItems,
+            superProducts ?? [],
+            lineItemMeasurementLinks
+          ),
         };
       });
 
@@ -442,7 +544,9 @@ export function NewGroupOrderPage() {
           // `OrderBuilderPage.tsx`'s identical block. Reachable only for the
           // briefest instant before the render-time auto-select block above
           // jumps to `CART_STEP`.
-          <Typography color="text.secondary">Building this group order for your own retailer…</Typography>
+          <Typography color="text.secondary">
+            Building this group order for your own retailer…
+          </Typography>
         ) : retailersLoading ? (
           <LoadingSpinner />
         ) : (
@@ -473,8 +577,8 @@ export function NewGroupOrderPage() {
       {activeStep === CART_STEP && retailerId && (
         <>
           <Typography variant="subtitle1" gutterBottom>
-            Build the shared cart for {selectedRetailer?.name} — every customer added on the next step gets these
-            exact products, quantities, and styling.
+            Build the shared cart for {selectedRetailer?.name} — every customer added on the next
+            step gets these exact products, quantities, and styling.
           </Typography>
 
           {superProductsError && (
@@ -513,175 +617,192 @@ export function NewGroupOrderPage() {
                 this avoids a real dead-end (no way back to CART_STEP from there). */}
             {!me?.retailerId && <Button onClick={() => setActiveStep(RETAILER_STEP)}>Back</Button>}
             {me?.retailerId && <span />}
-            <Button variant="contained" disabled={!sharedCartComplete} onClick={() => setActiveStep(CUSTOMERS_STEP)}>
+            <Button
+              variant="contained"
+              disabled={!sharedCartComplete}
+              onClick={() => setActiveStep(CUSTOMERS_STEP)}
+            >
               Next: Add Customers
             </Button>
           </Stack>
         </>
       )}
 
-      {activeStep === CUSTOMERS_STEP && retailerId && (
-        <>
-          <Typography variant="subtitle1" gutterBottom>
-            Customers in this group for {selectedRetailer?.name}
-          </Typography>
+      {activeStep === CUSTOMERS_STEP &&
+        retailerId &&
+        (() => {
+          const manageTargetCustomer = manageTargetKey
+            ? customers.find((customer) => customer.key === manageTargetKey)
+            : undefined;
+          // `manageTargetCustomer` guards against a stale key (e.g. the row was deleted while
+          // its own panel was open) — falls through to the table below instead of rendering
+          // a panel with nothing to manage.
+          if (manageTargetKey && manageTargetCustomer) {
+            // Takes over this step's entire rendered output (table/Add Customer/Back/Place
+            // Group Order all stop rendering) rather than layering a `Dialog` overlay on top of
+            // them — same "state swap, not real navigation" pattern `OrderCartStep.tsx`'s own
+            // focused Fabric & Styling panel already established (see its doc comment): plain
+            // in-flow content inside this page's own `Box`, so it fills exactly the app shell's
+            // `<main>` content area like every other page, never draws over the header/sidebar.
+            const targetKey = manageTargetKey;
+            // Excludes customers already picked by another row in this same group (real
+            // dedupe constraint) — text matching against whatever the admin types is left
+            // entirely to the panel's own `Autocomplete` internal filtering.
+            const availableCustomers = (customerOptions ?? []).filter(
+              (option) =>
+                !customers.some(
+                  (other) => other.key !== targetKey && other.customerId === option.id
+                )
+            );
+            return (
+              <GroupOrderManageCustomerPanel
+                key={targetKey}
+                retailerId={retailerId}
+                customerId={manageTargetCustomer.customerId}
+                customerOptions={availableCustomers}
+                customersLoading={customersLoading}
+                canManageCustomers={canManageCustomers}
+                lineItems={lineItems}
+                superProducts={superProducts ?? []}
+                measurementsByLineItem={manageTargetCustomer.measurementsByLineItem}
+                onChangeMeasurements={(lineItemId, componentId, next) =>
+                  handleChangeCustomerMeasurements(targetKey, lineItemId, componentId, next)
+                }
+                onClose={() => setManageTargetKey(null)}
+                onSaved={(customerId) => handleCustomerSaved(targetKey, customerId)}
+              />
+            );
+          }
 
-          {customersErrorFlag && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {getApiErrorMessage(customersErrorObj, "Failed to load customers.")}
-            </Alert>
-          )}
+          return (
+            <>
+              <Typography variant="subtitle1" gutterBottom>
+                Customers in this group for {selectedRetailer?.name}
+              </Typography>
 
-          <Stack spacing={3} sx={{ mb: 3 }}>
-            {customers.map((customer, index) => {
-              const selectedCustomer = customerOptions?.find((option) => option.id === customer.customerId) ?? null;
-              // Excludes customers already picked by another card in this same group
-              // (real dedupe constraint) — text matching against whatever the admin
-              // types is left entirely to the `Autocomplete` below's own internal filtering.
-              const availableCustomers = (customerOptions ?? []).filter(
-                (option) => !customers.some((other) => other.key !== customer.key && other.customerId === option.id)
-              );
-              const complete = customerComplete(customer);
+              {customersErrorFlag && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {getApiErrorMessage(customersErrorObj, "Failed to load customers.")}
+                </Alert>
+              )}
 
-              return (
-                <Paper key={customer.key} variant="outlined" sx={{ p: 3 }} data-testid={`group-customer-card-${index}`}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography variant="h6">Customer {index + 1}</Typography>
-                      <Chip
-                        size="small"
-                        data-testid="group-customer-status"
-                        label={complete ? "Complete" : "Missing"}
-                        color={complete ? "success" : "default"}
-                        sx={{ color: complete ? undefined : "red", fontWeight: 600 }}
-                      />
-                    </Stack>
-                    <Button variant="outlined" color="error" size="small" onClick={() => handleRemoveCustomer(customer.key)}>
-                      Remove
-                    </Button>
-                  </Stack>
+              <TextField
+                label="Number of Customers"
+                type="number"
+                size="small"
+                value={numberOfCustomers}
+                onChange={(event) => handleChangeNumberOfCustomers(event.target.value)}
+                inputProps={{ min: MIN_NUMBER_OF_CUSTOMERS }}
+                sx={{ mb: 2, maxWidth: 220 }}
+              />
+              {customerQuantityError && (
+                <Alert
+                  severity="error"
+                  sx={{ mb: 2 }}
+                  onClose={() => setCustomerQuantityError(null)}
+                >
+                  {customerQuantityError}
+                </Alert>
+              )}
 
-                  {!customer.customerId ? (
-                    <>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Pick a customer
-                      </Typography>
-                      <Stack direction="row" spacing={2} sx={{ mb: 2, maxWidth: 480 }}>
-                        {/* Real search dropdown — see `OrderBuilderPage.tsx`'s identical
-                            customer picker for the full reasoning (matches legacy's own
-                            `Group/newCustomer/NewCustomer.jsx` `Autocomplete`). */}
-                        <Autocomplete
-                          fullWidth
-                          size="small"
-                          options={availableCustomers}
-                          loading={customersLoading}
-                          getOptionLabel={(option) => customerName(option)}
-                          isOptionEqualToValue={(option, value) => option.id === value.id}
-                          // See `OrderBuilderPage.tsx`'s identical Autocomplete for why
-                          // `inputValue` is deliberately left uncontrolled.
-                          value={selectedCustomer}
-                          onChange={(_event, option) => {
-                            if (option) handleSelectCustomer(customer.key, option.id);
-                          }}
-                          renderOption={({ key: _key, ...props }, option) => (
-                            <li key={option.id} {...props}>
-                              <ListItemText primary={customerName(option)} secondary={option.contactNumber ?? undefined} />
-                            </li>
-                          )}
-                          noOptionsText={canManageCustomers ? "No matching customers — create one." : "No matching customers."}
-                          renderInput={({ InputLabelProps: _InputLabelProps, size: _size, ...params }) => (
-                            <TextField {...params} label="Search customers" size="small" />
-                          )}
-                        />
-                        {canManageCustomers && (
-                          <Button
-                            variant="outlined"
-                            onClick={() => setQuickCreateTargetKey(customer.key)}
-                            sx={{ whiteSpace: "nowrap" }}
-                          >
-                            New Customer
-                          </Button>
-                        )}
-                      </Stack>
-                    </>
-                  ) : (
-                    <>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                        <Typography variant="body1">
-                          Customer: <strong>{selectedCustomer ? customerName(selectedCustomer) : "—"}</strong>
-                        </Typography>
-                        <Button size="small" onClick={() => handleClearCustomer(customer.key)}>
-                          Change customer
-                        </Button>
-                      </Stack>
+              <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>S.No</TableCell>
+                      <TableCell>Customer Name</TableCell>
+                      <TableCell>Manage Customer</TableCell>
+                      <TableCell align="right">Delete</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {customers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4}>
+                          <Typography color="text.secondary">No customers added yet.</Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {customers.map((customer, index) => {
+                      const selectedCustomer =
+                        customerOptions?.find((option) => option.id === customer.customerId) ??
+                        null;
+                      const complete = customerComplete(customer);
+                      return (
+                        <TableRow key={customer.key} data-testid={`group-customer-row-${index}`}>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell>
+                            {selectedCustomer ? customerName(selectedCustomer) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="text"
+                              size="small"
+                              data-testid="group-customer-status"
+                              onClick={() => setManageTargetKey(customer.key)}
+                              sx={{
+                                color: complete ? "success.main" : "error.main",
+                                fontWeight: 600,
+                                textTransform: "none",
+                              }}
+                            >
+                              {complete ? "Manage" : "Missing"}
+                            </Button>
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              aria-label={`Delete customer ${index + 1}`}
+                              onClick={() => handleRemoveCustomer(customer.key)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-                      <Stack spacing={2}>
-                        {lineItems.map((lineItem) => {
-                          const superProduct = superProducts?.find((sp) => sp.id === lineItem.superProductId);
-                          if (!superProduct) return null;
-                          return (
-                            <Box key={lineItem.id}>
-                              <Typography variant="subtitle2" gutterBottom>
-                                {superProduct.name} × {lineItem.stylingDrafts.length}
-                              </Typography>
-                              <LineItemMeasurementsPanel
-                                components={superProduct.components}
-                                draft={customer.measurementsByLineItem[lineItem.id] ?? {}}
-                                customerId={customer.customerId}
-                                onChange={(componentId, next) =>
-                                  handleChangeCustomerMeasurements(customer.key, lineItem.id, componentId, next)
-                                }
-                              />
-                            </Box>
-                          );
-                        })}
-                      </Stack>
-                    </>
-                  )}
-                </Paper>
-              );
-            })}
-          </Stack>
+              {/* Only while there's still room for another slot — same "Add Customer" gate legacy's own `showAddCustomerButton` (`customers.length < customer_quantity`) enforces. */}
+              {customers.length < numberOfCustomers && (
+                <Button variant="outlined" onClick={handleAddCustomer} sx={{ mb: 3 }}>
+                  Add Customer
+                </Button>
+              )}
 
-          <Button variant="outlined" onClick={handleAddCustomer} sx={{ mb: 3 }}>
-            Add Customer
-          </Button>
+              <Divider sx={{ mb: 2 }} />
 
-          <Divider sx={{ mb: 2 }} />
+              {submitError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {submitError}
+                </Alert>
+              )}
+              {!canSubmit && customers.length > 0 && (
+                <Alert
+                  severity="warning"
+                  sx={{ mb: 2 }}
+                  data-testid="incomplete-group-customers-warning"
+                >
+                  {customers.length !== numberOfCustomers
+                    ? `Add ${numberOfCustomers} customer${numberOfCustomers === 1 ? "" : "s"} (currently ${customers.length}) before this group can be placed.`
+                    : "Every customer needs to be picked (or registered) before this group can be placed."}
+                </Alert>
+              )}
 
-          {submitError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {submitError}
-            </Alert>
-          )}
-          {!canSubmit && customers.length > 0 && (
-            <Alert severity="warning" sx={{ mb: 2 }} data-testid="incomplete-group-customers-warning">
-              Every customer needs to be picked (or created) and their measurements finished before this group can be
-              placed.
-            </Alert>
-          )}
-
-          <Stack direction="row" justifyContent="space-between">
-            <Button onClick={() => setActiveStep(CART_STEP)}>Back</Button>
-            <Button
-              variant="contained"
-              disabled={!canSubmit || createOrderGroupState.isLoading}
-              onClick={handleSubmit}
-            >
-              {createOrderGroupState.isLoading ? "Placing Group Order…" : "Place Group Order"}
-            </Button>
-          </Stack>
-
-          <CustomerQuickCreateDialog
-            open={quickCreateTargetKey !== null}
-            retailerId={retailerId}
-            onClose={() => setQuickCreateTargetKey(null)}
-            onCreated={(customer) => {
-              if (quickCreateTargetKey) handleCustomerCreated(quickCreateTargetKey, customer);
-            }}
-          />
-        </>
-      )}
+              <Stack direction="row" justifyContent="space-between">
+                <Button onClick={() => setActiveStep(CART_STEP)}>Back</Button>
+                <Button
+                  variant="contained"
+                  disabled={!canSubmit || createOrderGroupState.isLoading}
+                  onClick={handleSubmit}
+                >
+                  {createOrderGroupState.isLoading ? "Placing Group Order…" : "Place Group Order"}
+                </Button>
+              </Stack>
+            </>
+          );
+        })()}
     </Box>
   );
 }
