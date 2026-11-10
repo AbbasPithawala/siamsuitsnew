@@ -45,7 +45,7 @@ export function PlatformAdminShell() {
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600 }}>
-            Siam Suits — Platform Admin
+            Daihuuk — Platform Admin
           </Typography>
           {me && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>

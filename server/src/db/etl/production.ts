@@ -18,7 +18,7 @@ import type { EtlDomainResult } from "./result";
  * PHASE_7_TASKS.md Group 0 — one-shot(-but-safe-to-re-run) production data migration:
  * everything Phase 2's catalog-only ETL deliberately left in legacy Mongo (retailers,
  * tailors, customers, orders/group orders, manufacturing state, payroll, extra payments,
- * invoices, shipping) into the new Postgres schema, attached to the same "Siam Suits"
+ * invoices, shipping) into the new Postgres schema, attached to the same "Daihuuk"
  * tenant Phase 2 used.
  *
  * Read-only against legacy Mongo (`legacy-mongo.ts` — never calls insert/update/delete

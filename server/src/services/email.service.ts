@@ -66,9 +66,9 @@ export interface SendTenantWelcomeEmailInput {
  * here must never roll back or fail the approval itself.
  */
 export async function sendTenantWelcomeEmail(input: SendTenantWelcomeEmailInput): Promise<void> {
-  const loginUrl = env.CLIENT_APP_URL ? `${env.CLIENT_APP_URL.replace(/\/$/, "")}/login` : "your Siam Suits login page";
+  const loginUrl = env.CLIENT_APP_URL ? `${env.CLIENT_APP_URL.replace(/\/$/, "")}/login` : "your Daihuuk login page";
   const text = [
-    `Welcome to Siam Suits! Your account has been provisioned.`,
+    `Welcome to Daihuuk! Your account has been provisioned.`,
     ``,
     `Tenant: ${input.tenantSlug}`,
     `Username: ${input.username}`,
@@ -79,7 +79,7 @@ export async function sendTenantWelcomeEmail(input: SendTenantWelcomeEmailInput)
   ].join("\n");
 
   const html = [
-    `<p>Welcome to Siam Suits! Your account has been provisioned.</p>`,
+    `<p>Welcome to Daihuuk! Your account has been provisioned.</p>`,
     `<ul>`,
     `<li><strong>Tenant:</strong> ${input.tenantSlug}</li>`,
     `<li><strong>Username:</strong> ${input.username}</li>`,
@@ -92,7 +92,7 @@ export async function sendTenantWelcomeEmail(input: SendTenantWelcomeEmailInput)
   await getTransporter().sendMail({
     from: env.SMTP_FROM ?? env.SMTP_USER,
     to: input.to,
-    subject: "Your Siam Suits account is ready",
+    subject: "Your Daihuuk account is ready",
     text,
     html,
   });

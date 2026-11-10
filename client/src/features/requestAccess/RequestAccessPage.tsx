@@ -92,7 +92,7 @@ export function RequestAccessPage() {
           Request Access
         </Typography>
         <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
-          Tell us about your business and we&apos;ll set up your Siam Suits account.
+          Tell us about your business and we&apos;ll set up your Daihuuk account.
         </Typography>
         <Box component="form" onSubmit={handleSubmit} noValidate>
           <TextField

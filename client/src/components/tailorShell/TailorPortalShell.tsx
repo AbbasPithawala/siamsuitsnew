@@ -42,7 +42,7 @@ export function TailorPortalShell() {
       <AppBar position="static">
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600 }}>
-            Siam Suits — Tailor Portal
+            Daihuuk — Tailor Portal
           </Typography>
           {me && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>

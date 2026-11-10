@@ -17,7 +17,7 @@ const SEED_ADMIN_PASSWORD = "ChangeMe123!";
  * Idempotent: safe to re-run. Seeds the global permission catalog, plus a default
  * tenant + "Owner" role (all permissions, system-protected) and "Retailer" role
  * (tenant-configurable, retailer-scoped permission bundle) that Phase 2's Mongo->Postgres
- * ETL will migrate the existing Siam Suits business into.
+ * ETL will migrate the existing Daihuuk business into.
  */
 async function seed() {
   console.log("Seeding permission catalog...");
@@ -39,7 +39,7 @@ async function seed() {
   // silently change (PHASE_11_TASKS.md Decision C2).
   console.log("Provisioning default tenant + Owner role + admin user...");
   const { tenant, ownerUser: adminUser } = await provisionTenant({
-    businessName: "Siam Suits",
+    businessName: "Daihuuk",
     slug: "siam-suits",
     ownerName: "Admin",
     ownerEmail: "admin@siam-suits.local",

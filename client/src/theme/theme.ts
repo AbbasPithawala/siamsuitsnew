@@ -1,5 +1,5 @@
 /**
- * MUI v5 theme for the Siam Suits rewrite.
+ * MUI v5 theme for the Daihuuk rewrite.
  *
  * Per REWRITE_ARCHITECTURE.md §3 ("Visual design is carried over from
  * `siamClient`, not redesigned"), the values below are pulled from the

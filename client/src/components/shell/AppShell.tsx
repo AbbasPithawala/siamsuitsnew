@@ -142,7 +142,7 @@ export function AppShell() {
               />
             ) : (
               <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 600 }}>
-                Siam Suits
+                Daihuuk
               </Typography>
             )}
           </Box>

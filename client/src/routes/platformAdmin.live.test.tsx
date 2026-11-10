@@ -99,7 +99,7 @@ async function loginAsPlatformAdmin() {
   await waitFor(() => expect(store.getState().auth.token).toBeTruthy());
   // Scoped to the header's `body2` name element specifically
   // (`PlatformAdminShell.tsx`'s `<Typography variant="body2">{me.name}</Typography>`)
-  // — the shell's own title ("Siam Suits — Platform Admin") also matches
+  // — the shell's own title ("Daihuuk — Platform Admin") also matches
   // /platform admin/i as plain text, so an unscoped lookup is ambiguous
   // (`me.name` is literally "Platform Admin" for the seeded dev account).
   await waitFor(() => {
