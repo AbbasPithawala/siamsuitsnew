@@ -75,7 +75,7 @@ describe.skipIf(!seededToken)("Login flow (live siam/server integration)", () =>
 
     await user.type(screen.getByLabelText(/tenant/i), SEED_CREDENTIALS.tenant);
     await user.type(screen.getByLabelText(/username/i), SEED_CREDENTIALS.username);
-    await user.type(screen.getByLabelText(/password/i), SEED_CREDENTIALS.password);
+    await user.type(screen.getByLabelText(/password/i, { selector: "input" }), SEED_CREDENTIALS.password);
     await user.click(screen.getByRole("button", { name: /login/i }));
 
     await waitFor(() => {
@@ -95,7 +95,7 @@ describe.skipIf(!seededToken)("Login flow (live siam/server integration)", () =>
 
     await user.type(screen.getByLabelText(/tenant/i), SEED_CREDENTIALS.tenant);
     await user.type(screen.getByLabelText(/username/i), SEED_CREDENTIALS.username);
-    await user.type(screen.getByLabelText(/password/i), "definitely-wrong-password");
+    await user.type(screen.getByLabelText(/password/i, { selector: "input" }), "definitely-wrong-password");
     await user.click(screen.getByRole("button", { name: /login/i }));
 
     await screen.findByText(/invalid credentials/i);

@@ -12,45 +12,34 @@ import { Send as SendIcon } from "@mui/icons-material";
 import { getApiErrorMessage } from "../../api/errorUtils";
 import { useCreateTenantRequestMutation } from "./requestAccessApi";
 
-const SLUG_PATTERN = /^[a-z0-9-]+$/;
-
 /**
  * Public, unauthenticated signup page (PHASE_11_TASKS.md Workstream E) — a
  * top-level sibling to `/login`/`/tailor/login`, reachable with or without a
  * stored token, with no route guard at all. Field list and required-ness
  * mirror `createTenantRequestSchema` in `tenantRequests.routes.ts` exactly:
- * business name/contact name/contact email/contact phone/desired slug are
- * all required, and "approx. retail locations/order volume" +
- * "how did you hear about us" are folded into the one optional free-text
- * `notes` field per the locked field list, rather than inventing extra
- * structured columns the backend doesn't have.
+ * business name/contact name/contact email/contact phone are all required,
+ * and "approx. retail locations/order volume" + "how did you hear about
+ * us" are folded into the one optional free-text `notes` field per the
+ * locked field list, rather than inventing extra structured columns the
+ * backend doesn't have. There's no slug field — the server derives and
+ * dedupes a login slug from `businessName` automatically.
  */
 export function RequestAccessPage() {
   const [businessName, setBusinessName] = useState("");
   const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [requestedSlug, setRequestedSlug] = useState("");
   const [notes, setNotes] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [submitTenantRequest, { isLoading, error, isSuccess }] = useCreateTenantRequestMutation();
-
-  const slugValid = requestedSlug.length > 0 && SLUG_PATTERN.test(requestedSlug);
-  const slugError = slugTouched && requestedSlug.length > 0 && !slugValid;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSlugTouched(true);
-    if (!slugValid) {
-      return;
-    }
     const trimmedNotes = notes.trim();
     submitTenantRequest({
       businessName,
       contactName,
       email,
       phone,
-      requestedSlug,
       ...(trimmedNotes ? { notes: trimmedNotes } : {}),
     })
       .unwrap()
@@ -139,21 +128,6 @@ export function RequestAccessPage() {
             margin="normal"
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
-          />
-          <TextField
-            label="Desired slug"
-            fullWidth
-            required
-            margin="normal"
-            value={requestedSlug}
-            onChange={(event) => setRequestedSlug(event.target.value)}
-            onBlur={() => setSlugTouched(true)}
-            error={slugError}
-            helperText={
-              slugError
-                ? "Lowercase letters, numbers, and hyphens only (e.g. acme-tailors)."
-                : "This will be part of your account's web address (e.g. acme-tailors)."
-            }
           />
           <TextField
             label="Notes"

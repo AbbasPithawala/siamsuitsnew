@@ -8,11 +8,8 @@ import { requireParam } from "../utils/params";
 import { paginationQuerySchema, paginatedResult } from "../utils/pagination";
 import * as platformTenantsService from "../services/platformTenants.service";
 
-const slugSchema = z.string().regex(/^[a-z0-9-]+$/, "slug must contain only lowercase letters, numbers, and hyphens");
-
 const createTenantSchema = z.object({
   businessName: z.string().min(1),
-  slug: slugSchema,
   ownerName: z.string().min(1),
   ownerEmail: z.string().email(),
   plan: z.string().optional(),
@@ -23,7 +20,6 @@ const createTenantSchema = z.object({
 
 const updateTenantSchema = z.object({
   name: z.string().min(1).optional(),
-  slug: slugSchema.optional(),
   plan: z.string().optional(),
   logo: z.string().optional(),
   address: z.string().optional(),

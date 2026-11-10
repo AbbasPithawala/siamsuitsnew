@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
+import { MemoryRouter } from "react-router-dom";
 import { baseApi } from "../../api/baseApi";
 import type { AuthTokenSliceState } from "../../api/baseApi";
 import { FeaturesPage } from "./FeaturesPage";
@@ -12,11 +13,13 @@ import { FeaturesPage } from "./FeaturesPage";
  * mirroring `SuperProductsPage.live.test.tsx`'s pattern. These exercise
  * PHASE_5_TASKS.md Group 3's actual acceptance criterion: create a `choice`
  * feature linked to exactly 2 of the real migrated catalog's 6 products
- * (not all 6), give it 2 styles, entirely through the UI — the literal proof
- * that a feature like Piping/Lining/Monogram can apply to a genuine subset
- * of products, matching what the Phase 2 ETL already proved at the data
- * level (see the pre-existing "Piping" feature these tests deliberately
- * never touch).
+ * (not all 6), entirely through the UI — the literal proof that a feature
+ * like Piping/Lining/Monogram can apply to a genuine subset of products,
+ * matching what the Phase 2 ETL already proved at the data level (see the
+ * pre-existing "Piping" feature these tests deliberately never touch).
+ * Styles themselves now live on their own page (`FeatureStylesPage.tsx`,
+ * linked from this page's Styles column) — see
+ * `FeatureStylesPage.live.test.tsx` for that flow.
  */
 
 const SEED_CREDENTIALS = {
@@ -84,7 +87,13 @@ function buildTestStore(token: string | null) {
 function renderPage() {
   return render(
     <Provider store={buildTestStore(seededToken)}>
-      <FeaturesPage />
+      {/* Bare MemoryRouter (no <Routes>), same as ProductsPage.live.test.tsx's
+          identical setup — this page's "Manage" styles link (RouterLink) just
+          needs router context to render, navigating there is covered by
+          FeatureStylesPage.live.test.tsx instead. */}
+      <MemoryRouter initialEntries={["/catalog/features"]}>
+        <FeaturesPage />
+      </MemoryRouter>
     </Provider>
   );
 }
@@ -162,7 +171,7 @@ afterEach(async () => {
 
 describe.skipIf(!seededToken)("FeaturesPage (live siam/server integration)", () => {
   it(
-    "creates a choice feature linked to a genuine subset of real products with two styles entirely through the UI, and displays it correctly",
+    "creates a choice feature linked to a genuine subset of real products entirely through the UI, and links to its Styles page",
     async () => {
       const user = userEvent.setup();
       renderPage();
@@ -203,47 +212,19 @@ describe.skipIf(!seededToken)("FeaturesPage (live siam/server integration)", () 
       createdFeatureIds.push(created.id);
       expect(created.products.map((p) => p.id).sort()).toEqual([realProducts.jacket, realProducts.vest].sort());
 
-      // Reopen for editing to add the 2 styles — there's no bulk "create with
-      // styles" endpoint, styles are always managed on an already-persisted feature.
-      await user.click(screen.getByRole("button", { name: `Edit ${createdName}` }));
-      const editDialog = await screen.findByRole("dialog");
-
-      await user.click(within(editDialog).getByRole("button", { name: "Add style" }));
-      await user.type(within(editDialog).getByLabelText("Style name"), "Piped edge");
-      await user.type(within(editDialog).getByLabelText("Style thai name"), "ขอบเชือก");
-      await user.click(within(editDialog).getByRole("button", { name: "Save new style" }));
-      await within(editDialog).findByText(/Piped edge/, {}, NETWORK_WAIT);
-
-      await user.click(within(editDialog).getByRole("button", { name: "Add style" }));
-      await user.type(within(editDialog).getByLabelText("Style name"), "Plain edge");
-      await user.click(within(editDialog).getByRole("button", { name: "Save new style" }));
-      await within(editDialog).findByText(/Plain edge/, {}, NETWORK_WAIT);
-
-      expect(within(editDialog).getByText("Styles (2)")).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), NETWORK_WAIT);
-
-      // Re-open and confirm both styles persisted server-side and display on reload.
-      await user.click(screen.getByRole("button", { name: `Edit ${createdName}` }));
-      const reopenedDialog = await screen.findByRole("dialog");
-      await within(reopenedDialog).findByText(/Piped edge/, {}, NETWORK_WAIT);
-      await within(reopenedDialog).findByText(/Plain edge/, {}, NETWORK_WAIT);
-      expect(within(reopenedDialog).getByText("Styles (2)")).toBeInTheDocument();
-
-      const serverDetail = await apiRequest<{ data: { styles: { name: string }[] } }>(
-        `/features/${created.id}`,
-        seededToken as string
+      // The Styles column's "Manage" link only renders for `type: "choice"` (the
+      // default this test used) — adding/editing styles themselves now happens on
+      // that linked page, covered by FeatureStylesPage.live.test.tsx instead.
+      expect(within(row as HTMLElement).getByRole("link", { name: "Manage" })).toHaveAttribute(
+        "href",
+        `/catalog/features/${created.id}/styles`
       );
-      expect(serverDetail.data.styles.map((s) => s.name).sort()).toEqual(["Piped edge", "Plain edge"]);
-
-      await user.click(screen.getByRole("button", { name: "Cancel" }));
     },
     45000
   );
 
   it(
-    "edits an existing feature's linked products and type-independent fields, deletes one of its styles, then deletes the whole feature",
+    "edits an existing feature's linked products and type-independent fields, then deletes the whole feature",
     async () => {
       const token = seededToken as string;
       const fixtureName = `Live Feature Edit Fixture ${Date.now()}`;
@@ -252,7 +233,11 @@ describe.skipIf(!seededToken)("FeaturesPage (live siam/server integration)", () 
         body: JSON.stringify({ name: fixtureName, type: "choice", productIds: [realProducts.jacket] }),
       });
       createdFeatureIds.push(created.data.id);
-      const styleA = await apiRequest<{ data: { id: string } }>(`/features/${created.data.id}/styles`, token, {
+      // Seeded directly via the API, not the UI — this test's own concern is the
+      // product-link edit below; styles themselves are no longer reachable from
+      // this dialog (see FeatureStylesPage.live.test.tsx), but still need to
+      // round-trip untouched and get cleaned up alongside the feature.
+      await apiRequest(`/features/${created.data.id}/styles`, token, {
         method: "POST",
         body: JSON.stringify({ name: "Style A" }),
       });
@@ -270,18 +255,10 @@ describe.skipIf(!seededToken)("FeaturesPage (live siam/server integration)", () 
       const dialog = await screen.findByRole("dialog");
 
       // Add a second linked product — the same subset proof, now shown via
-      // an edit rather than only at creation time.
+      // an edit rather than only at creation time. (Style A/Style B, seeded
+      // directly via the API above, are no longer visible from this dialog —
+      // see FeatureStylesPage.live.test.tsx for the styles-editing flow.)
       await toggleProductCheckbox(dialog, "vest");
-
-      // Style rows render name/price/worker-price as one Typography (multiple
-      // interpolations in one text node), so exact-string `getByText` won't
-      // match — use a substring regex, same as the "Piped edge"/"Plain edge"
-      // assertions in the previous test.
-      await within(dialog).findByText(/Style A/, {}, NETWORK_WAIT);
-      await within(dialog).findByText(/Style B/, {}, NETWORK_WAIT);
-      await user.click(within(dialog).getByRole("button", { name: "Delete style Style A" }));
-      await waitFor(() => expect(within(dialog).queryByText(/Style A/)).not.toBeInTheDocument(), NETWORK_WAIT);
-      expect(within(dialog).getByText(/Style B/)).toBeInTheDocument();
 
       await user.click(within(dialog).getByRole("button", { name: "Save" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument(), NETWORK_WAIT);
@@ -295,17 +272,16 @@ describe.skipIf(!seededToken)("FeaturesPage (live siam/server integration)", () 
         token
       );
       expect(afterEdit.data.products.map((p) => p.id).sort()).toEqual([realProducts.jacket, realProducts.vest].sort());
-      expect(afterEdit.data.styles.map((s) => s.name)).toEqual(["Style B"]);
-      expect(afterEdit.data.styles.find((s) => s.id === styleA.data.id)).toBeUndefined();
+      expect(afterEdit.data.styles.map((s) => s.name).sort()).toEqual(["Style A", "Style B"]);
 
       // `softDeleteFeature` doesn't cascade to its styles (see
       // `features.service.ts`), and `requireStyle` 404s once the parent
       // feature is itself soft-deleted — so any style left active at
       // feature-delete time becomes permanently unreachable via the API.
-      // Delete the remaining "Style B" explicitly first so this test doesn't
-      // orphan a row on every run (this was a real leak this suite was
-      // causing, not just live-server flakiness — confirmed by direct DB
-      // inspection during verification).
+      // Delete both styles explicitly first so this test doesn't orphan a row
+      // on every run (this was a real leak this suite was causing, not just
+      // live-server flakiness — confirmed by direct DB inspection during
+      // verification).
       for (const style of afterEdit.data.styles) {
         await apiRequest(`/styles/${style.id}`, token, { method: "DELETE" });
       }

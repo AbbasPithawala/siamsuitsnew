@@ -18,8 +18,9 @@ import { ChangePasswordPage } from "../features/onboarding/ChangePasswordPage";
 import { CompleteProfilePage } from "../features/onboarding/CompleteProfilePage";
 import { TenantRequestsPage } from "../features/platformAdmin/TenantRequestsPage";
 import { TenantsPage as PlatformTenantsPage } from "../features/platformAdmin/TenantsPage";
-import { DashboardPage } from "./placeholders/DashboardPage";
+import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { FeaturesPage } from "../features/catalog/FeaturesPage";
+import { FeatureStylesPage } from "../features/catalog/FeatureStylesPage";
 import { FittingsPage } from "../features/catalog/FittingsPage";
 import { FittingValuesPage } from "../features/catalog/FittingValuesPage";
 import { MeasurementDefinitionsPage } from "../features/catalog/MeasurementDefinitionsPage";
@@ -221,6 +222,19 @@ export function AppRoutes() {
             }
           />
           {/*
+            Drill-down from the Styles column above — same
+            `catalog.features.manage` gate, same pattern as the
+            `/catalog/products/:productId/fittings[/:fittingId]` pair.
+          */}
+          <Route
+            path="/catalog/features/:featureId/styles"
+            element={
+              <RequirePermission permission="catalog.features.manage">
+                <FeatureStylesPage />
+              </RequirePermission>
+            }
+          />
+          {/*
             Group 4 RBAC admin screens: unlike the catalog pages above,
             these ARE wrapped in RequirePermission at the route level — a
             deliberate page-level gate for this admin surface (see
@@ -290,20 +304,24 @@ export function AppRoutes() {
             }
           />
           {/*
-            PHASE_10_TASKS.md Workstream E Group 6.3b — the admin edit-wizard
-            entry point, gated on `orders.edit` (granted to Admin/Owner, not
-            Retailer, per Group 5/`orders.edit.routes.test.ts`) rather than
-            `orders.create` — re-hosts `OrderBuilderPage.tsx` itself (see its
-            own doc comment on `isEditMode`) in an "edit an existing order"
-            mode, not a separate page component. Declared after the static
-            "/orders/:id" and "/orders/new" routes (same React Router
-            static-over-param ranking already noted above), with its own
-            dedicated ":id/edit" segment so it never collides with either.
+            PHASE_10_TASKS.md Workstream E Group 6.3b — the edit-wizard entry
+            point, gated on `orders.edit` (Admin/Owner) OR `orders.edit.own`
+            (the seeded Retailer role — lets a retailer edit their own orders
+            while still New Order/Modified, `orders.edit.routes.test.ts`)
+            rather than `orders.create` — re-hosts `OrderBuilderPage.tsx`
+            itself (see its own doc comment on `isEditMode`) in an "edit an
+            existing order" mode, not a separate page component; that
+            component enforces the status restriction for an `orders.edit.own`-
+            only actor since this route-level permission check can't see the
+            order's own status. Declared after the static "/orders/:id" and
+            "/orders/new" routes (same React Router static-over-param ranking
+            already noted above), with its own dedicated ":id/edit" segment
+            so it never collides with either.
           */}
           <Route
             path="/orders/:id/edit"
             element={
-              <RequirePermission permission="orders.edit">
+              <RequirePermission permission={["orders.edit", "orders.edit.own"]}>
                 <OrderBuilderPage />
               </RequirePermission>
             }

@@ -64,7 +64,7 @@ describe("resolveUserPermissions", () => {
 
     const resolved = await resolveUserPermissions(admin.id);
 
-    expect(permissionCatalog).toHaveLength(30);
+    expect(permissionCatalog).toHaveLength(31);
     expect(resolved.size).toBe(permissionCatalog.length - 1);
     expect(resolved.has("orders.create")).toBe(false);
     expect(resolved.has("orders.edit")).toBe(true);

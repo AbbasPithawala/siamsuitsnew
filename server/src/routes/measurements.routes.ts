@@ -11,7 +11,6 @@ import * as measurementsService from "../services/measurements.service";
 const createDefinitionSchema = z.object({
   name: z.string().min(1),
   thaiName: z.string().min(1).optional(),
-  slug: z.string().min(1),
 });
 
 const updateDefinitionSchema = createDefinitionSchema.partial();

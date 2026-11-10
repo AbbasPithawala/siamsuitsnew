@@ -30,7 +30,7 @@ export interface TailorCreateInput {
   isActive?: boolean;
 }
 
-export type TailorUpdateInput = Partial<Pick<TailorCreateInput, "name" | "username" | "isActive">>;
+export type TailorUpdateInput = Partial<Pick<TailorCreateInput, "name" | "username" | "isActive" | "password">>;
 
 interface TailorResponseEnvelope {
   data: Tailor;

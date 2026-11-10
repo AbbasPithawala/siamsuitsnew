@@ -172,6 +172,9 @@ export function OrderBuilderPage() {
 
   const canManageCustomers = useHasPermission("customers.manage");
   const canRush = useHasPermission("orders.rush");
+  /** Only relevant in edit mode: `orders.edit` (admin) has no status restriction; `orders.edit.own` (Retailer) does — see the blocking check near the bottom of this component, mirroring `RETAILER_EDITABLE_STATUSES` in `orders.service.ts`. */
+  const canEdit = useHasPermission("orders.edit");
+  const canEditOwn = useHasPermission("orders.edit.own");
 
   const { data: me } = useMeQuery();
   const { data: retailers, isLoading: retailersLoading, isError: retailersError, error: retailersErrorObj } =
@@ -592,6 +595,24 @@ export function OrderBuilderPage() {
         ) : (
           <LoadingSpinner />
         )}
+      </Box>
+    );
+  }
+
+  /**
+   * The route itself only checks `orders.edit`/`orders.edit.own` at all (see
+   * `AppRoutes.tsx`), not the order's own status — it can't, without fetching the order
+   * first. So an `orders.edit.own`-only actor (Retailer) who navigates straight to this URL
+   * for an order that's moved past New Order/Modified is blocked here instead, once
+   * `editSource` has loaded. `editOrderItems` on the server enforces the same rule; this is
+   * just the earlier, friendlier UI stop.
+   */
+  if (isEditMode && editSource && !canEdit && canEditOwn && editSource.status !== "New Order" && editSource.status !== "Modified") {
+    return (
+      <Box sx={{ p: 4 }}>
+        <Alert severity="warning">
+          This order is "{editSource.status}" and can no longer be edited — it must be in New Order or Modified status.
+        </Alert>
       </Box>
     );
   }

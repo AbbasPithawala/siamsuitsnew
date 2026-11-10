@@ -11,9 +11,13 @@ import type { RootState } from "../../app/store";
  * `catalog.*.manage`. So the page itself sits behind `RequireAuth` alone,
  * and this hook decides whether to render the mutating buttons (Add/Edit/
  * Delete), not whether to render the page.
+ *
+ * `permission` accepts a single key or an array — an array is an OR (holding any one of
+ * them is sufficient), mirroring the server's own `requirePermission` semantics.
  */
-export function useHasPermission(permission: string): boolean {
+export function useHasPermission(permission: string | string[]): boolean {
   const token = useSelector((state: RootState) => state.auth.token);
   const { data: me } = useMeQuery(undefined, { skip: !token });
-  return me?.permissions.includes(permission) ?? false;
+  const required = Array.isArray(permission) ? permission : [permission];
+  return required.some((key) => me?.permissions.includes(key) ?? false);
 }

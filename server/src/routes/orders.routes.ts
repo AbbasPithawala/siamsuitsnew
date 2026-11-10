@@ -171,14 +171,17 @@ ordersRouter.post("/orders/:id/pdf", authenticate, requirePermission("orders.vie
 /**
  * The full edit-wizard surface (PHASE_10_TASKS.md Workstream E Group 6.2) — add/remove
  * line items or units, re-submit measurements/styling/Manual Size for any unit. Gated by
- * `orders.edit` (granted to Admin/Owner, not Retailer — Retailer keeps `orders.create`
- * instead, per Group 5). Deliberately separate from the narrower status/cancel/reassign
- * actions below, which never touch `items[]`.
+ * `orders.edit` (granted to Admin/Owner) OR `orders.edit.own` (granted to the seeded
+ * Retailer role) — the latter lets a retailer edit their own orders, but only while still
+ * in "New Order"/"Modified" status; `editOrderItems` enforces that status restriction for
+ * retailer-linked actors. Deliberately separate from the narrower status/cancel/reassign
+ * actions below, which never touch `items[]` and stay gated on `orders.edit` alone —
+ * Retailer never holds that key.
  */
 ordersRouter.patch(
   "/orders/:id",
   authenticate,
-  requirePermission("orders.edit"),
+  requirePermission(["orders.edit", "orders.edit.own"]),
   validateBody(editOrderSchema),
   async (req, res, next) => {
     try {

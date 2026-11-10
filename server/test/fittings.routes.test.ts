@@ -49,7 +49,7 @@ describe("/api/fittings", () => {
     const res = await fetch(`${baseUrl}/api/measurement-definitions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name, slug: `${name.toLowerCase()}-${randomUUID()}` }),
+      body: JSON.stringify({ name }),
     });
     return ((await res.json()) as { data: { id: string } }).data;
   }

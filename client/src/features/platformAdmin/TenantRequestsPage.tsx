@@ -36,7 +36,7 @@ import type { ApproveTenantRequestResult, TenantRequest, TenantRequestStatus } f
 
 type StatusFilter = TenantRequestStatus | "all";
 
-const EMPTY_APPROVE_FORM = { slug: "", plan: "", logo: "", address: "", invoiceFooterText: "" };
+const EMPTY_APPROVE_FORM = { plan: "", logo: "", address: "", invoiceFooterText: "" };
 
 /**
  * PHASE_11_TASKS.md Workstream F Group 1 — the superadmin's queue of public tenant-signup
@@ -204,7 +204,6 @@ function ApproveTenantRequestDialog({ request, onClose, onApproved }: ApproveTen
       const result = await approveTenantRequest({
         id: request.id,
         body: {
-          ...(form.slug.trim() ? { slug: form.slug.trim() } : {}),
           ...(form.plan.trim() ? { plan: form.plan.trim() } : {}),
           ...(form.logo.trim() ? { logo: form.logo.trim() } : {}),
           ...(form.address.trim() ? { address: form.address.trim() } : {}),
@@ -224,17 +223,10 @@ function ApproveTenantRequestDialog({ request, onClose, onApproved }: ApproveTen
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
           Every field below is optional. Leave them blank to let the new owner complete their own
-          business profile on first login instead.
+          business profile on first login instead. A unique login slug is generated automatically
+          from the business name.
         </DialogContentText>
         <Stack spacing={2}>
-          <TextField
-            label="Slug override"
-            fullWidth
-            placeholder={request?.requestedSlug ?? ""}
-            helperText="Defaults to the requested slug if left blank."
-            value={form.slug}
-            onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))}
-          />
           <TextField
             label="Plan"
             fullWidth

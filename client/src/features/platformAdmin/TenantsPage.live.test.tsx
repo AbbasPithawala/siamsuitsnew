@@ -17,8 +17,10 @@ import { TenantsPage } from "./TenantsPage";
  * production data, not a soft-deletable catalog row), so unlike every other `*.live.test.tsx`
  * file in this codebase, cleanup of tenants created here can't happen inside the test process
  * itself. It's done out-of-band after this suite runs, directly against the dev database (see
- * the verification notes accompanying this change) — every tenant this file creates is tagged
- * with a `live-test-` slug prefix specifically so it's unambiguous which rows are throwaway.
+ * the verification notes accompanying this change) — every tenant this file creates uses a
+ * `Live Test ...` business name specifically so it's unambiguous which rows are throwaway. The
+ * server derives each tenant's slug from its business name (there's no Slug input anymore), so
+ * every one of those rows also lands with a `live-test-...` slug prefix automatically.
  */
 
 const PLATFORM_ADMIN_CREDENTIALS = { username: "platform-admin", password: "ChangeMe123!" };
@@ -78,32 +80,32 @@ interface PlatformTenantDto {
 }
 
 /**
- * Every slug this file creates carries this prefix — the out-of-band cleanup step run after
- * this suite finishes targets exactly this prefix, never touching `siam-suits`/`sawasdee-suits`.
+ * Every business name this file creates carries this prefix — the out-of-band cleanup step run
+ * after this suite finishes targets the `live-test-...` slugs the server derives from it, never
+ * touching `siam-suits`/`sawasdee-suits`.
  */
-function liveTestSlug(suffix: number | string): string {
-  return `live-test-tenant-${suffix}`;
+function liveTestBusinessName(suffix: number | string): string {
+  return `Live Test Tenant Co ${suffix}`;
 }
 
 // Recorded purely for this file's own reporting/debugging — actual deletion happens out-of-band
 // (see this file's doc comment), not here, since there's no delete endpoint to call.
-const createdSlugs: string[] = [];
+const createdBusinessNames: string[] = [];
 
 afterAll(() => {
-  if (createdSlugs.length > 0) {
-    console.log("Live-test tenants created this run (clean up out-of-band):", createdSlugs);
+  if (createdBusinessNames.length > 0) {
+    console.log("Live-test tenants created this run (clean up out-of-band):", createdBusinessNames);
   }
 });
 
 describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platform admin)", () => {
   it(
-    "creates a tenant through the Add Tenant dialog, and the returned temp password lets the new owner log in",
+    "creates a tenant through the Add Tenant dialog with no Slug field, and the returned temp password lets the new owner log in",
     async () => {
       const token = seededToken as string;
       const suffix = Date.now();
-      const slug = liveTestSlug(suffix);
-      const businessName = `Live Test Tenant Co ${suffix}`;
-      createdSlugs.push(slug);
+      const businessName = liveTestBusinessName(suffix);
+      createdBusinessNames.push(businessName);
 
       const user = userEvent.setup();
       renderPage();
@@ -112,8 +114,8 @@ describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platfo
       await user.click(screen.getByRole("button", { name: "Add Tenant" }));
       const dialog = await screen.findByRole("dialog");
 
+      expect(within(dialog).queryByLabelText(/^slug/i)).not.toBeInTheDocument();
       await user.type(within(dialog).getByLabelText(/business name/i), businessName);
-      await user.type(within(dialog).getByLabelText(/^slug/i), slug);
       await user.type(within(dialog).getByLabelText(/owner name/i), "Live Test Owner");
       await user.type(within(dialog).getByLabelText(/owner email/i), `livetest+${suffix}@example.com`);
       await user.click(within(dialog).getByRole("button", { name: "Add Tenant" }));
@@ -129,16 +131,19 @@ describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platfo
       await user.click(within(resultDialog).getByRole("button", { name: "Close" }));
       await waitFor(() => expect(screen.queryByText(businessName)).toBeInTheDocument());
 
-      // Independently confirm the row landed for real (not just the UI's own claim).
+      // Independently confirm the row landed for real (not just the UI's own claim), and that
+      // the server derived a slug matching the business name.
       const list = await apiRequest<{ data: PlatformTenantDto[] }>("/platform/tenants?page=1&pageSize=100", token);
-      const created = list.data.find((t) => t.slug === slug);
+      const created = list.data.find((t) => t.name === businessName);
       expect(created).toBeTruthy();
+      expect(created?.slug).toMatch(/^live-test-tenant-co-\d+$/);
 
-      // The real, load-bearing assertion: the generated credentials actually authenticate.
+      // The real, load-bearing assertion: the generated credentials actually authenticate,
+      // against the server-derived slug (never typed anywhere in this test).
       const loginRes = await fetch(`${apiBaseUrl}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenant: slug, username, password: tempPassword }),
+        body: JSON.stringify({ tenant: created?.slug, username, password: tempPassword }),
       });
       expect(loginRes.status).toBe(200);
       const loginBody = (await loginRes.json()) as { data: { token: string } };
@@ -148,26 +153,40 @@ describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platfo
   );
 
   it(
-    "surfaces a real backend 409 as an inline Slug field error when creating with an already-taken slug",
+    "creating a second tenant with the exact same business name is idempotent rather than erroring or duplicating",
     async () => {
+      const token = seededToken as string;
+      const suffix = Date.now();
+      const businessName = `Live Test Duplicate Name Co ${suffix}`;
+      createdBusinessNames.push(businessName);
+
       const user = userEvent.setup();
       renderPage();
 
       await screen.findByRole("heading", { name: "Tenants" });
-      await user.click(screen.getByRole("button", { name: "Add Tenant" }));
-      const dialog = await screen.findByRole("dialog");
 
-      await user.type(within(dialog).getByLabelText(/business name/i), `Collision Test ${Date.now()}`);
-      await user.type(within(dialog).getByLabelText(/^slug/i), "siam-suits");
-      await user.type(within(dialog).getByLabelText(/owner name/i), "Collision Owner");
-      await user.type(within(dialog).getByLabelText(/owner email/i), `collision+${Date.now()}@example.com`);
-      await user.click(within(dialog).getByRole("button", { name: "Add Tenant" }));
+      async function submitCreate(ownerEmail: string) {
+        await user.click(screen.getByRole("button", { name: "Add Tenant" }));
+        const dialog = await screen.findByRole("dialog");
+        await user.type(within(dialog).getByLabelText(/business name/i), businessName);
+        await user.type(within(dialog).getByLabelText(/owner name/i), "Live Test Owner");
+        await user.type(within(dialog).getByLabelText(/owner email/i), ownerEmail);
+        await user.click(within(dialog).getByRole("button", { name: "Add Tenant" }));
+        const resultHeading = await screen.findByRole("heading", { name: "Tenant provisioned" }, { timeout: 10000 });
+        const resultDialog = resultHeading.closest('[role="dialog"]') as HTMLElement;
+        await user.click(within(resultDialog).getByRole("button", { name: "Close" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      }
 
-      await within(dialog).findByText(/already taken/i);
-      // Still the create dialog, not the result dialog — the failed request never provisioned anything.
-      expect(within(dialog).queryByTestId("created-tenant-temp-password")).not.toBeInTheDocument();
+      await submitCreate(`duplicate-first+${suffix}@example.com`);
+      await submitCreate(`duplicate-second+${suffix}@example.com`);
+
+      // Same business name twice resolves to the one tenant, not two rows with suffixed slugs.
+      const list = await apiRequest<{ data: PlatformTenantDto[] }>("/platform/tenants?page=1&pageSize=100", token);
+      const matches = list.data.filter((t) => t.name === businessName);
+      expect(matches).toHaveLength(1);
     },
-    15000
+    25000
   );
 
   it(
@@ -175,15 +194,13 @@ describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platfo
     async () => {
       const token = seededToken as string;
       const suffix = Date.now();
-      const slug = liveTestSlug(suffix);
       const businessName = `Live Test Edit Target ${suffix}`;
-      createdSlugs.push(slug);
+      createdBusinessNames.push(businessName);
 
       await apiRequest("/platform/tenants", token, {
         method: "POST",
         body: JSON.stringify({
           businessName,
-          slug,
           ownerName: "Live Test Owner",
           ownerEmail: `edittarget+${suffix}@example.com`,
         }),
@@ -196,6 +213,7 @@ describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platfo
       await user.click(screen.getByRole("button", { name: `Edit ${businessName}` }));
       const dialog = await screen.findByRole("dialog");
 
+      expect(within(dialog).queryByLabelText(/^slug/i)).not.toBeInTheDocument();
       const newAddress = `123 Live Test Street, Suite ${suffix}`;
       const addressField = within(dialog).getByLabelText(/business address/i);
       await user.clear(addressField);
@@ -205,7 +223,7 @@ describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platfo
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
       const list = await apiRequest<{ data: PlatformTenantDto[] }>("/platform/tenants?page=1&pageSize=100", token);
-      const edited = list.data.find((t) => t.slug === slug);
+      const edited = list.data.find((t) => t.name === businessName);
       expect(edited?.address).toBe(newAddress);
     },
     20000
@@ -216,15 +234,13 @@ describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platfo
     async () => {
       const token = seededToken as string;
       const suffix = Date.now();
-      const slug = liveTestSlug(suffix);
       const businessName = `Live Test Toggle Target ${suffix}`;
-      createdSlugs.push(slug);
+      createdBusinessNames.push(businessName);
 
       await apiRequest("/platform/tenants", token, {
         method: "POST",
         body: JSON.stringify({
           businessName,
-          slug,
           ownerName: "Live Test Owner",
           ownerEmail: `toggletarget+${suffix}@example.com`,
         }),
@@ -241,7 +257,7 @@ describe.skipIf(!seededToken)("TenantsPage (live siam/server integration, platfo
       await waitFor(() => expect(toggle).not.toBeChecked());
 
       const list = await apiRequest<{ data: PlatformTenantDto[] }>("/platform/tenants?page=1&pageSize=100", token);
-      expect(list.data.find((t) => t.slug === slug)?.isActive).toBe(false);
+      expect(list.data.find((t) => t.name === businessName)?.isActive).toBe(false);
     },
     20000
   );

@@ -33,6 +33,7 @@ import { useListCustomersQuery } from "../customers/customersApi";
 import type { Customer } from "../customers/customersApi";
 import { useListRetailersQuery } from "../retailers/retailersApi";
 import { resolveUploadUrl } from "../uploads/uploadsApi";
+import { STATUS_CHIP_COLORS } from "./orderStatusColors";
 import { useGenerateOrderPdfMutation, useListOrdersPaginatedQuery, useListOrdersQuery, useSetOrderStatusMutation } from "./ordersApi";
 import type { OrderListItem } from "./ordersApi";
 
@@ -65,21 +66,6 @@ const STATUS_OPTIONS = STATUS_TABS.filter((tab) => tab.value !== "");
 function customerName(customer: Customer): string {
   return customer.lastName ? `${customer.firstName} ${customer.lastName}` : customer.firstName;
 }
-
-/**
- * Colors lifted verbatim from legacy's real `.newOrderBg`/`.ProcessingBg`/`.ModifiedBg`/
- * `.ShipmentBg`/`.SentBg` classes (`dashboard.css`, `SingleOrder.css`, `customerOrder.css` —
- * identical rules in all three), keyed by `orders.status`'s real values. A status with no
- * legacy color (shouldn't happen — the set is closed today, see `orders.ts`'s own doc comment)
- * falls back to a plain default MUI Chip rather than guessing a color.
- */
-const STATUS_CHIP_COLORS: Record<string, { color: string; background: string }> = {
-  "New Order": { color: "#009e15", background: "#009e153d" },
-  Processing: { color: "#1300a5", background: "#334ad73d" },
-  Modified: { color: "#cb7400", background: "#fff00045" },
-  Shipment: { color: "#000000", background: "#3d3d3d45" },
-  Sent: { color: "#a200ff", background: "#be00ff26" },
-};
 
 function StatusChip({ order }: { order: OrderListItem }) {
   const palette = STATUS_CHIP_COLORS[order.status];

@@ -169,8 +169,7 @@ async function createCustomer(baseUrl: string, ctx: Ctx, retailerId: string): Pr
 }
 
 async function createMeasurementDefinition(baseUrl: string, ctx: Ctx, name: string): Promise<string> {
-  const suffix = randomUUID();
-  const res = await postJson(baseUrl, "/api/measurement-definitions", ctx.token, { name: `${name} ${suffix}`, slug: `${name.toLowerCase()}-${suffix}` });
+  const res = await postJson(baseUrl, "/api/measurement-definitions", ctx.token, { name: `${name} ${randomUUID()}` });
   const body = (await res.json()) as { data: { id: string } };
   return body.data.id;
 }
@@ -259,8 +258,10 @@ describe("PATCH /api/orders/:id — order edit surface (PHASE_10_TASKS.md Workst
       "customers.manage",
     ]);
 
-    // Holds the real seeded Retailer role's exact 7-key bundle (PHASE_10_TASKS.md
-    // Workstream E Group 3) — explicitly does NOT include `orders.edit`.
+    // A tenant user (not retailer-linked) holding none of the real seeded Retailer role's
+    // bundle's edit keys — explicitly neither `orders.edit` nor `orders.edit.own`. Not the
+    // same fixture as "a retailer-linked user holding `orders.edit.own`" below: this proves
+    // the edit surface is closed to someone with no edit permission at all.
     noEdit = await createUserInTenant(owner.tenantId, [
       "customers.manage",
       "orders.create",
@@ -533,6 +534,46 @@ describe("PATCH /api/orders/:id — order edit surface (PHASE_10_TASKS.md Workst
 
     const retailerRes = await patchJson(baseUrl, `/api/orders/${created.data.id}/retailer`, noEdit.token, { retailerId: retailer2.id });
     expect(retailerRes.status).toBe(403);
+  });
+
+  it("orders.edit.own: a retailer-linked actor can edit their own order while it's New Order/Modified, but is 403'd once it moves past that — and never unlocks the status/reassign routes", async () => {
+    const retailerLinkedOwn = await createRetailerLinkedUser(owner.tenantId, retailer.id, ["orders.view", "orders.edit.own"]);
+    try {
+      const created = await createBaseOrder([
+        { superProductId: onePiece.id, components: [{ superProductComponentId: onePiece.components[0]!.id }] },
+      ]);
+      expect(created.data.status).toBe("New Order");
+
+      const editRes = await patchJson(baseUrl, `/api/orders/${created.data.id}`, retailerLinkedOwn.token, {
+        items: [{ superProductId: onePiece.id, components: [{ superProductComponentId: onePiece.components[0]!.id }] }],
+      });
+      expect(editRes.status).toBe(200);
+      expect(((await editRes.json()) as { data: OrderDetail }).data.status).toBe("Modified");
+
+      // Still "Modified" — still retailer-editable.
+      const secondEditRes = await patchJson(baseUrl, `/api/orders/${created.data.id}`, retailerLinkedOwn.token, {
+        items: [{ superProductId: onePiece.id, components: [{ superProductComponentId: onePiece.components[0]!.id }] }],
+      });
+      expect(secondEditRes.status).toBe(200);
+
+      // Admin moves it past retailer-editable territory.
+      const advanceRes = await patchJson(baseUrl, `/api/orders/${created.data.id}/status`, owner.token, { status: "Processing" });
+      expect(advanceRes.status).toBe(200);
+
+      const blockedRes = await patchJson(baseUrl, `/api/orders/${created.data.id}`, retailerLinkedOwn.token, {
+        items: [{ superProductId: onePiece.id, components: [{ superProductComponentId: onePiece.components[0]!.id }] }],
+      });
+      expect(blockedRes.status).toBe(403);
+      expect(((await blockedRes.json()) as { error: { code: string } }).error.code).toBe("ORDER_NOT_EDITABLE");
+
+      const statusRes = await patchJson(baseUrl, `/api/orders/${created.data.id}/status`, retailerLinkedOwn.token, { status: "Cancelled" });
+      expect(statusRes.status).toBe(403);
+
+      const reassignRes = await patchJson(baseUrl, `/api/orders/${created.data.id}/retailer`, retailerLinkedOwn.token, { retailerId: retailer2.id });
+      expect(reassignRes.status).toBe(403);
+    } finally {
+      await retailerLinkedOwn.cleanup();
+    }
   });
 
   describe("row-level retailer isolation (PHASE_10_TASKS.md Workstream E Group 2 convention)", () => {

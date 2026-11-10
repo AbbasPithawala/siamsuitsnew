@@ -73,7 +73,7 @@ async function loginAs(credentials: { tenant: string; username: string; password
 
   await user.type(screen.getByLabelText(/tenant/i), credentials.tenant);
   await user.type(screen.getByLabelText(/username/i), credentials.username);
-  await user.type(screen.getByLabelText(/password/i), credentials.password);
+  await user.type(screen.getByLabelText(/password/i, { selector: "input" }), credentials.password);
   await user.click(screen.getByRole("button", { name: /login/i }));
 
   await waitFor(() => expect(store.getState().auth.token).toBeTruthy());

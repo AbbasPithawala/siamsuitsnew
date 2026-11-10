@@ -25,9 +25,10 @@ export interface ListTenantRequestsParams extends PaginationQueryParams {
   status?: TenantRequestStatus;
 }
 
-/** The hybrid pre-fill surface (PHASE_11_TASKS.md Workstream C5/F Group 1) — every field optional. */
+/** The hybrid pre-fill surface (PHASE_11_TASKS.md Workstream C5/F Group 1) — every field
+ * optional. `slug` is never an override here — the server derives and dedupes it from the
+ * request's `businessName` (`tenantRequests.service.ts`'s `approveTenantRequest`). */
 export interface ApproveTenantRequestInput {
-  slug?: string;
   plan?: string;
   logo?: string;
   address?: string;

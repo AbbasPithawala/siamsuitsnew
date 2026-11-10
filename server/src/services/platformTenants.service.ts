@@ -2,10 +2,9 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../db/index";
 import { tenants } from "../db/schema/index";
 import { HttpError } from "../utils/http-error";
-import { catchUniqueViolation } from "../utils/db-errors";
 import { DEFAULT_PAGINATION, toLimitOffset } from "../utils/pagination";
 import type { PaginationParams } from "../utils/pagination";
-import { provisionTenant, PROVISIONED_OWNER_USERNAME } from "./provisioning.service";
+import { generateUniqueTenantSlug, provisionTenant, PROVISIONED_OWNER_USERNAME } from "./provisioning.service";
 
 /**
  * `tenants` itself carries no `tenant_id`/RLS policy (it's the root tenant row — see
@@ -27,7 +26,6 @@ export async function listTenants(pagination: PaginationParams = DEFAULT_PAGINAT
 
 export interface CreateTenantInput {
   businessName: string;
-  slug: string;
   ownerName: string;
   ownerEmail: string;
   plan?: string;
@@ -40,14 +38,17 @@ export interface CreateTenantInput {
  * Direct superadmin-initiated creation — bypasses the request/approve flow entirely (there's
  * no `tenant_requests` row here), but otherwise provisions identically to an approved request:
  * same `provisionTenant()`, same fixed owner username, same forced-password-change default.
+ * `slug` is never collected from the caller — it's derived from `businessName` and guaranteed
+ * unique by `generateUniqueTenantSlug()`.
  */
-export function createTenant(input: CreateTenantInput) {
+export async function createTenant(input: CreateTenantInput) {
   const profileFieldsProvided =
     input.logo !== undefined || input.address !== undefined || input.invoiceFooterText !== undefined;
+  const slug = await generateUniqueTenantSlug(input.businessName);
 
   return provisionTenant({
     businessName: input.businessName,
-    slug: input.slug,
+    slug,
     ...(input.plan !== undefined ? { plan: input.plan } : {}),
     ownerName: input.ownerName,
     ownerEmail: input.ownerEmail,
@@ -66,7 +67,6 @@ export function createTenant(input: CreateTenantInput) {
 
 export interface UpdateTenantInput {
   name?: string;
-  slug?: string;
   plan?: string;
   logo?: string;
   address?: string;
@@ -75,17 +75,17 @@ export interface UpdateTenantInput {
 }
 
 /**
- * Full tenant edit (name/slug/plan/letterhead/active state), all fields optional — same
- * "only touch fields present" convention as `updateTenantSettings`. `slug` is the one field
- * that can collide (`tenants_slug_unique`), so it's the only case wrapped in
- * `catchUniqueViolation` — no other column on `tenants` has a unique constraint.
+ * Full tenant edit (name/plan/letterhead/active state), all fields optional — same "only touch
+ * fields present" convention as `updateTenantSettings`. `slug` is never editable here — it's
+ * fixed at creation (`createTenant`'s `generateUniqueTenantSlug()`), since it's also the login
+ * identifier (`auth.routes.ts`'s `tenant` field) and changing it out from under an existing
+ * tenant would break every user's login.
  */
 export async function updateTenant(id: string, input: UpdateTenantInput) {
   const isLetterheadUpdate = input.logo !== undefined || input.address !== undefined || input.invoiceFooterText !== undefined;
 
   const setValues = {
     ...(input.name !== undefined ? { name: input.name } : {}),
-    ...(input.slug !== undefined ? { slug: input.slug } : {}),
     ...(input.plan !== undefined ? { plan: input.plan } : {}),
     ...(input.logo !== undefined ? { logo: input.logo || null } : {}),
     ...(input.address !== undefined ? { address: input.address || null } : {}),
@@ -97,12 +97,7 @@ export async function updateTenant(id: string, input: UpdateTenantInput) {
     updatedAt: new Date(),
   };
 
-  const runUpdate = () => db.update(tenants).set(setValues).where(eq(tenants.id, id)).returning();
-
-  const [updated] =
-    input.slug !== undefined
-      ? await catchUniqueViolation(runUpdate, "TENANT_SLUG_TAKEN", `A tenant with slug "${input.slug}" already exists`)
-      : await runUpdate();
+  const [updated] = await db.update(tenants).set(setValues).where(eq(tenants.id, id)).returning();
 
   if (!updated) throw new HttpError(404, "TENANT_NOT_FOUND", `Tenant ${id} not found`);
   return updated;

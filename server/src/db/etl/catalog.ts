@@ -9,6 +9,7 @@ import {
   featureProducts,
   styles,
 } from "../schema/index";
+import { slugifyMeasurementName } from "../../utils/slug";
 
 /**
  * Phase 2's catalog ETL (now deleted) migrated `products`/`processes`/`measurement_definitions`/
@@ -128,11 +129,6 @@ export async function findProcessByName(tx: Transaction, tenantId: string, name:
   return tx.query.processes.findFirst({
     where: and(eq(processes.tenantId, tenantId), eq(processes.name, name), isNull(processes.deletedAt)),
   });
-}
-
-/** Mirrors the `slug` Phase 2 generated for `measurement_definitions` (lowercased, spaces to underscores). */
-export function slugifyMeasurementName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, "_");
 }
 
 export async function findMeasurementDefinitionByName(tx: Transaction, tenantId: string, name: string) {

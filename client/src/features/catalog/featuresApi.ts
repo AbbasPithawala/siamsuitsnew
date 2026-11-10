@@ -114,6 +114,17 @@ export const featuresApi = baseApi.injectEndpoints({
           ? [...result.map((feature) => ({ type: "Feature" as const, id: feature.id })), { type: "Feature" as const, id: `PRODUCT-${productId}` }]
           : [{ type: "Feature" as const, id: `PRODUCT-${productId}` }],
     }),
+    /**
+     * Single-feature fetch (`GET /features/:id`, already existed server-side for
+     * `cleanupFeature` test helpers to use directly) — `FeatureStylesPage.tsx`'s
+     * only data source, since styles/style-options only ever come back nested
+     * under one feature, never from the list endpoints' own cache entries.
+     */
+    getFeature: builder.query<ProductFeature, string>({
+      query: (id) => `/features/${id}`,
+      transformResponse: (response: FeatureResponseEnvelope) => response.data,
+      providesTags: (_result, _error, id) => [{ type: "Feature" as const, id }],
+    }),
     createFeature: builder.mutation<ProductFeature, FeatureInput>({
       query: (body) => ({ url: "/features", method: "POST", body }),
       transformResponse: (response: FeatureResponseEnvelope) => response.data,
@@ -214,6 +225,7 @@ export const {
   useListFeaturesQuery,
   useListFeaturesPaginatedQuery,
   useListProductFeaturesQuery,
+  useGetFeatureQuery,
   useCreateFeatureMutation,
   useUpdateFeatureMutation,
   useDeleteFeatureMutation,

@@ -123,12 +123,12 @@ describe.skipIf(!serverUp)("Platform admin panel & public request-access page (l
 
     await screen.findByRole("heading", { name: /request access/i });
 
-    const uniqueSlug = `live-test-${Date.now()}`;
-    await user.type(screen.getByLabelText(/business name/i), "Live Test Tailors");
+    const businessName = `Live Test Tailors ${Date.now()}`;
+    await user.type(screen.getByLabelText(/business name/i), businessName);
     await user.type(screen.getByLabelText(/contact name/i), "Live Test Contact");
     await user.type(screen.getByLabelText(/contact email/i), "livetest@example.com");
     await user.type(screen.getByLabelText(/contact phone/i), "555-0100");
-    await user.type(screen.getByLabelText(/desired slug/i), uniqueSlug);
+    expect(screen.queryByLabelText(/desired slug/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /submit request/i }));
 
     await screen.findByRole("heading", { name: /request received/i });
@@ -145,9 +145,12 @@ describe.skipIf(!serverUp)("Platform admin panel & public request-access page (l
       headers: { Authorization: `Bearer ${loginData.token}` },
     });
     const { data: requests } = (await listRes.json()) as {
-      data: Array<{ requestedSlug: string; status: string }>;
+      data: Array<{ businessName: string; requestedSlug: string; status: string }>;
     };
-    expect(requests.some((r) => r.requestedSlug === uniqueSlug && r.status === "pending")).toBe(true);
+    const created = requests.find((r) => r.businessName === businessName && r.status === "pending");
+    expect(created).toBeTruthy();
+    // No Desired slug input exists anymore — the server derived it from the business name.
+    expect(created?.requestedSlug).toMatch(/^live-test-tailors-\d+$/);
   });
 
   it("logs a platform admin in, lands on the tenant-requests shell, and logs out back to /platform/login", async () => {

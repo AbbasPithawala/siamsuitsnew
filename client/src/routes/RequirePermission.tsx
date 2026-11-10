@@ -6,7 +6,7 @@ import { useMeQuery } from "../api/baseApi";
 import type { RootState } from "../app/store";
 
 interface RequirePermissionProps {
-  permission: string;
+  permission: string | string[];
   children: ReactNode;
 }
 
@@ -16,12 +16,16 @@ interface RequirePermissionProps {
  * inline "not authorized" message rather than redirecting: the user IS
  * authenticated, so bouncing them to `/login` would be wrong, and there's
  * no single obviously-correct fallback route to send them to instead.
+ *
+ * `permission` accepts a single key or an array — an array is an OR (holding any one of
+ * them is sufficient), mirroring the server's own `requirePermission` semantics.
  */
 export function RequirePermission({ permission, children }: RequirePermissionProps) {
   const token = useSelector((state: RootState) => state.auth.token);
   const { data: me } = useMeQuery(undefined, { skip: !token });
+  const required = Array.isArray(permission) ? permission : [permission];
 
-  if (!me?.permissions.includes(permission)) {
+  if (!required.some((key) => me?.permissions.includes(key))) {
     return (
       <Box sx={{ p: 4 }}>
         <Alert severity="warning">You do not have permission to view this page.</Alert>

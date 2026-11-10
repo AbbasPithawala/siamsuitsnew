@@ -5,7 +5,30 @@ import { permissions, rolePermissions, roles, tenants, userRoles, users } from "
 import { HttpError } from "../utils/http-error";
 import { catchUniqueViolation } from "../utils/db-errors";
 import { omit } from "../utils/object";
+import { slugifyBusinessName } from "../utils/slug";
 import { generateTemporaryPassword, hashPassword } from "./auth.service";
+
+/**
+ * Generates a unique, non-null tenant slug from `businessName` — callers never collect a slug
+ * directly. Mirrors `provisionTenant()`'s own retry-idempotency reasoning below: if the base
+ * slug is already held by a tenant with this exact `businessName`, that's a resumed retry of
+ * the same provisioning attempt, not a collision, so it's reused as-is rather than suffixed.
+ * Only a different business already holding the slug causes a numbered suffix.
+ */
+export async function generateUniqueTenantSlug(businessName: string): Promise<string> {
+  const baseSlug = slugifyBusinessName(businessName);
+  let slug = baseSlug;
+  let suffix = 1;
+  while (true) {
+    const existing = await db.query.tenants.findFirst({ where: eq(tenants.slug, slug) });
+    // A slug already held by a tenant with this exact `businessName` is treated as a resumed
+    // retry of this same provisioning attempt (mirrors `provisionTenant()`'s own reasoning
+    // just below) and reused as-is; only a different business already on the slug suffixes.
+    if (!existing || existing.name === businessName) return slug;
+    suffix += 1;
+    slug = `${baseSlug}-${suffix}`;
+  }
+}
 
 /**
  * PHASE_10_TASKS.md Workstream E Group 5's carve-out, lifted verbatim from `db/seed/index.ts`:

@@ -64,20 +64,31 @@ function renderAppAt(initialPath: string, store: EnhancedStore) {
   );
 }
 
-function uniqueSlug(): string {
-  return `onboarding-live-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+function uniqueSuffix(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function submitTenantRequestViaApi(slug: string) {
+/** Mirrors `server/src/utils/slug.ts`'s `slugifyBusinessName` exactly, so these tests can
+ * predict the slug the server will derive from a given business name — there's no Slug/
+ * Requested-slug input anywhere anymore for a test to just read the value back from. */
+function slugifyBusinessName(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "tenant";
+}
+
+async function submitTenantRequestViaApi(businessName: string) {
   const res = await fetch(`${apiBaseUrl}/platform/tenant-requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      businessName: `Onboarding Live Test ${slug}`,
+      businessName,
       contactName: "Onboarding Test Contact",
-      email: `${slug}@example.com`,
+      email: `${slugifyBusinessName(businessName)}@example.com`,
       phone: "555-0100",
-      requestedSlug: slug,
     }),
   });
   expect(res.status).toBe(201);
@@ -138,14 +149,14 @@ async function loginRawStatus(credentials: StaffCredentials): Promise<number> {
 
 async function approveViaUi(
   adminStore: EnhancedStore,
-  slug: string,
+  businessName: string,
   overrides?: { logo?: string; address?: string; invoiceFooterText?: string }
 ): Promise<string> {
   const rendered = renderAppAt("/platform/tenant-requests", adminStore);
   const user = userEvent.setup();
 
   await screen.findByRole("heading", { name: /tenant requests/i });
-  const row = (await screen.findByText(slug, {}, NETWORK_WAIT)).closest("tr");
+  const row = (await screen.findByText(businessName, {}, NETWORK_WAIT)).closest("tr");
   expect(row).not.toBeNull();
   await user.click(within(row as HTMLElement).getByRole("button", { name: /approve/i }));
 
@@ -178,12 +189,13 @@ describe.skipIf(!serverUp)(
     it(
       "approves with no overrides: forces change-password then complete-profile, and a subsequent login skips both",
       async () => {
-        const slug = uniqueSlug();
-        await submitTenantRequestViaApi(slug);
+        const businessName = `Onboarding Live Test ${uniqueSuffix()}`;
+        const slug = slugifyBusinessName(businessName);
+        await submitTenantRequestViaApi(businessName);
 
         try {
           const adminStore = await loginAsPlatformAdmin();
-          const tempPassword = await approveViaUi(adminStore, slug);
+          const tempPassword = await approveViaUi(adminStore, businessName);
           window.localStorage.clear();
 
           const ownerStore = await loginAsStaff({ tenant: slug, username: "owner", password: tempPassword });
@@ -228,12 +240,13 @@ describe.skipIf(!serverUp)(
     it(
       "hybrid pre-fill: approving WITH logo/address/footer overrides skips profile completion entirely",
       async () => {
-        const slug = uniqueSlug();
-        await submitTenantRequestViaApi(slug);
+        const businessName = `Onboarding Live Test ${uniqueSuffix()}`;
+        const slug = slugifyBusinessName(businessName);
+        await submitTenantRequestViaApi(businessName);
 
         try {
           const adminStore = await loginAsPlatformAdmin();
-          const tempPassword = await approveViaUi(adminStore, slug, {
+          const tempPassword = await approveViaUi(adminStore, businessName, {
             logo: "https://example.com/logo.png",
             address: "456 Hybrid Ave",
             invoiceFooterText: "Thanks for shopping!",
@@ -264,8 +277,9 @@ describe.skipIf(!serverUp)(
     it(
       "rejects a request with a reason: shows rejected + reason, creates no tenant, hides its actions",
       async () => {
-        const slug = uniqueSlug();
-        await submitTenantRequestViaApi(slug);
+        const businessName = `Onboarding Live Test ${uniqueSuffix()}`;
+        const slug = slugifyBusinessName(businessName);
+        await submitTenantRequestViaApi(businessName);
 
         try {
           const adminStore = await loginAsPlatformAdmin();
@@ -273,7 +287,7 @@ describe.skipIf(!serverUp)(
           const user = userEvent.setup();
 
           await screen.findByRole("heading", { name: /tenant requests/i });
-          const row = (await screen.findByText(slug, {}, NETWORK_WAIT)).closest("tr");
+          const row = (await screen.findByText(businessName, {}, NETWORK_WAIT)).closest("tr");
           expect(row).not.toBeNull();
           await user.click(within(row as HTMLElement).getByRole("button", { name: /reject/i }));
 
@@ -290,7 +304,7 @@ describe.skipIf(!serverUp)(
 
           await waitFor(
             () => {
-              const refreshedRow = screen.getByText(slug).closest("tr") as HTMLElement;
+              const refreshedRow = screen.getByText(businessName).closest("tr") as HTMLElement;
               expect(within(refreshedRow).getByText(/rejected/i)).toBeInTheDocument();
               expect(within(refreshedRow).queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
               expect(within(refreshedRow).queryByRole("button", { name: /reject/i })).not.toBeInTheDocument();
@@ -320,12 +334,13 @@ describe.skipIf(!serverUp)(
     it(
       "TenantsPage: deactivating a tenant blocks its owner's login, reactivating restores it",
       async () => {
-        const slug = uniqueSlug();
-        await submitTenantRequestViaApi(slug);
+        const businessName = `Onboarding Live Test ${uniqueSuffix()}`;
+        const slug = slugifyBusinessName(businessName);
+        await submitTenantRequestViaApi(businessName);
 
         try {
           const adminStore = await loginAsPlatformAdmin();
-          const tempPassword = await approveViaUi(adminStore, slug);
+          const tempPassword = await approveViaUi(adminStore, businessName);
 
           expect(await loginRawStatus({ tenant: slug, username: "owner", password: tempPassword })).toBe(200);
 
@@ -338,7 +353,7 @@ describe.skipIf(!serverUp)(
           await user.click(screen.getByRole("combobox", { name: /rows per page/i }));
           await user.click(await screen.findByRole("option", { name: "100" }));
 
-          const tenantRow = (await screen.findByText(slug, {}, NETWORK_WAIT)).closest("tr") as HTMLElement;
+          const tenantRow = (await screen.findByText(businessName, {}, NETWORK_WAIT)).closest("tr") as HTMLElement;
           const toggle = within(tenantRow).getByRole("checkbox");
           expect(toggle).toBeChecked();
 

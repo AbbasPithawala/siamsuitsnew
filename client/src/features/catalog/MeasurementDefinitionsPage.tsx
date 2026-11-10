@@ -32,10 +32,10 @@ import {
 } from "./measurementDefinitionsApi";
 import type { MeasurementDefinition, MeasurementDefinitionInput } from "./measurementDefinitionsApi";
 
-const EMPTY_FORM: MeasurementDefinitionInput = { name: "", thaiName: "", slug: "" };
+const EMPTY_FORM: MeasurementDefinitionInput = { name: "", thaiName: "" };
 
 function toBody(form: MeasurementDefinitionInput): MeasurementDefinitionInput {
-  const body: MeasurementDefinitionInput = { name: form.name.trim(), slug: form.slug.trim() };
+  const body: MeasurementDefinitionInput = { name: form.name.trim() };
   const thaiName = form.thaiName?.trim();
   if (thaiName) body.thaiName = thaiName;
   return body;
@@ -82,7 +82,6 @@ export function MeasurementDefinitionsPage() {
     setForm({
       name: definition.name,
       thaiName: definition.thaiName ?? "",
-      slug: definition.slug,
     });
     setDialogOpen(true);
   }
@@ -189,13 +188,6 @@ export function MeasurementDefinitionsPage() {
               value={form.thaiName ?? ""}
               onChange={(event) => setForm((current) => ({ ...current, thaiName: event.target.value }))}
             />
-            <TextField
-              label="Slug"
-              required
-              fullWidth
-              value={form.slug}
-              onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))}
-            />
             {mutationState.error && (
               <Alert severity="error">
                 {getApiErrorMessage(mutationState.error, "Failed to save measurement definition.")}
@@ -208,7 +200,7 @@ export function MeasurementDefinitionsPage() {
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={!form.name.trim() || !form.slug.trim() || mutationState.isLoading}
+            disabled={!form.name.trim() || mutationState.isLoading}
           >
             {editingId ? "Save" : "Add Measurement Definition"}
           </Button>

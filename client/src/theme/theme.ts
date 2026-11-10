@@ -59,7 +59,7 @@ export const theme = createTheme({
       main: "#ff0000", // legacy uses literal `red` throughout for error/delete states
     },
     background: {
-      default: "#F3F8FF", // legacy body / header background
+      default: "#ffffff", // was legacy #F3F8FF; switched to white per design request
       paper: "#ffffff",
     },
     text: {
@@ -92,7 +92,7 @@ export const theme = createTheme({
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: "#f3f8ff",
+          backgroundColor: "#ffffff",
           color: "#242424",
         },
       },

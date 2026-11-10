@@ -37,7 +37,6 @@ import type { CreateTenantResult, PlatformTenant } from "./platformTenantsApi";
 
 const EMPTY_FORM = {
   businessName: "",
-  slug: "",
   ownerName: "",
   ownerEmail: "",
   plan: "",
@@ -46,10 +45,9 @@ const EMPTY_FORM = {
   invoiceFooterText: "",
 };
 
-/** The `TENANT_SLUG_TAKEN` code both create/edit endpoints share — surfaced against the Slug
- * field specifically rather than just a generic dialog-level alert, the same "attribute a
- * known error code to the field it's actually about" approach the manufacturing screens use
- * for their own per-code copy (`manufacturingErrors.ts`). */
+/** The `TENANT_SLUG_TAKEN` code is still possible (a race between two concurrent creates for
+ * businesses with the identical name), but with no Slug field to attach it to it's just
+ * surfaced via the generic dialog-level alert below, with friendlier copy. */
 function isSlugTakenError(error: unknown): boolean {
   return getApiErrorCode(error) === "TENANT_SLUG_TAKEN";
 }
@@ -99,7 +97,6 @@ export function TenantsPage() {
     setEditingId(tenant.id);
     setForm({
       businessName: tenant.name,
-      slug: tenant.slug,
       ownerName: "",
       ownerEmail: "",
       plan: tenant.plan,
@@ -117,7 +114,6 @@ export function TenantsPage() {
           id: editingId,
           body: {
             name: form.businessName.trim(),
-            slug: form.slug.trim(),
             ...(form.plan.trim() ? { plan: form.plan.trim() } : {}),
             // Empty string, not omitted — see `UpdateTenantInput`'s doc comment (`platformTenantsApi.ts`)
             // on why this, not `null`/omission, is the correct "clear this field" signal here.
@@ -130,7 +126,6 @@ export function TenantsPage() {
       } else {
         const result = await createTenant({
           businessName: form.businessName.trim(),
-          slug: form.slug.trim(),
           ownerName: form.ownerName.trim(),
           ownerEmail: form.ownerEmail.trim(),
           ...(form.plan.trim() ? { plan: form.plan.trim() } : {}),
@@ -147,8 +142,8 @@ export function TenantsPage() {
   }
 
   const requiredFilled = editingId
-    ? form.businessName.trim() && form.slug.trim()
-    : form.businessName.trim() && form.slug.trim() && form.ownerName.trim() && form.ownerEmail.trim();
+    ? form.businessName.trim().length > 0
+    : form.businessName.trim() && form.ownerName.trim() && form.ownerEmail.trim();
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -221,8 +216,9 @@ export function TenantsPage() {
         <DialogContent>
           {!editingId && (
             <DialogContentText sx={{ mb: 2 }}>
-              Business name, slug, and owner contact are required. The rest is optional — leave
-              blank to let the new owner complete their own business profile on first login.
+              Business name and owner contact are required. The rest is optional — leave blank to
+              let the new owner complete their own business profile on first login. A unique login
+              slug is generated automatically from the business name.
             </DialogContentText>
           )}
           <Stack spacing={2} sx={{ mt: editingId ? 1 : 0 }}>
@@ -232,15 +228,6 @@ export function TenantsPage() {
               fullWidth
               value={form.businessName}
               onChange={(event) => setForm((current) => ({ ...current, businessName: event.target.value }))}
-            />
-            <TextField
-              label="Slug"
-              required
-              fullWidth
-              error={isSlugTakenError(mutationState.error)}
-              helperText={isSlugTakenError(mutationState.error) ? "That slug is already taken by another tenant." : undefined}
-              value={form.slug}
-              onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))}
             />
             {!editingId && (
               <>
@@ -287,8 +274,12 @@ export function TenantsPage() {
               value={form.invoiceFooterText}
               onChange={(event) => setForm((current) => ({ ...current, invoiceFooterText: event.target.value }))}
             />
-            {mutationState.error && !isSlugTakenError(mutationState.error) && (
-              <Alert severity="error">{getApiErrorMessage(mutationState.error, "Failed to save tenant.")}</Alert>
+            {mutationState.error && (
+              <Alert severity="error">
+                {isSlugTakenError(mutationState.error)
+                  ? "Another tenant already has a login slug derived from this exact business name. Try a slightly different business name."
+                  : getApiErrorMessage(mutationState.error, "Failed to save tenant.")}
+              </Alert>
             )}
           </Stack>
         </DialogContent>

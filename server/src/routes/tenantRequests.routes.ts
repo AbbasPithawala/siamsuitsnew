@@ -14,9 +14,6 @@ const createTenantRequestSchema = z.object({
   contactName: z.string().min(1),
   email: z.string().email(),
   phone: z.string().min(1),
-  requestedSlug: z
-    .string()
-    .regex(/^[a-z0-9-]+$/, "requestedSlug must contain only lowercase letters, numbers, and hyphens"),
   notes: z.string().optional(),
 });
 
@@ -25,10 +22,6 @@ const listTenantRequestsQuerySchema = paginationQuerySchema.extend({
 });
 
 const approveTenantRequestSchema = z.object({
-  slug: z
-    .string()
-    .regex(/^[a-z0-9-]+$/, "slug must contain only lowercase letters, numbers, and hyphens")
-    .optional(),
   plan: z.string().optional(),
   logo: z.string().optional(),
   address: z.string().optional(),

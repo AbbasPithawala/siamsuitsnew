@@ -13,6 +13,7 @@ describe("seeded Retailer role", () => {
     "customers.manage",
     "orders.create",
     "orders.view",
+    "orders.edit.own",
     "orders.repeat",
     "orders.group.create",
     "invoices.view",

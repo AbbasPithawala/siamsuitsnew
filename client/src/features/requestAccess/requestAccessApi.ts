@@ -5,7 +5,6 @@ export interface CreateTenantRequestBody {
   contactName: string;
   email: string;
   phone: string;
-  requestedSlug: string;
   notes?: string;
 }
 

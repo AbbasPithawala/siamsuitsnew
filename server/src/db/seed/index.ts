@@ -65,6 +65,11 @@ async function seed() {
   // left as-is, because a stray/placeholder "Retailer" role predating this seed (e.g. a
   // manually-created demo login with an overbroad grant) would otherwise leave the actual
   // security boundary this task exists to establish silently unenforced.
+  //
+  // `orders.edit.own` (not the admin-only `orders.edit`) lets a retailer edit their own
+  // orders' line items — enforced further in `editOrderItems` to only orders still in
+  // "New Order"/"Modified" status; it deliberately does NOT unlock the status-change or
+  // retailer-reassignment routes, which stay gated on `orders.edit` alone.
   console.log("Seeding default Retailer role...");
   let retailerRole = await db.query.roles.findFirst({
     where: and(eq(roles.tenantId, tenant.id), eq(roles.name, "Retailer")),
@@ -82,6 +87,7 @@ async function seed() {
     "customers.manage",
     "orders.create",
     "orders.view",
+    "orders.edit.own",
     "orders.repeat",
     "orders.group.create",
     "invoices.view",

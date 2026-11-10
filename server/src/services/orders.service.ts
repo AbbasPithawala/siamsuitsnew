@@ -646,6 +646,31 @@ export interface EditOrderInput {
  * function `buildOrder` uses — one real implementation of "validate + resolve items against
  * the catalog," not a second, edit-only copy.
  */
+/**
+ * Statuses a retailer-linked actor (holding only `orders.edit.own`, never the admin-only
+ * `orders.edit`) may still edit line items on. Once an order has moved past these — into
+ * Processing/Shipment/Sent/Cancelled/etc. — production has (or may have) already started
+ * against it, so further item edits are admin-only via `orders.edit`.
+ */
+const RETAILER_EDITABLE_STATUSES = new Set(["New Order", "Modified"]);
+
+/**
+ * No-op for staff/admin actors (`actorRetailerId` null — `orders.edit` carries no status
+ * restriction). For a retailer-linked actor, `requireOrder` above already confirmed this is
+ * their own order; this additionally confirms it's still in an editable status, since a
+ * retailer might hold only `orders.edit.own`, not the unrestricted `orders.edit`.
+ */
+function assertRetailerCanEditStatus(status: string, actorRetailerId?: string | null): void {
+  if (!actorRetailerId) return;
+  if (!RETAILER_EDITABLE_STATUSES.has(status)) {
+    throw new HttpError(
+      403,
+      "ORDER_NOT_EDITABLE",
+      `This order is "${status}" and can no longer be edited by the retailer — it must be in New Order or Modified status`
+    );
+  }
+}
+
 export async function editOrderItems(
   tenantId: string,
   orderId: string,
@@ -654,6 +679,7 @@ export async function editOrderItems(
 ) {
   return withTenant(tenantId, async (tx) => {
     const order = await requireOrder(tx, orderId, actorRetailerId);
+    assertRetailerCanEditStatus(order.status, actorRetailerId);
     const resolvedItems = await resolveItemsFromInput(tx, input.items);
 
     const { items: existingItems, componentsByItem: existingComponentsByItem } = await fetchExistingItemTree(tx, orderId);

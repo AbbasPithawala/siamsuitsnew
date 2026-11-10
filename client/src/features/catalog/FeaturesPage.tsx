@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -7,7 +8,6 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
-import Divider from "@mui/material/Divider";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
@@ -36,7 +36,6 @@ import { PaginationControls } from "../../components/PaginationControls";
 import { usePagination } from "../../hooks/usePagination";
 import { useHasPermission } from "../auth/useHasPermission";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
-import { FeatureStylesEditor } from "./FeatureStylesEditor";
 import {
   useCreateFeatureMutation,
   useDeleteFeatureMutation,
@@ -104,13 +103,18 @@ function toFeatureBody(form: FeatureFormState) {
  * products, not all-or-nothing the way the legacy's one-`product_id`-per-
  * Feature model forced.
  *
- * The nested styles/style-options builder (`FeatureStylesEditor`) only
- * appears in the edit dialog for a persisted `type: "choice"` feature —
- * there's no bulk "create feature with styles" endpoint the way super
- * products accept inline components on create, so a brand-new choice
- * feature is created first (name/type/process/products), then reopened via
- * Edit to add its styles, mirroring `SuperProductsPage.tsx`'s edit-only
- * component-management path for the same reason.
+ * The styles/style-options builder lives on its own page
+ * (`FeatureStylesPage.tsx`, linked from the Styles column below) rather than
+ * nested in the edit dialog — matches legacy's own two-screen split
+ * (`ManageStyleOptionForm.jsx` for feature metadata vs. the separate
+ * `ManageEditStyling.jsx` for style rows), and mirrors this rewrite's own
+ * `FittingsPage.tsx` → `FittingValuesPage.tsx` drill-down pattern. Only
+ * reachable once a feature already has an id — there's no bulk "create
+ * feature with styles" endpoint the way super products accept inline
+ * components on create, so a brand-new choice feature is created first
+ * (name/type/process/products), then its Styles link opens once persisted,
+ * same "edit-only" reasoning `SuperProductsPage.tsx`'s component-management
+ * path already documents.
  */
 export function FeaturesPage() {
   const canManage = useHasPermission("catalog.features.manage");
@@ -157,8 +161,6 @@ export function FeaturesPage() {
   const mutationState = editingId ? updateState : createState;
   const combinedError = mutationState.error ?? (editingId ? setProductsState.error : undefined);
   const isSaving = mutationState.isLoading || (editingId ? setProductsState.isLoading : false);
-
-  const editingFeature = editingId ? (features?.find((feature) => feature.id === editingId) ?? null) : null;
 
   function openCreateDialog() {
     setEditingId(null);
@@ -258,13 +260,14 @@ export function FeaturesPage() {
               <TableCell>Thai name</TableCell>
               <TableCell>Type</TableCell>
               <TableCell>Products</TableCell>
+              <TableCell>Styles</TableCell>
               {canManage && <TableCell align="right">Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {features?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={canManage ? 5 : 4}>
+                <TableCell colSpan={canManage ? 6 : 5}>
                   <Typography color="text.secondary">No features yet.</Typography>
                 </TableCell>
               </TableRow>
@@ -278,6 +281,15 @@ export function FeaturesPage() {
                   {feature.products.length === 0
                     ? "0"
                     : `${feature.products.length} (${feature.products.map((p) => p.name).join(", ")})`}
+                </TableCell>
+                <TableCell>
+                  {feature.type === "choice" ? (
+                    <Button component={RouterLink} to={`/catalog/features/${feature.id}/styles`} size="small">
+                      Manage
+                    </Button>
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
                 {canManage && (
                   <TableCell align="right">
@@ -383,13 +395,6 @@ export function FeaturesPage() {
             </FormControl>
 
             {combinedError && <Alert severity="error">{getApiErrorMessage(combinedError, "Failed to save feature.")}</Alert>}
-
-            {editingFeature?.type === "choice" && (
-              <>
-                <Divider />
-                <FeatureStylesEditor featureId={editingFeature.id} styles={editingFeature.styles ?? []} />
-              </>
-            )}
           </Stack>
         </DialogContent>
         <DialogActions>

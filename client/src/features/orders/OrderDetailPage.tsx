@@ -74,8 +74,10 @@ export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const canRepeat = useHasPermission("orders.repeat");
-  /** PHASE_10_TASKS.md Workstream E Group 6.3d — gates the edit-wizard entry point and the status/cancel/reassign actions below, all real second-order mutations distinct from `orders.create`/`orders.view`. */
+  /** PHASE_10_TASKS.md Workstream E Group 6.3d — gates the status/cancel/reassign actions below, real second-order mutations distinct from `orders.create`/`orders.view`, admin-only (Retailer never holds `orders.edit`). */
   const canEdit = useHasPermission("orders.edit");
+  /** The seeded Retailer role's narrower grant — combined with `canEdit` and the order's own status below to gate the "Edit Order" button specifically (not the other three admin-only actions). */
+  const canEditOwn = useHasPermission("orders.edit.own");
 
   const { data: order, isLoading, isError, error } = useGetOrderQuery(id ?? "", { skip: !id });
   const { data: retailers } = useListRetailersQuery();
@@ -191,6 +193,13 @@ export function OrderDetailPage() {
     );
   }
 
+  /**
+   * `canEdit` (admin's `orders.edit`) can always edit; `orders.edit.own` (Retailer) only
+   * while the order is still New Order/Modified — mirrors `RETAILER_EDITABLE_STATUSES` in
+   * `orders.service.ts#assertRetailerCanEditStatus`, which is the actual enforcement point.
+   */
+  const canEditItems = canEdit || (canEditOwn && (order.status === "New Order" || order.status === "Modified"));
+
   return (
     <Box sx={{ p: 4 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2, flexWrap: "wrap", gap: 2 }}>
@@ -213,13 +222,12 @@ export function OrderDetailPage() {
             </Button>
           )}
           {/*
-           * PHASE_10_TASKS.md Workstream E Group 6.3d — all four gated on
-           * `orders.edit` alone (Retailer never holds it, per Group 5), no
-           * button-level split beyond that single check: the edit wizard and
-           * the three smaller status/reassign actions are all real second-order
-           * mutations against an existing order, none of them `orders.create`.
+           * PHASE_10_TASKS.md Workstream E Group 6.3d — "Edit Order" is the one button split
+           * from the other three: it's also reachable via `orders.edit.own` (Retailer),
+           * gated additionally on the order's own status (`canEditItems`). The other three —
+           * status/cancel/reassign — stay on `orders.edit` alone (Retailer never holds it).
            */}
-          {canEdit && (
+          {canEditItems && (
             <Button variant="outlined" onClick={handleEditOrder}>
               Edit Order
             </Button>

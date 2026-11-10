@@ -41,11 +41,10 @@ describe("/api/measurement-definitions", () => {
     });
     const product = (await productRes.json()) as { data: { id: string } };
 
-    const suffix = randomUUID();
     const defRes = await fetch(`${baseUrl}/api/measurement-definitions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${managerA.token}` },
-      body: JSON.stringify({ name: "Chest", slug: `chest-${suffix}` }),
+      body: JSON.stringify({ name: `Chest ${randomUUID()}` }),
     });
     expect(defRes.status).toBe(201);
     const definition = (await defRes.json()) as { data: { id: string } };
@@ -73,17 +72,16 @@ describe("/api/measurement-definitions", () => {
     });
     const product = (await productRes.json()) as { data: { id: string } };
 
-    const suffix = randomUUID();
     const [defARes, defBRes] = await Promise.all([
       fetch(`${baseUrl}/api/measurement-definitions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${managerA.token}` },
-        body: JSON.stringify({ name: "Length", slug: `length-${suffix}` }),
+        body: JSON.stringify({ name: `Length ${randomUUID()}` }),
       }),
       fetch(`${baseUrl}/api/measurement-definitions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${managerA.token}` },
-        body: JSON.stringify({ name: "Chest", slug: `chest2-${suffix}` }),
+        body: JSON.stringify({ name: `Chest ${randomUUID()}` }),
       }),
     ]);
     const defA = ((await defARes.json()) as { data: { id: string } }).data;
@@ -111,7 +109,7 @@ describe("/api/measurement-definitions", () => {
     const res = await fetch(`${baseUrl}/api/measurement-definitions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${readOnlyA.token}` },
-      body: JSON.stringify({ name: "Waist", slug: `waist-${randomUUID()}` }),
+      body: JSON.stringify({ name: `Waist ${randomUUID()}` }),
     });
     expect(res.status).toBe(403);
   });

@@ -51,6 +51,7 @@ export function ManageLinkedItemsDialog({
 }: ManageLinkedItemsDialogProps) {
   const [orderedIds, setOrderedIds] = useState<string[]>(linkedIds);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState("");
   const dragIndexRef = useRef<number | null>(null);
 
   const itemById = new Map(allItems.map((item) => [item.id, item]));
@@ -80,6 +81,7 @@ export function ManageLinkedItemsDialog({
   function handleAdd(item: LinkedItemOption | null) {
     if (!item) return;
     setOrderedIds((current) => [...current, item.id]);
+    setInputValue("");
   }
 
   async function handleSave() {
@@ -152,6 +154,11 @@ export function ManageLinkedItemsDialog({
               getOptionLabel={(item) => item.label}
               onChange={(_event, item) => handleAdd(item)}
               value={null}
+              inputValue={inputValue}
+              onInputChange={(_event, newInputValue, reason) => {
+                if (reason === "reset") return;
+                setInputValue(newInputValue);
+              }}
               renderInput={({ InputLabelProps: _InputLabelProps, ...params }) => (
                 // MUI's `AutocompleteRenderInputParams.InputLabelProps.className` is typed
                 // `string | undefined`, which trips this project's `exactOptionalPropertyTypes`

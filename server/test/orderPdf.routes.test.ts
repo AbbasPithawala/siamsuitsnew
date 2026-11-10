@@ -149,8 +149,7 @@ async function createCustomer(baseUrl: string, ctx: Ctx, retailerId: string): Pr
 }
 
 async function createMeasurementDefinition(baseUrl: string, ctx: Ctx, name: string): Promise<string> {
-  const suffix = randomUUID();
-  const res = await postJson(baseUrl, "/api/measurement-definitions", ctx.token, { name: `${name} ${suffix}`, slug: `${name.toLowerCase()}-${suffix}` });
+  const res = await postJson(baseUrl, "/api/measurement-definitions", ctx.token, { name: `${name} ${randomUUID()}` });
   const body = (await res.json()) as { data: { id: string } };
   return body.data.id;
 }

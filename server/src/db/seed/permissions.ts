@@ -27,6 +27,11 @@ export const permissionCatalog: Array<{ key: string; module: string; description
   // Orders
   { key: "orders.create", module: "Orders", description: "Create new orders" },
   { key: "orders.edit", module: "Orders", description: "Edit existing orders" },
+  {
+    key: "orders.edit.own",
+    module: "Orders",
+    description: "Edit own retailer's orders while still in New Order or Modified status",
+  },
   { key: "orders.view", module: "Orders", description: "View/search orders" },
   { key: "orders.repeat", module: "Orders", description: "Repeat a prior order" },
   { key: "orders.rush", module: "Orders", description: "Flag an order as rush" },

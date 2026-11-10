@@ -103,8 +103,8 @@ describe("GET /api/me", () => {
     expect(body.data.name).toBeTruthy();
     expect(body.data).not.toHaveProperty("passwordHash");
 
-    expect(permissionCatalog).toHaveLength(30);
-    expect(body.data.permissions).toHaveLength(29);
+    expect(permissionCatalog).toHaveLength(31);
+    expect(body.data.permissions).toHaveLength(30);
     expect(body.data.permissions).not.toContain("orders.create");
     for (const permission of permissionCatalog) {
       if (permission.key === "orders.create") continue;

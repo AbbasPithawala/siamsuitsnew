@@ -23,8 +23,10 @@ function loadServerDatabaseUrl() {
  * accumulating tenants in the real dev DB, which matters here specifically because
  * `TenantsPage`'s live test has to find one exact row among however many tenants exist.
  *
- * Assumes (as every test in `onboarding.live.test.tsx` does) that the approve dialog was never
- * given a `slug` override — the tenant's real slug always equals the original `requestedSlug`.
+ * Assumes (as every test in `onboarding.live.test.tsx` does) the tenant's real slug is whatever
+ * the server derived from its business name (there's no Slug override field anymore — see
+ * `tenantRequests.service.ts`'s `approveTenantRequest`), computed by the caller via the same
+ * `slugifyBusinessName` the server uses.
  */
 export async function cleanupProvisionedTenant(slug) {
   const sql = postgres(loadServerDatabaseUrl());

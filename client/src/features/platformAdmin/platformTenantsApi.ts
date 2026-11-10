@@ -22,12 +22,12 @@ interface PlatformTenantResponseEnvelope {
 
 /** `POST /api/platform/tenants` body — direct-provisioning counterpart to
  * `ApproveTenantRequestInput` (`tenantRequestsApi.ts`), same hybrid pre-fill reasoning:
- * only `businessName`/`slug`/`ownerName`/`ownerEmail` are required, the rest is optional
+ * only `businessName`/`ownerName`/`ownerEmail` are required, the rest is optional
  * business-profile detail a superadmin can set now or leave for the new owner to fill in
- * on first login. */
+ * on first login. `slug` is never collected here — the server derives and dedupes it from
+ * `businessName` (`platformTenants.service.ts`'s `generateUniqueTenantSlug`). */
 export interface CreateTenantInput {
   businessName: string;
-  slug: string;
   ownerName: string;
   ownerEmail: string;
   plan?: string;
@@ -61,7 +61,6 @@ interface CreateTenantResponseEnvelope {
  * not `null` — the service layer itself does the `input.logo || null` conversion server-side. */
 export interface UpdateTenantInput {
   name?: string;
-  slug?: string;
   plan?: string;
   logo?: string;
   address?: string;

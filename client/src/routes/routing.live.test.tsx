@@ -27,17 +27,18 @@ const SEED_ADMIN = {
 };
 
 /**
- * The real seeded Retailer role's exact 7-key permission bundle
+ * The real seeded Retailer role's exact 8-key permission bundle
  * (`server/src/db/seed/index.ts`'s `retailerPermissionKeys`, Workstream E
- * Group 3) — module-scoped so both the Group 4 catalog-lockdown tests and
- * the Group 6 edit-wizard-route test below share the identical bundle,
- * rather than each hand-picking its own list that could silently drift out
- * of sync with the real seed.
+ * Group 3, since extended by `orders.edit.own`) — module-scoped so both the
+ * Group 4 catalog-lockdown tests and the Group 6 edit-wizard-route test
+ * below share the identical bundle, rather than each hand-picking its own
+ * list that could silently drift out of sync with the real seed.
  */
 const RETAILER_PERMISSION_KEYS = [
   "customers.manage",
   "orders.create",
   "orders.view",
+  "orders.edit.own",
   "orders.repeat",
   "orders.group.create",
   "invoices.view",
@@ -110,7 +111,7 @@ async function loginAs(credentials: { tenant: string; username: string; password
 
   await user.type(screen.getByLabelText(/tenant/i), credentials.tenant);
   await user.type(screen.getByLabelText(/username/i), credentials.username);
-  await user.type(screen.getByLabelText(/password/i), credentials.password);
+  await user.type(screen.getByLabelText(/password/i, { selector: "input" }), credentials.password);
   await user.click(screen.getByRole("button", { name: /login/i }));
 
   await waitFor(() => expect(store.getState().auth.token).toBeTruthy());
@@ -297,19 +298,41 @@ describe.skipIf(!serverUp)("Routing & permission guards (live siam/server integr
   /**
    * PHASE_10_TASKS.md Workstream E Group 6.3d — the edit-wizard route
    * (`/orders/:id/edit`, `OrderBuilderPage.tsx` re-hosted in edit mode) is
-   * gated on `orders.edit`, not `orders.view`/`orders.create` — same
-   * `RequirePermission` mechanism as every other route in this file, checked
-   * before `OrderBuilderPage` even mounts (so it never actually needs a real
-   * order id to prove the gate itself; a syntactically-valid but nonexistent
-   * uuid is enough — `OrderBuilderPage`'s own `GET /orders/:id` failing
+   * gated on `orders.edit` OR `orders.edit.own` — same `RequirePermission`
+   * mechanism as every other route in this file, checked before
+   * `OrderBuilderPage` even mounts (so it never actually needs a real order
+   * id to prove the gate itself; a syntactically-valid but nonexistent uuid
+   * is enough — `OrderBuilderPage`'s own `GET /orders/:id` failing
    * afterward, for the positive case, is a separate, already-covered concern,
-   * see `orders.edit.routes.test.ts`/`OrderEditWizard.live.test.tsx`).
+   * see `orders.edit.routes.test.ts`/`OrderEditWizard.live.test.tsx`). The
+   * seeded Retailer role now holds `orders.edit.own` (not `orders.edit`), so
+   * it's no longer blocked at this route-level check at all — its own
+   * narrower, order-status-based restriction lives inside `OrderBuilderPage`
+   * instead (once the order itself has loaded), covered by a dedicated test
+   * in `OrderEditWizard.live.test.tsx`, not here.
    */
-  describe.skipIf(!dbUp)("Workstream E Group 6: order edit-wizard route gated on orders.edit", () => {
+  describe.skipIf(!dbUp)("Workstream E Group 6: order edit-wizard route gated on orders.edit/orders.edit.own", () => {
     const NONEXISTENT_ORDER_ID = "00000000-0000-4000-8000-000000000000";
 
-    it("blocks a Retailer-role session from /orders/:id/edit", async () => {
+    it("lets a Retailer-role session (orders.edit.own) reach /orders/:id/edit — the route itself no longer blocks it", async () => {
       const fixture = await createTenantWithLimitedUser(RETAILER_PERMISSION_KEYS);
+      try {
+        const store = await loginAs(fixture);
+
+        renderAppAt(`/orders/${NONEXISTENT_ORDER_ID}/edit`, store);
+
+        // Not blocked by RequirePermission — same shape as the admin
+        // assertion below; the nonexistent order id surfaces as this page's
+        // own load error, not a permission warning.
+        await screen.findByText(/Edit Order|not found/i);
+        expect(screen.queryByText(/do not have permission/i)).not.toBeInTheDocument();
+      } finally {
+        await fixture.cleanup();
+      }
+    });
+
+    it("blocks a session holding neither orders.edit nor orders.edit.own from /orders/:id/edit", async () => {
+      const fixture = await createTenantWithLimitedUser(["orders.view"]);
       try {
         const store = await loginAs(fixture);
 

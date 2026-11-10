@@ -3,8 +3,10 @@ import type { PaginatedResponse, PaginationQueryParams } from "../../api/paginat
 
 /**
  * Mirrors `server/src/db/schema/catalog.ts`'s `measurementDefinitions`
- * table: `id`, `name`, `thaiName` (nullable), `slug` (required, unique per
- * tenant — see `measurementsRouter`'s `createDefinitionSchema`).
+ * table: `id`, `name`, `thaiName` (nullable), `slug` (unique per tenant,
+ * auto-generated server-side from `name` — see
+ * `measurements.service.ts`'s `generateUniqueMeasurementSlug`; there is no
+ * client-side input for it).
  *
  * Distinct from `../measurements/measurementsApi.ts`'s `MeasurementDefinition`
  * (a read-only shape nested under a product-measurement link, for Group 5's
@@ -20,7 +22,6 @@ export interface MeasurementDefinition {
 export interface MeasurementDefinitionInput {
   name: string;
   thaiName?: string;
-  slug: string;
 }
 
 interface MeasurementDefinitionResponseEnvelope {

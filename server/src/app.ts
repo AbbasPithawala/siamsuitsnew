@@ -33,6 +33,7 @@ import { invoicesRouter } from "./routes/invoices.routes";
 import { tenantSettingsRouter } from "./routes/tenantSettings.routes";
 import { shippingRouter } from "./routes/shipping.routes";
 import { uploadsRouter } from "./routes/uploads.routes";
+import { dashboardRouter } from "./routes/dashboard.routes";
 import { localStorageRootDir, LOCAL_STATIC_URL_PREFIX } from "./services/storage.service";
 
 export const app = express();
@@ -82,6 +83,7 @@ app.use("/api", invoicesRouter);
 app.use("/api", tenantSettingsRouter);
 app.use("/api", shippingRouter);
 app.use("/api", uploadsRouter);
+app.use("/api", dashboardRouter);
 
 if (env.CLIENT_DIST_PATH) {
   const clientDistPath = path.resolve(env.CLIENT_DIST_PATH);

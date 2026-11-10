@@ -110,13 +110,11 @@ describe.skipIf(!seededToken)("MeasurementDefinitionsPage (live siam/server inte
 
       const suffix = Date.now();
       const createdName = `Live Test Measurement ${suffix}`;
-      const createdSlug = `live-test-measurement-${suffix}`;
       await screen.findByRole("heading", { name: "Measurement Definitions" });
 
       await user.click(screen.getByRole("button", { name: "Add Measurement Definition" }));
       let dialog = await screen.findByRole("dialog");
       await user.type(within(dialog).getByLabelText(/^Name/i), createdName);
-      await user.type(within(dialog).getByLabelText(/^Slug/i), createdSlug);
       await user.click(within(dialog).getByRole("button", { name: "Add Measurement Definition" }));
 
       await screen.findByText(createdName);
@@ -152,31 +150,36 @@ describe.skipIf(!seededToken)("MeasurementDefinitionsPage (live siam/server inte
   );
 
   it(
-    "surfaces a real backend validation error in the create dialog for a duplicate slug",
+    "auto-generates a unique slug server-side when two measurement definitions share the same name",
     async () => {
       const token = seededToken as string;
       const suffix = Date.now();
-      const fixtureName = `Live Test Duplicate Measurement ${suffix}`;
-      const fixtureSlug = `live-test-duplicate-measurement-${suffix}`;
-      const created = await apiRequest<{ data: { id: string } }>("/measurement-definitions", token, {
+      const sharedName = `Live Test Duplicate Measurement ${suffix}`;
+      await apiRequest<{ data: { id: string; slug: string } }>("/measurement-definitions", token, {
         method: "POST",
-        body: JSON.stringify({ name: fixtureName, slug: fixtureSlug }),
+        body: JSON.stringify({ name: sharedName }),
       });
-      createdDefinitionIds.push(created.data.id);
 
       const user = userEvent.setup();
       renderPage();
       await showMaxRowsPerPage(user);
 
-      await screen.findByText(fixtureName);
+      await screen.findByText(sharedName);
       await user.click(screen.getByRole("button", { name: "Add Measurement Definition" }));
       const dialog = await screen.findByRole("dialog");
-      await user.type(within(dialog).getByLabelText(/^Name/i), `Different Name ${suffix}`);
-      await user.type(within(dialog).getByLabelText(/^Slug/i), fixtureSlug);
+      await user.type(within(dialog).getByLabelText(/^Name/i), sharedName);
       await user.click(within(dialog).getByRole("button", { name: "Add Measurement Definition" }));
 
-      await within(dialog).findByText(/already exists/i);
-      expect(screen.queryByText(`Different Name ${suffix}`)).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+      const list = await apiRequest<{ data: { id: string; name: string; slug: string }[] }>(
+        "/measurement-definitions",
+        token
+      );
+      const matches = list.data.filter((definition) => definition.name === sharedName);
+      expect(matches).toHaveLength(2);
+      expect(matches[0]?.slug).not.toBe(matches[1]?.slug);
+      for (const match of matches) createdDefinitionIds.push(match.id);
     },
     25000
   );

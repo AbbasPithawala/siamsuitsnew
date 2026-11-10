@@ -48,16 +48,20 @@ interface TailorFormState {
   username: string;
   password: string;
   isActive: boolean;
+  resetPassword: boolean;
 }
 
-const EMPTY_FORM: TailorFormState = { name: "", username: "", password: "", isActive: true };
+const EMPTY_FORM: TailorFormState = { name: "", username: "", password: "", isActive: true, resetPassword: false };
 
 /**
  * Tailors admin — PHASE_6_TASKS.md Group 4, the closest sibling to
- * `UsersPage.tsx` (Phase 5 Group 4): a password field that only exists on
- * create (`createTailorSchema` in `tailors.routes.ts` requires it, min 8
- * chars, hashed server-side; this page deliberately doesn't wire a "reset
- * password" control on edit), plus a nested certifications sub-view — the
+ * `UsersPage.tsx` (Phase 5 Group 4). The password field is required on
+ * create (`createTailorSchema` in `tailors.routes.ts`, min 8 chars, hashed
+ * server-side) and optional on edit via a "Reset password" toggle — the
+ * backend's `updateTailorSchema` already accepted an optional `password`
+ * field, this page just didn't expose it (the gap that motivated tailors
+ * getting fresh random ETL-migration passwords with no way to recover or
+ * reset them from the admin UI) — plus a nested certifications sub-view, the
  * process equivalent of that page's `UserRolesEditor` roles checkbox list.
  * Gated by `RequirePermission permission="factory.tailors.manage"` at the
  * route level in `AppRoutes.tsx`, same page-level-gate reasoning as
@@ -95,7 +99,9 @@ export function TailorsPage() {
   const isFormValid =
     form.name.trim().length > 0 &&
     form.username.trim().length > 0 &&
-    (editingId !== null || form.password.length >= MIN_PASSWORD_LENGTH);
+    (editingId === null
+      ? form.password.length >= MIN_PASSWORD_LENGTH
+      : !form.resetPassword || form.password.length >= MIN_PASSWORD_LENGTH);
 
   function openCreateDialog() {
     setEditingId(null);
@@ -105,7 +111,7 @@ export function TailorsPage() {
 
   function openEditDialog(tailor: Tailor) {
     setEditingId(tailor.id);
-    setForm({ name: tailor.name, username: tailor.username, password: "", isActive: tailor.isActive });
+    setForm({ name: tailor.name, username: tailor.username, password: "", isActive: tailor.isActive, resetPassword: false });
     setDialogOpen(true);
   }
 
@@ -114,7 +120,12 @@ export function TailorsPage() {
       if (editingId) {
         await updateTailor({
           id: editingId,
-          body: { name: form.name.trim(), username: form.username.trim(), isActive: form.isActive },
+          body: {
+            name: form.name.trim(),
+            username: form.username.trim(),
+            isActive: form.isActive,
+            ...(form.resetPassword ? { password: form.password } : {}),
+          },
         }).unwrap();
       } else {
         await createTailor({ name: form.name.trim(), username: form.username.trim(), password: form.password }).unwrap();
@@ -237,15 +248,40 @@ export function TailorsPage() {
               />
             )}
             {editingId !== null && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={form.isActive}
-                    onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
+              <>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.isActive}
+                      onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))}
+                    />
+                  }
+                  label="Active"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.resetPassword}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, resetPassword: event.target.checked, password: "" }))
+                      }
+                    />
+                  }
+                  label="Reset password"
+                />
+                {form.resetPassword && (
+                  <TextField
+                    label="New password"
+                    type="password"
+                    required
+                    fullWidth
+                    autoFocus
+                    helperText={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+                    value={form.password}
+                    onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
                   />
-                }
-                label="Active"
-              />
+                )}
+              </>
             )}
             {mutationState.error && (
               <Alert severity="error">{getApiErrorMessage(mutationState.error, "Failed to save tailor.")}</Alert>

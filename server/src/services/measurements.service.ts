@@ -1,7 +1,9 @@
-import { eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { withTenant } from "../db/withTenant";
+import type { Transaction } from "../db/withTenant";
 import { measurementDefinitions, productMeasurements } from "../db/schema/index";
 import { catchUniqueViolation } from "../utils/db-errors";
+import { slugifyMeasurementName } from "../utils/slug";
 import { requireMeasurementDefinition, requireProduct } from "./catalog-helpers";
 import { toLimitOffset } from "../utils/pagination";
 import type { PaginationParams } from "../utils/pagination";
@@ -9,20 +11,40 @@ import type { PaginationParams } from "../utils/pagination";
 export interface CreateMeasurementDefinitionInput {
   name: string;
   thaiName?: string;
-  slug: string;
 }
 
 export type UpdateMeasurementDefinitionInput = Partial<CreateMeasurementDefinitionInput>;
+
+/** Generates a unique, non-null slug from `name` — callers never supply a slug directly. */
+async function generateUniqueMeasurementSlug(tx: Transaction, tenantId: string, name: string): Promise<string> {
+  const baseSlug = slugifyMeasurementName(name);
+  let slug = baseSlug;
+  let suffix = 1;
+  while (
+    await tx.query.measurementDefinitions.findFirst({
+      where: and(
+        eq(measurementDefinitions.tenantId, tenantId),
+        eq(measurementDefinitions.slug, slug),
+        isNull(measurementDefinitions.deletedAt)
+      ),
+    })
+  ) {
+    suffix += 1;
+    slug = `${baseSlug}_${suffix}`;
+  }
+  return slug;
+}
 
 export function createMeasurementDefinition(tenantId: string, input: CreateMeasurementDefinitionInput) {
   return withTenant(tenantId, (tx) =>
     catchUniqueViolation(
       async () => {
-        const [definition] = await tx.insert(measurementDefinitions).values({ tenantId, ...input }).returning();
+        const slug = await generateUniqueMeasurementSlug(tx, tenantId, input.name);
+        const [definition] = await tx.insert(measurementDefinitions).values({ tenantId, ...input, slug }).returning();
         return definition;
       },
       "MEASUREMENT_SLUG_TAKEN",
-      `A measurement definition with slug "${input.slug}" already exists`
+      `A measurement definition with a slug derived from "${input.name}" already exists`
     )
   );
 }
@@ -57,21 +79,15 @@ export function getMeasurementDefinition(tenantId: string, id: string) {
 }
 
 export function updateMeasurementDefinition(tenantId: string, id: string, input: UpdateMeasurementDefinitionInput) {
-  return withTenant(tenantId, (tx) =>
-    catchUniqueViolation(
-      async () => {
-        await requireMeasurementDefinition(tx, id);
-        const [updated] = await tx
-          .update(measurementDefinitions)
-          .set({ ...input, updatedAt: new Date() })
-          .where(eq(measurementDefinitions.id, id))
-          .returning();
-        return updated;
-      },
-      "MEASUREMENT_SLUG_TAKEN",
-      `A measurement definition with slug "${input.slug}" already exists`
-    )
-  );
+  return withTenant(tenantId, async (tx) => {
+    await requireMeasurementDefinition(tx, id);
+    const [updated] = await tx
+      .update(measurementDefinitions)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(measurementDefinitions.id, id))
+      .returning();
+    return updated;
+  });
 }
 
 export function softDeleteMeasurementDefinition(tenantId: string, id: string) {

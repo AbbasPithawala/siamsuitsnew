@@ -7,7 +7,7 @@ import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { baseApi } from "../../api/baseApi";
 import type { AuthTokenSliceState } from "../../api/baseApi";
-import { createLimitedUserInTenant } from "../../routes/testSupport/permissionFixtures";
+import { createLimitedUserInTenant, createRetailerLinkedUserInTenant } from "../../routes/testSupport/permissionFixtures";
 import { OrderBuilderPage } from "./OrderBuilderPage";
 import { OrderDetailPage } from "./OrderDetailPage";
 import { hardDeleteOrders, countOrdersByIds } from "./testSupport/orderDbCleanup";
@@ -501,5 +501,73 @@ describe.skipIf(!seededToken)("Order edit wizard + Manual Size (live siam/server
     expect(screen.queryByRole("button", { name: "Mark Modified" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel Order" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reassign Retailer" })).not.toBeInTheDocument();
+  });
+
+  it("orders.edit.own: a retailer-linked session sees Edit Order (not the admin-only actions) while New Order, loses it once the order moves past that, and OrderBuilderPage itself blocks a direct navigation there too", async () => {
+    const token = seededToken as string;
+    const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const retailer = await apiRequest<{ data: { id: string } }>("/retailers", token, {
+      method: "POST",
+      body: JSON.stringify({ name: `Live Retailer Own-Edit Retailer ${suffix}`, code: `LRE-${suffix}`.toUpperCase() }),
+    });
+    createdRetailerIds.push(retailer.data.id);
+
+    const customer = await apiRequest<{ data: { id: string } }>("/customers", token, {
+      method: "POST",
+      body: JSON.stringify({ retailerId: retailer.data.id, firstName: `LiveRetailerOwnEditCust-${suffix}` }),
+    });
+    createdCustomerIds.push(customer.data.id);
+
+    const listRes = await apiRequest<{ data: { id: string; name: string }[] }>("/products", token);
+    const anyProduct = listRes.data[0];
+    if (!anyProduct) throw new Error("Expected at least one real product to exist for this fixture");
+    const superProduct = await apiRequest<{ data: { id: string; components: { id: string }[] } }>("/super-products", token, {
+      method: "POST",
+      body: JSON.stringify({ name: `Live Retailer Own-Edit Super Product ${suffix}`, components: [{ productId: anyProduct.id, slotLabel: "Piece" }] }),
+    });
+    createdSuperProductIds.push(superProduct.data.id);
+
+    if (!orderCreatorToken) throw new Error("Expected an orders.create-holding fixture token to have been minted for this file");
+    const order = await apiRequest<{ data: OrderApiDetail }>("/orders", orderCreatorToken, {
+      method: "POST",
+      body: JSON.stringify({
+        retailerId: retailer.data.id,
+        customerId: customer.data.id,
+        items: [{ superProductId: superProduct.data.id, components: [{ superProductComponentId: superProduct.data.components[0]!.id }] }],
+      }),
+    });
+    createdOrderIds.push(order.data.id);
+
+    const retailerFixture = await createRetailerLinkedUserInTenant("siam-suits", retailer.data.id, ["orders.view", "orders.edit.own"]);
+    try {
+      const retailerToken = await fetchToken(retailerFixture);
+      if (!retailerToken) throw new Error("Failed to log in as the orders.edit.own retailer fixture");
+
+      // Still "New Order" — the retailer session sees "Edit Order" but none of the admin-only actions.
+      const firstRender = renderDetail(order.data.id, retailerToken);
+      await screen.findByRole("heading", { name: `Order ${order.data.orderNumber}` }, NETWORK_WAIT);
+      expect(screen.getByRole("button", { name: "Edit Order" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark Modified" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Cancel Order" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Reassign Retailer" })).not.toBeInTheDocument();
+      firstRender.unmount();
+
+      // Admin advances the order past retailer-editable territory.
+      await apiRequest(`/orders/${order.data.id}/status`, token, { method: "PATCH", body: JSON.stringify({ status: "Processing" }) });
+
+      const secondRender = renderDetail(order.data.id, retailerToken);
+      await screen.findByRole("heading", { name: `Order ${order.data.orderNumber}` }, NETWORK_WAIT);
+      expect(screen.queryByRole("button", { name: "Edit Order" })).not.toBeInTheDocument();
+      secondRender.unmount();
+
+      // A direct navigation to the edit-wizard URL isn't blocked by the route's own
+      // permission check (orders.edit.own passes it) — OrderBuilderPage blocks it itself,
+      // once it has loaded the order and seen its status.
+      renderEditWizard(order.data.id, retailerToken);
+      await screen.findByText(/can no longer be edited/i, {}, NETWORK_WAIT);
+    } finally {
+      await retailerFixture.cleanup();
+    }
   });
 });

@@ -4,7 +4,8 @@ import { tenantRequests } from "../db/schema/index";
 import { HttpError } from "../utils/http-error";
 import { DEFAULT_PAGINATION, toLimitOffset } from "../utils/pagination";
 import type { PaginationParams } from "../utils/pagination";
-import { provisionTenant, PROVISIONED_OWNER_USERNAME } from "./provisioning.service";
+import { slugifyBusinessName } from "../utils/slug";
+import { generateUniqueTenantSlug, provisionTenant, PROVISIONED_OWNER_USERNAME } from "./provisioning.service";
 
 /**
  * `tenant_requests` is a global table (PHASE_11_TASKS.md Convention 1) — a request exists
@@ -17,14 +18,22 @@ export interface CreateTenantRequestInput {
   contactName: string;
   email: string;
   phone: string;
-  requestedSlug: string;
   notes?: string;
 }
 
 export type TenantRequestStatus = "pending" | "approved" | "rejected";
 
+/**
+ * `requestedSlug` is never collected from the requester — it's derived from `businessName`
+ * (`slugifyBusinessName`). No uniqueness check against other requests/tenants here (see this
+ * table's own schema comment): it's purely informational until approval, where
+ * `approveTenantRequest()` re-derives and dedupes it for real against `tenants.slug`.
+ */
 export async function createTenantRequest(input: CreateTenantRequestInput) {
-  const [request] = await db.insert(tenantRequests).values(input).returning();
+  const [request] = await db
+    .insert(tenantRequests)
+    .values({ ...input, requestedSlug: slugifyBusinessName(input.businessName) })
+    .returning();
   if (!request) throw new HttpError(500, "INTERNAL_ERROR", "Failed to create tenant request");
   return request;
 }
@@ -48,7 +57,6 @@ export async function getTenantRequest(id: string) {
 }
 
 export interface ApproveTenantRequestOverrides {
-  slug?: string;
   plan?: string;
   logo?: string;
   address?: string;
@@ -58,8 +66,13 @@ export interface ApproveTenantRequestOverrides {
 /**
  * PHASE_11_TASKS.md Workstream C Group 1 / C3: only flips the request to `approved` (setting
  * `reviewedByPlatformAdminId`/`reviewedAt`/`createdTenantId`) after `provisionTenant()` has
- * already returned successfully — if it throws (e.g. a slug collision), the request row is
- * left untouched, still `pending`, visibly retryable from the superadmin's own queue.
+ * already returned successfully — if it throws, the request row is left untouched, still
+ * `pending`, visibly retryable from the superadmin's own queue.
+ *
+ * `slug` is never an override here — it's re-derived from `request.businessName` via
+ * `generateUniqueTenantSlug()`, the same auto-generated-and-unique rule `createTenant()` uses
+ * for direct creation, rather than trusting the request's own `requestedSlug` (which was never
+ * checked for collisions when the request was submitted).
  */
 export async function approveTenantRequest(id: string, platformAdminId: string, overrides: ApproveTenantRequestOverrides = {}) {
   const request = await getTenantRequest(id);
@@ -69,10 +82,11 @@ export async function approveTenantRequest(id: string, platformAdminId: string, 
 
   const profileFieldsProvided =
     overrides.logo !== undefined || overrides.address !== undefined || overrides.invoiceFooterText !== undefined;
+  const slug = await generateUniqueTenantSlug(request.businessName);
 
   const provisioned = await provisionTenant({
     businessName: request.businessName,
-    slug: overrides.slug ?? request.requestedSlug,
+    slug,
     ...(overrides.plan !== undefined ? { plan: overrides.plan } : {}),
     ownerName: request.contactName,
     ownerEmail: request.email,
