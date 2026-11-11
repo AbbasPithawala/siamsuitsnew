@@ -1,5 +1,6 @@
 /**
- * MUI v5 theme for the Daihuuk rewrite.
+ * MUI v5 theme for Daihuuk (Google Cloud Console-style palette: white surfaces, Google blue,
+ * neutral greys). Layout/typography still follow the legacy values documented below.
  *
  * Per REWRITE_ARCHITECTURE.md §3 ("Visual design is carried over from
  * `siamClient`, not redesigned"), the values below are pulled from the
@@ -43,28 +44,38 @@
  */
 import { createTheme } from "@mui/material/styles";
 
-const brandBlue = "#1c4d8f";
-const brandBlueDark = "#002255"; // legacy shorthand `#025`
-const brandBlueLight = "#1851a7"; // legacy `.link-btn` accent, between main and dark
+// Google Cloud Console palette
+const googleBlue = "#1a73e8";
+const googleBlueDark = "#1967d2";
+const googleBlueDarker = "#174ea6";
+const googleBlueLight = "#e8f0fe";
+const textPrimary = "#202124";
+const textSecondary = "#5f6368";
+const divider = "#dadce0";
+const surfaceAlt = "#f8f9fa";
 
 export const theme = createTheme({
   palette: {
     primary: {
-      main: brandBlue,
-      dark: brandBlueDark,
-      light: brandBlueLight,
+      main: googleBlue,
+      dark: googleBlueDark,
+      light: googleBlueLight,
       contrastText: "#ffffff",
     },
-    error: {
-      main: "#ff0000", // legacy uses literal `red` throughout for error/delete states
-    },
+    error: { main: "#d93025" },
+    warning: { main: "#f9ab00" },
+    success: { main: "#188038" },
+    info: { main: googleBlue },
     background: {
-      default: "#ffffff", // was legacy #F3F8FF; switched to white per design request
+      default: "#ffffff",
       paper: "#ffffff",
     },
     text: {
-      primary: "#363636", // legacy sidebar/table body text color
+      primary: textPrimary,
+      secondary: textSecondary,
     },
+    divider,
+    grey: { 50: surfaceAlt, 100: "#f1f3f4", 200: "#e8eaed", 300: divider, 600: textSecondary, 900: textPrimary },
   },
   typography: {
     fontFamily: '"Montserrat", "Noto Sans Thai", "Helvetica Neue", Arial, sans-serif',
@@ -83,17 +94,22 @@ export const theme = createTheme({
           padding: "10px 24px",
         },
         containedPrimary: {
+          boxShadow: "none",
           "&:hover": {
-            backgroundColor: brandBlueDark,
+            backgroundColor: googleBlueDark,
+            boxShadow: "0 1px 2px rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)",
           },
+          "&:active": { backgroundColor: googleBlueDarker },
         },
       },
     },
     MuiAppBar: {
+      defaultProps: { elevation: 0 },
       styleOverrides: {
         root: {
           backgroundColor: "#ffffff",
-          color: "#242424",
+          color: textPrimary,
+          borderBottom: `1px solid ${divider}`,
         },
       },
     },
@@ -102,6 +118,12 @@ export const theme = createTheme({
         rounded: {
           borderRadius: 10, // legacy `.content-wrapper` / dashboard card radius
         },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        head: { color: textSecondary, backgroundColor: surfaceAlt, borderBottomColor: divider },
+        root: { borderBottomColor: divider },
       },
     },
   },

@@ -195,12 +195,12 @@ export function AppShell() {
                       id={`${group.key}-header`}
                       expandIcon={
                         <ExpandArrowIcon
-                          sx={{ fontSize: "0.8rem", color: isExpanded ? "#fff" : "#242424" }}
+                          sx={{ fontSize: "0.8rem", color: isExpanded ? "#1967d2" : "#5f6368" }}
                         />
                       }
                     >
                       <GroupIcon
-                        sx={{ fontSize: 14, color: isExpanded ? "#fff" : "#242424", mr: 1 }}
+                        sx={{ fontSize: 14, color: isExpanded ? "#1967d2" : "#5f6368", mr: 1 }}
                       />
                       <span>{group.label}</span>
                     </AccordionSummary>

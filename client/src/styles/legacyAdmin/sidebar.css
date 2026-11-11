@@ -33,15 +33,15 @@
     /* box-shadow: rgb(50 50 93 / 25%) 0px 2px 5px -1px, rgb(0 0 0 / 30%) 0px 1px 3px -1px; */
 }
 .sidebar #leftside-navigation ul li.active > a {
-    color: #fff;
-    background: #1c4d8f;
+    color: #1967d2;
+    background: #e8f0fe;
 }
 .sidebar #leftside-navigation ul li.active ul {
   display: block;
   /* background:transparent; */
 }
 .sidebar #leftside-navigation ul li a {
-    color: #363636;
+    color: #3c4043;
     text-decoration: none;
     display: block;
     padding: 10px 10px 10px 20px;
@@ -54,7 +54,7 @@
 }
 
 .sidebar #leftside-navigation ul li a:hover {
-  color: #1c4d8f;
+  color: #1a73e8;
   font-weight: 600;
 }
 
@@ -86,10 +86,10 @@
   padding-top: 13px;
   padding-bottom: 13px;
   padding-left: 45px;
-  color: #aeb2b7;
+  color: #5f6368;
 }
 li.sub-menu a:hover{
-    background: #1c4d8f;
+    background: #f1f3f4;
 }
 
 
@@ -97,16 +97,16 @@ li.sub-menu a:hover{
 
 /*Up0dated Css by Nav */
 .Mui-expanded div.MuiAccordionSummary-root {
-  background: #1c4d8f;
-  color: #fff;
+  background: #e8f0fe;
+  color: #1967d2;
   border: 0;
 }
 .Mui-expanded div.MuiAccordionSummary-root .css-gom31b-MuiSvgIcon-root{
-  color:#fff;
+  color:#1967d2;
   transform: rotate(90deg);
 }
 .activeList {
-  color:#1c4d8f !important;
+  color:#1a73e8 !important;
   font-weight:600;
 }
 div#leftside-navigation span {
@@ -115,24 +115,24 @@ div#leftside-navigation span {
   padding-left: 10px;
 }
 .Mui-expanded div.MuiAccordionSummary-root i{
-  color: #242424;
+  color: #202124;
   font-size: 14px;
 }
 .Mui-expanded div.MuiAccordionSummary-root i{
-  color:#ffffff;
+  color:#1967d2;
 }
 div#leftside-navigation .sidebarmenu {
   border: 0;
   border-top-right-radius: 7px;
   border-bottom-right-radius: 7px;
-  box-shadow: rgb(0 0 0 / 8%) 0px 6px 20px;
+  box-shadow: none;
 }
 div#leftside-navigation .sidebarmenu:hover{
-   background:#1c4d8f;
+   background:#f1f3f4;
    transition:0.3s ease;
-   color:#fff;
+   color:#202124;
 }
-div#leftside-navigation .sidebarmenu:hover .css-gom31b-MuiSvgIcon-root {color:#ffffff;}
+div#leftside-navigation .sidebarmenu:hover .css-gom31b-MuiSvgIcon-root {color:#5f6368;}
 .MuiAccordion-root {
    border: 0;
 }

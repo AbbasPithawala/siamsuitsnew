@@ -88,7 +88,7 @@ function StatusChip({ order }: { order: OrderListItem }) {
 function OrderTypeChip({ order }: { order: OrderListItem }) {
   if (order.isRush) {
     return (
-      <Chip size="small" label="Rush Order" sx={{ color: "#fff", backgroundColor: "#ff4444", fontWeight: 600 }} />
+      <Chip size="small" label="Rush Order" sx={{ color: "#fff", backgroundColor: "#d93025", fontWeight: 600 }} />
     );
   }
   if (order.type === "group") {

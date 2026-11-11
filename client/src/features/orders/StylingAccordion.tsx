@@ -218,7 +218,7 @@ export function StylingAccordion({ components, quantity, value, onChange, onDele
                 className="fabric_infoNM"
                 aria-controls={`unit-${index}-content`}
                 id={`unit-${index}-header`}
-                expandIcon={<ExpandArrowIcon sx={{ fontSize: "0.8rem", color: "#242424" }} />}
+                expandIcon={<ExpandArrowIcon sx={{ fontSize: "0.8rem", color: "#202124" }} />}
               >
                 <span>
                   Fabric Information for <strong>Item {index + 1}</strong>
@@ -386,7 +386,7 @@ const ComponentStylingPanel = memo(function ComponentStylingPanel({
               sx={{
                 width: 200,
                 height: 200,
-                border: "2px dashed #ccc",
+                border: "2px dashed #dadce0",
                 borderRadius: "8px",
                 display: "flex",
                 flexDirection: "column",
@@ -395,7 +395,7 @@ const ComponentStylingPanel = memo(function ComponentStylingPanel({
                 backgroundColor: "#f9f9f9",
               }}
             >
-              <CloudUploadIcon sx={{ fontSize: 48, color: "#999", mb: 1 }} />
+              <CloudUploadIcon sx={{ fontSize: 48, color: "#5f6368", mb: 1 }} />
               <Typography variant="body2" color="text.secondary" align="center" sx={{ px: 1 }}>
                 Click to upload image
               </Typography>

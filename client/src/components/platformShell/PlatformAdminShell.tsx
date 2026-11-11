@@ -78,7 +78,7 @@ export function PlatformAdminShell() {
                    * `sidebar.css`'s *nested* `ul ul li a` leaf items, which sit on a plain
                    * background. This flat list has no nesting — its items ARE the
                    * top-level `li.active > a` rule (white text, blue background). Applying
-                   * `.activeList`'s `color: #1c4d8f !important` on top of that same blue
+                   * `.activeList`'s `color: #1a73e8 !important` on top of that same blue
                    * background made the active item's text invisible (dark-blue-on-blue) —
                    * a real bug found live, not a hypothetical. The bare `li.active` class
                    * above already fully drives the correct active styling with nothing left

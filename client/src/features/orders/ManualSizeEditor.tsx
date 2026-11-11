@@ -248,13 +248,13 @@ export function ManualSizeEditor({ open, onClose, title, productName, diagramIma
                 ref={canvasRef}
                 sx={
                   legacyLayout
-                    ? { position: "relative", width: "fit-content", mx: "auto", border: "1px solid #ddd", bgcolor: "#fff" }
+                    ? { position: "relative", width: "fit-content", mx: "auto", border: "1px solid #dadce0", bgcolor: "#fff" }
                     : {
                         position: "relative",
                         width: CANVAS_WIDTH,
                         height: CANVAS_HEIGHT,
                         mx: "auto",
-                        border: "1px solid #ddd",
+                        border: "1px solid #dadce0",
                         backgroundImage: `url(${resolveUploadUrl(diagramImageUrl!)})`,
                         backgroundSize: "contain",
                         backgroundRepeat: "no-repeat",
@@ -289,7 +289,7 @@ export function ManualSizeEditor({ open, onClose, title, productName, diagramIma
                           px: 1,
                           py: 0.25,
                           bgcolor: "#e0e0df",
-                          border: "1px solid #999",
+                          border: "1px solid #5f6368",
                           borderRadius: 1,
                           cursor: "move",
                           fontSize: 14,

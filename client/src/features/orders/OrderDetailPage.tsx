@@ -330,7 +330,7 @@ export function OrderDetailPage() {
                       <img
                         src={resolveUploadUrl(component.manualSizeImage)}
                         alt="Manual Size annotation"
-                        style={{ maxWidth: 240, border: "1px solid #ddd" }}
+                        style={{ maxWidth: 240, border: "1px solid #dadce0" }}
                       />
                     </Box>
                   )}

@@ -7,7 +7,7 @@ body{
 	padding:0;
 }
 a:hover{
-	color:#1c4d8f;
+	color:#1a73e8;
 }
 * {
 	box-sizing: border-box;
@@ -22,8 +22,8 @@ a:hover{
 
 .outline-back-btn{
     background-color: transparent !important;
-    border: 1px solid #1c4d8f !important;
-    color: #1c4d8f !important;
+    border: 1px solid #1a73e8 !important;
+    color: #1a73e8 !important;
     padding: 10px 25px !important;
     margin-left: 15px;
     font-size: 14px;
@@ -32,7 +32,7 @@ a:hover{
 }
 
 .custom-btn {
-    background: #1c4d8f;
+    background: #1a73e8;
     border: 0;
     padding: 12px 24px;
     color: #fff;
@@ -47,17 +47,17 @@ a:hover{
     background: #fff;
     border: 0;
     padding: 12px 24px;
-    color: #1c4d8f;
+    color: #1a73e8;
     font-family: 'Montserrat', sans-serif;
     border-radius: 7px;
     font-weight: 600;
 	transition:0.4s ease;
 	cursor: pointer;
-    border: 1px solid #1c4d8f;
+    border: 1px solid #1a73e8;
 }
 
 .custom-btn-red {
-    background: red;
+    background: #d93025;
     border: 0;
     padding: 12px 24px;
     color: #fff;
@@ -68,7 +68,7 @@ a:hover{
 	cursor: pointer;
 }
 .b-btn {
-    background: #1c4d8f;
+    background: #1a73e8;
     border: 0;
     padding: 10px 20px;
     font-size: 13px;
@@ -81,23 +81,23 @@ a:hover{
 }
 
 .form-group.error-handle label{
-    color:red;
+    color:#d93025;
 }
 .searchinput-inner.error-handle p{
-    color:red;
+    color:#d93025;
 }
 .searchinput-inner.error-handle label{
-    color:red;
+    color:#d93025;
 }
 .error-handle input{
-    border-color:red;
+    border-color:#d93025;
 }
 .error-handle select{
-    border-color:red;
+    border-color:#d93025;
 }
 
 .back-button {
-    background: #ddd;
+    background: #dadce0;
     border: 0;
     padding: 12px 24px;
     color: #000;
@@ -113,7 +113,7 @@ a:hover{
 }
 
 .next-button {
-    background: #1c4d8f;
+    background: #1a73e8;
     border: 0;
     padding: 12px 24px;
     color: #fff;
@@ -126,18 +126,18 @@ a:hover{
 
 .custom-btn:hover{
 	transition:0.4s ease;
-	background:#025;
+	background:#1967d2;
 }
 
 .custom-btn-white:hover{
 	transition:0.4s ease;
-	background:#1c4d8f;
+	background:#1a73e8;
 	color:#fff;
 }
 
 .b-btn:hover{
 	transition:0.4s ease;
-	background:#025;
+	background:#1967d2;
     color: #fff;
 }
 
@@ -202,7 +202,7 @@ a{text-decoration:none;}
     padding-left: 40px !important;
 }
 .order-table thead {
-    border-bottom: 2px solid #ddd;
+    border-bottom: 2px solid #dadce0;
 }
 
 .pd-15{
@@ -236,14 +236,14 @@ a{text-decoration:none;}
 }
 
 .red-required{
-    color:red;
+    color:#d93025;
 }
 
 .orderlist-new {
-    border: 1px solid #025;
+    border: 1px solid #1967d2;
     padding: 5px 15px;
     border-radius: 50px;
-    color: #025;
+    color: #1967d2;
     font-weight: 500;
 }
 
@@ -255,7 +255,7 @@ a{text-decoration:none;}
     font-size:0.8rem;
 }
 input::placeholder{
-    color:#999 !important;
+    color:#5f6368 !important;
     font-size: 13px !important;
     font-weight: 550 !important;
 
@@ -272,7 +272,7 @@ input::placeholder{
 }
 
 .link-btn{
-    background: #1851a7 !important;
+    background: #1967d2 !important;
     border-radius: 50px;
     min-width: 40px;
 }
@@ -281,7 +281,7 @@ input::placeholder{
     background: #fad7d7;
     padding: 7px 13px;
     border-radius: 6px;
-    color: red;
+    color: #d93025;
 }
 .box {
     position: absolute;
@@ -302,7 +302,7 @@ div#new-item input {
     height: 40px;
     padding: 15px;
     margin-left: 23px;
-    border: 1px solid #363636;
+    border: 1px solid #3c4043;
     font-size: 14px;
     width: 160px;
 }
@@ -310,10 +310,10 @@ div#new-item input {
 div#new-item button {
     height: 40px;
     padding: 0 22px;
-    border: 1px solid #1c4d8f;
+    border: 1px solid #1a73e8;
     font-size: 14px;
     margin-left: 5px;
-    background: #1c4d8f;
+    background: #1a73e8;
     color: #fff;
     cursor: pointer;
     font-weight: bold;
@@ -326,7 +326,7 @@ div#items button#delete {
     top: -10px;
     right: -11px;
     background: #fff;
-    border: 1px solid #36363673;
+    border: 1px solid #3c404373;
     font-size: 14px;
     font-weight: 600;
     border-radius: 100%;

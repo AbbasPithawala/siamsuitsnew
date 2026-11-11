@@ -3,18 +3,18 @@
     box-shadow: rgb(17 17 26 / 10%) 0px 1px 0px, rgb(17 17 26 / 10%) 0px 8px 24px, rgb(17 17 26 / 10%) 0px 16px 48px;
 }
 .order-top-tabs ul li button {
-    background: #00225517;
+    background: #1967d217;
     padding: 10px 15px;
     text-decoration: none;
     font-size: 14px;
-    color: #363636;
+    color: #3c4043;
     font-weight: 500;
 	transition:0.5s ease;
     border-radius: 50px;
     border:none
 }
 .order-top-tabs ul li button.active{
-	background:#025;
+	background:#1967d2;
 	color:#fff;
 }
 .order-top-tabs ul li {
@@ -51,7 +51,7 @@ table {
     padding: 16px;
   }
   tr:nth-child(even) {
-    background-color: #F3F8FF;
+    background-color: #f8f9fa;
   }
   table.table th {
       text-transform: uppercase;
@@ -67,10 +67,10 @@ table {
       color: #021736;
   }
   button.orderlist-new {
-    border: 1px solid #025;
+    border: 1px solid #1967d2;
     padding: 5px 15px;
     border-radius: 50px;
-    color: #025;
+    color: #1967d2;
     font-weight: 500;
 }
 .table td {
@@ -91,7 +91,7 @@ table {
     border: 0;
 }
 .manage-page thead th {
-    border-bottom: 2px solid #ddd !important;
+    border-bottom: 2px solid #dadce0 !important;
     font-size: 14px !important;
 }
 .action {
@@ -178,9 +178,9 @@ table {
     height: 40px;
     border-radius: 5px 0 0 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .step-input {
@@ -189,9 +189,9 @@ table {
     height: 40px;
     border-radius:5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left:15px;
-    color: #051a2d;
+    color: #202124;
 }
 .measurement-input {
     margin-bottom: 10px;
@@ -199,9 +199,9 @@ table {
     height: 40px;
     border-radius: 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .option-value-input {
@@ -210,9 +210,9 @@ table {
     height: 40px;
     border-radius: 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .thai-option-value-input {
@@ -221,9 +221,9 @@ table {
     height: 40px;
     border-radius: 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .price-input {
@@ -232,9 +232,9 @@ table {
     height: 40px;
     border-radius: 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .worker-price-input {
@@ -243,9 +243,9 @@ table {
     height: 40px;
     border-radius: 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .measurementfit {
@@ -254,9 +254,9 @@ table {
     height: 40px;
     border-radius: 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .style-input {
@@ -265,9 +265,9 @@ table {
     height: 40px;
     border-radius: 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .optional-input {
@@ -276,14 +276,14 @@ table {
     height: 40px;
     border-radius: 5px;
     background-color: #ffffff;
-    border: 1px solid #e2e2e2;
+    border: 1px solid #dadce0;
     padding-left: 15px;
-    color: #051a2d;
+    color: #202124;
 }
 
 .append-inputs-btn{
     display: flex;
-    border-top: 1px solid #e1e1e1;
+    border-top: 1px solid #dadce0;
     padding-top: 15px;
 }
 
@@ -298,7 +298,7 @@ table {
 
 .searchinput::placeholder {
     font-size: 14px;
-    color: #051a2d;
+    color: #202124;
     font-weight: 500;
 }
 
@@ -364,7 +364,7 @@ table {
 }
 
 .delete-icon{
-    background: #e4efff !important;
+    background: #e8f0fe !important;
     border-radius: 50px !important;
     height: 40px !important;
     min-width: 40px !important; 
@@ -380,7 +380,7 @@ table {
 
 .admin-from-style-NM {
     padding: 15px;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid #dadce0;
 }
 .admin-from-style-NM input.form-control {
     height: 45px;
@@ -418,7 +418,7 @@ table {
 /* abbas */
 
 .retailerCodeInput{
-    border-color: red !important;
+    border-color: #d93025 !important;
 }
 
 .add-measurment-boxNM .form-group{
@@ -434,7 +434,7 @@ table {
     display: inline-flex;
     width: 40px;
     height: 40px;
-    background-color: #e1e1e1;
+    background-color: #dadce0;
     align-items: center;
     justify-content: center !important;
     border-radius: 50px;
@@ -478,7 +478,7 @@ table {
   }
   
   .list li:hover {
-    background-color: #1C4D8F !important;
+    background-color: #1a73e8 !important;
    color: white !important;
   }
 
